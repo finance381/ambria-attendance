@@ -10,6 +10,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import Employees from './pages/admin/Employees'
 import Departments from './pages/admin/Departments'
 import Venues from './pages/admin/Venues'
+import DailyAttendance from './pages/admin/DailyAttendance'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -88,6 +89,11 @@ export default function App() {
         <Route path="venues" element={
           <ProtectedRoute roles={['admin']}>
             <Venues />
+          </ProtectedRoute>
+        } />
+        <Route path="attendance" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <DailyAttendance />
           </ProtectedRoute>
         } />
       </Route>

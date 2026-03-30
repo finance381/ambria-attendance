@@ -3,6 +3,7 @@ import { useAuth } from '../../lib/useAuth'
 
 var NAV_ITEMS = [
   { to: '/admin', label: 'Overview', icon: '📊' },
+  { to: '/admin/attendance', label: 'Daily Attendance', icon: '📋' },
   { to: '/admin/employees', label: 'Employees', icon: '👥' },
   { to: '/admin/departments', label: 'Departments', icon: '🏢' },
   { to: '/admin/venues', label: 'Venues', icon: '📍' },
