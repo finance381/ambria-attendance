@@ -50,9 +50,11 @@ export function AuthProvider({ children }) {
       function (_event, s) {
         setSession(s)
         if (s?.user) {
-          fetchEmployee(s.user.id)
+          setLoading(true)
+          fetchEmployee(s.user.id).then(function () { setLoading(false) })
         } else {
           setEmployee(null)
+          setLoading(false)
         }
       }
     )
