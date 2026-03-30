@@ -1,13 +1,13 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { useAuth } from '../lib/useAuth'
+import { useAuth } from '../../lib/useAuth'
 
 var NAV_ITEMS = [
-  { to: '/', label: 'Home', icon: '🏠', roles: ['staff', 'supervisor', 'manager', 'admin'] },
-  { to: '/employees', label: 'Employees', icon: '👥', roles: ['admin'] },
-  { to: '/departments', label: 'Departments', icon: '🏢', roles: ['admin'] },
+  { to: '/admin', label: 'Overview', icon: '📊' },
+  { to: '/admin/employees', label: 'Employees', icon: '👥' },
+  { to: '/admin/departments', label: 'Departments', icon: '🏢' },
 ]
 
-export default function Shell() {
+export default function AdminShell() {
   var { employee, logout } = useAuth()
   var navigate = useNavigate()
 
@@ -15,10 +15,6 @@ export default function Shell() {
     await logout()
     navigate('/login')
   }
-
-  var visibleNav = NAV_ITEMS.filter(function (item) {
-    return item.roles.includes(employee.role)
-  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -29,27 +25,35 @@ export default function Shell() {
               <span className="text-sm font-bold">A</span>
             </div>
             <div>
-              <h1 className="text-sm font-semibold leading-tight">Ambria Attendance</h1>
+              <h1 className="text-sm font-semibold leading-tight">Ambria Attendance — Admin</h1>
               <p className="text-[10px] text-white/50">{employee.name} · {employee.role}</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-xs text-white/60 hover:text-white transition-colors px-2 py-1"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={function () { navigate('/') }}
+              className="text-xs text-white/60 hover:text-white transition-colors px-2 py-1"
+            >
+              ← Back to App
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-xs text-white/60 hover:text-white transition-colors px-2 py-1"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
       <nav className="bg-white border-b border-gray-200 overflow-x-auto">
         <div className="max-w-5xl mx-auto px-4 flex">
-          {visibleNav.map(function (item) {
+          {NAV_ITEMS.map(function (item) {
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === '/'}
+                end={item.to === '/admin'}
                 className={function ({ isActive }) {
                   return 'flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 whitespace-nowrap transition-colors ' +
                     (isActive

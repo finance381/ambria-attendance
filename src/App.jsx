@@ -1,10 +1,14 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/useAuth'
 import Login from './pages/Login'
-import Shell from './pages/Shell'
-import Dashboard from './pages/Dashboard'
-import Employees from './pages/Employees'
-import Departments from './pages/Departments'
+import MobileShell from './pages/mobile/MobileShell'
+import Home from './pages/mobile/Home'
+import MyAttendance from './pages/mobile/MyAttendance'
+import Settings from './pages/mobile/Settings'
+import AdminShell from './pages/admin/AdminShell'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import Employees from './pages/admin/Employees'
+import Departments from './pages/admin/Departments'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -51,12 +55,25 @@ export default function App() {
       <Route path="/login" element={
         session ? <Navigate to="/" replace /> : <Login />
       } />
+
+      {/* Mobile PWA — all authenticated users */}
       <Route path="/" element={
         <ProtectedRoute>
-          <Shell />
+          <MobileShell />
         </ProtectedRoute>
       }>
-        <Route index element={<Dashboard />} />
+        <Route index element={<Home />} />
+        <Route path="attendance" element={<MyAttendance />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
+
+      {/* Admin Desktop — manager + admin only */}
+      <Route path="/admin" element={
+        <ProtectedRoute roles={['admin', 'manager']}>
+          <AdminShell />
+        </ProtectedRoute>
+      }>
+        <Route index element={<AdminDashboard />} />
         <Route path="employees" element={
           <ProtectedRoute roles={['admin']}>
             <Employees />
@@ -68,6 +85,7 @@ export default function App() {
           </ProtectedRoute>
         } />
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
