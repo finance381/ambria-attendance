@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import PunchCapture from '../../components/PunchCapture'
+import InstallPrompt from '../../components/InstallPrompt'
 
 export default function Home() {
   var { employee } = useAuth()
@@ -44,6 +45,7 @@ export default function Home() {
       <p className="text-xs text-gray-400 mb-5">
         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
       </p>
+      <InstallPrompt />
 
       {/* Status card */}
       <div className={'rounded-2xl px-5 py-4 mb-5 border ' + (isPunchedIn
