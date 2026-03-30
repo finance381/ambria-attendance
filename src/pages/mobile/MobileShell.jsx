@@ -4,6 +4,7 @@ import { useAuth } from '../../lib/useAuth'
 var TABS = [
   { to: '/', label: 'Home', icon: '🏠', roles: null },
   { to: '/team', label: 'Team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
+  { to: '/claims', label: 'Claims', icon: '📝', roles: null },
   { to: '/attendance', label: 'Attendance', icon: '📅', roles: null },
   { to: '/settings', label: 'Settings', icon: '⚙️', roles: null },
 ]

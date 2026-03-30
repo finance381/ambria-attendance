@@ -13,6 +13,8 @@ import Venues from './pages/admin/Venues'
 import DailyAttendance from './pages/admin/DailyAttendance'
 import MonthlyReport from './pages/admin/MonthlyReport'
 import PunchForTeam from './pages/mobile/PunchForTeam'
+import MyClaims from './pages/mobile/MyClaims'
+import ClaimsQueue from './pages/admin/ClaimsQueue'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -69,6 +71,7 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="team" element={<PunchForTeam />} />
         <Route path="attendance" element={<MyAttendance />} />
+        <Route path="claims" element={<MyClaims />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 
@@ -102,6 +105,11 @@ export default function App() {
         <Route path="monthly" element={
           <ProtectedRoute roles={['admin', 'manager']}>
             <MonthlyReport />
+          </ProtectedRoute>
+        } />
+        <Route path="claims" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <ClaimsQueue />
           </ProtectedRoute>
         } />
       </Route>
