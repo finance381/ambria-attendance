@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+import EmployeeImport from '../components/EmployeeImport'
 
 var ROLES = ['staff', 'supervisor', 'manager', 'admin']
 
@@ -15,6 +18,7 @@ export default function Employees() {
   var [deactivateTarget, setDeactivateTarget] = useState(null)
   var [saving, setSaving] = useState(false)
   var [toast, setToast] = useState('')
+  var [showImport, setShowImport] = useState(false)
 
   var [form, setForm] = useState({
     name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: ''
@@ -195,6 +199,31 @@ export default function Employees() {
       return
     }
 
+    function exportCSV() {
+    var headers = ['Employee Code', 'Name', 'Phone', 'Department', 'Role', 'Designation', 'Date of Joining', 'Status']
+    var csvRows = [headers.join(',')]
+
+    employees.forEach(function (emp) {
+      csvRows.push([
+        emp.emp_code,
+        '"' + (emp.name || '').replace(/"/g, '""') + '"',
+        emp.phone || '',
+        '"' + deptName(emp.department_id) + '"',
+        emp.role,
+        '"' + (emp.designation || '').replace(/"/g, '""') + '"',
+        emp.date_of_joining || '',
+        emp.active ? 'Active' : 'Inactive'
+      ].join(','))
+    })
+
+    var blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+    var a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'ambria_employees_' + new Date().toISOString().slice(0, 10) + '.csv'
+    a.click()
+    showToast('CSV exported')
+  }
+
     setSaving(true)
 
     var { data, error } = await supabase.functions.invoke('reset-password', {
@@ -226,12 +255,26 @@ export default function Employees() {
             {activeCount} active · {inactiveCount} inactive
           </p>
         </div>
-        <button
-          onClick={openAdd}
-          className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors font-medium"
-        >
-          + Add Employee
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCSV}
+            className="px-3 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          >
+            ⬇ Export
+          </button>
+          <button
+            onClick={function () { setShowImport(true) }}
+            className="px-3 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          >
+            ⬆ Import CSV
+          </button>
+          <button
+            onClick={openAdd}
+            className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors font-medium"
+          >
+            + Add Employee
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-4">
@@ -429,6 +472,14 @@ export default function Employees() {
             </div>
           </div>
         </div>
+      )}
+
+      {showImport && (
+        <EmployeeImport
+          departments={departments}
+          onClose={function () { setShowImport(false) }}
+          onDone={function () { setShowImport(false); loadAll() }}
+        />
       )}
 
       {toast && (
