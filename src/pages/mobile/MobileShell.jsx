@@ -2,9 +2,10 @@ import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../../lib/useAuth'
 
 var TABS = [
-  { to: '/', label: 'Home', icon: '🏠' },
-  { to: '/attendance', label: 'Attendance', icon: '📅' },
-  { to: '/settings', label: 'Settings', icon: '⚙️' },
+  { to: '/', label: 'Home', icon: '🏠', roles: null },
+  { to: '/team', label: 'Team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
+  { to: '/attendance', label: 'Attendance', icon: '📅', roles: null },
+  { to: '/settings', label: 'Settings', icon: '⚙️', roles: null },
 ]
 
 export default function MobileShell() {
@@ -30,10 +31,12 @@ export default function MobileShell() {
         <Outlet />
       </main>
 
-      {/* Bottom tab bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-          {TABS.map(function (tab) {
+          {TABS.filter(function (tab) {
+            if (!tab.roles) return true
+            return tab.roles.includes(employee.role)
+          }).map(function (tab) {
             return (
               <NavLink
                 key={tab.to}

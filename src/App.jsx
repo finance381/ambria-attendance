@@ -12,6 +12,7 @@ import Departments from './pages/admin/Departments'
 import Venues from './pages/admin/Venues'
 import DailyAttendance from './pages/admin/DailyAttendance'
 import MonthlyReport from './pages/admin/MonthlyReport'
+import PunchForTeam from './pages/mobile/PunchForTeam'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -66,6 +67,7 @@ export default function App() {
         </ProtectedRoute>
       }>
         <Route index element={<Home />} />
+        <Route path="team" element={<PunchForTeam />} />
         <Route path="attendance" element={<MyAttendance />} />
         <Route path="settings" element={<Settings />} />
       </Route>
