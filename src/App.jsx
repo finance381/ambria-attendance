@@ -11,6 +11,7 @@ import Employees from './pages/admin/Employees'
 import Departments from './pages/admin/Departments'
 import Venues from './pages/admin/Venues'
 import DailyAttendance from './pages/admin/DailyAttendance'
+import MonthlyReport from './pages/admin/MonthlyReport'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -94,6 +95,11 @@ export default function App() {
         <Route path="attendance" element={
           <ProtectedRoute roles={['admin', 'manager']}>
             <DailyAttendance />
+          </ProtectedRoute>
+        } />
+        <Route path="monthly" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <MonthlyReport />
           </ProtectedRoute>
         } />
       </Route>
