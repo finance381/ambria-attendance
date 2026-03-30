@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
 import EmployeeImport from '../components/EmployeeImport'
 
 var ROLES = ['staff', 'supervisor', 'manager', 'admin']
