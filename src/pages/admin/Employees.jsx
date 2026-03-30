@@ -197,7 +197,25 @@ export default function Employees() {
       return
     }
 
-    function exportCSV() {
+    setSaving(true)
+
+    var { data, error } = await supabase.functions.invoke('reset-password', {
+      body: { employee_id: resetId, new_password: newPassword }
+    })
+
+    setSaving(false)
+
+    if (error || (data && data.error)) {
+      setResetError((data && data.error) || error.message || 'Failed to reset password')
+      return
+    }
+
+    showToast('Password reset successfully')
+    setResetId(null)
+    setNewPassword('')
+  }
+
+  function exportCSV() {
     var headers = ['Employee Code', 'Name', 'Phone', 'Department', 'Role', 'Designation', 'Date of Joining', 'Status']
     var csvRows = [headers.join(',')]
 
@@ -220,24 +238,6 @@ export default function Employees() {
     a.download = 'ambria_employees_' + new Date().toISOString().slice(0, 10) + '.csv'
     a.click()
     showToast('CSV exported')
-  }
-
-    setSaving(true)
-
-    var { data, error } = await supabase.functions.invoke('reset-password', {
-      body: { employee_id: resetId, new_password: newPassword }
-    })
-
-    setSaving(false)
-
-    if (error || (data && data.error)) {
-      setResetError((data && data.error) || error.message || 'Failed to reset password')
-      return
-    }
-
-    showToast('Password reset successfully')
-    setResetId(null)
-    setNewPassword('')
   }
 
   if (loading) {
