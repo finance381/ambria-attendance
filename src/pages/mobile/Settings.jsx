@@ -146,15 +146,27 @@ export default function Settings() {
 function LeaveBalance() {
   var [data, setData] = useState(null)
   var [loading, setLoading] = useState(true)
+  var [err, setErr] = useState('')
 
   useEffect(function () {
     supabase.rpc('my_leave_balance').then(function (res) {
-      if (res.data && !res.data.error) setData(res.data)
+      if (res.error) {
+        setErr(res.error.message)
+      } else if (res.data && res.data.error) {
+        setErr(res.data.error)
+      } else {
+        setData(res.data)
+      }
       setLoading(false)
     })
   }, [])
 
   if (loading) return null
+  if (err) return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+      <p className="text-xs text-red-600">Leave balance error: {err}</p>
+    </div>
+  )
   if (!data) return null
 
   var pct = data.annual_leaves > 0
