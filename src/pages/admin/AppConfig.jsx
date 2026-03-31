@@ -9,6 +9,7 @@ var CONFIG_FIELDS = [
     type: 'int',
     min: 0,
     max: 99,
+    unit: 'claims/month',
     fallback: '4'
   },
   {
@@ -19,6 +20,7 @@ var CONFIG_FIELDS = [
     min: 0.5,
     max: 24,
     step: 0.5,
+    unit: 'hours',
     fallback: '4'
   },
   {
@@ -29,6 +31,7 @@ var CONFIG_FIELDS = [
     min: 0,
     max: 24,
     step: 0.5,
+    unit: 'hours',
     fallback: '0.5'
   },
   {
@@ -38,6 +41,7 @@ var CONFIG_FIELDS = [
     type: 'int',
     min: 0,
     max: 365,
+    unit: 'leaves/year',
     fallback: '24'
   }
 ]
@@ -161,7 +165,7 @@ export default function AppConfig() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-slate-700"
                 />
                 <p className="text-[10px] text-gray-400 text-right mt-1">
-                  {f.type === 'int' ? 'claims/month' : 'hours'}
+                  {f.unit}
                 </p>
               </div>
             </div>
