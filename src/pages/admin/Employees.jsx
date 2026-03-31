@@ -14,6 +14,8 @@ export default function Employees() {
   var [editId, setEditId] = useState(null)
   var [resetId, setResetId] = useState(null)
   var [deactivateTarget, setDeactivateTarget] = useState(null)
+  var [deleteTarget, setDeleteTarget] = useState(null)
+  var [deleteResult, setDeleteResult] = useState(null)
   var [saving, setSaving] = useState(false)
   var [toast, setToast] = useState('')
   var [showImport, setShowImport] = useState(false)
@@ -348,6 +350,7 @@ export default function Employees() {
                       ) : (
                         <button onClick={function () { handleReactivate(emp) }} className="px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded transition-colors">Reactivate</button>
                       )}
+                      <button onClick={function () { setDeleteTarget(emp); setDeleteResult(null) }} className="px-2 py-1 text-xs text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -466,6 +469,42 @@ export default function Employees() {
               <button onClick={function () { setDeactivateTarget(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
               <button onClick={handleDeactivate} disabled={saving} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors font-medium">
                 {saving ? 'Deactivating…' : 'Deactivate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setDeleteTarget(null) }}>
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl p-5" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="text-sm font-bold text-red-600 mb-2">Permanently Delete Employee</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Delete <strong>{deleteTarget.name}</strong> ({deleteTarget.emp_code}) forever?
+            </p>
+            <p className="text-xs text-gray-500 mb-4">
+              This will also remove all their punches, claims, overrides, and auth account. This cannot be undone.
+            </p>
+            {deleteResult && (
+              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg mb-3">
+                <p className="text-xs text-red-600">{deleteResult}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={function () { setDeleteTarget(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={async function () {
+                setSaving(true)
+                setDeleteResult(null)
+                var { data, error } = await supabase.rpc('delete_employee', { p_employee_id: deleteTarget.id })
+                setSaving(false)
+                if (error || (data && data.error)) {
+                  setDeleteResult((data && data.error) || error.message)
+                  return
+                }
+                showToast(deleteTarget.name + ' deleted — ' + (data.punches_removed || 0) + ' punches, ' + (data.claims_removed || 0) + ' claims removed')
+                setDeleteTarget(null)
+                loadAll()
+              }} disabled={saving} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors font-medium">
+                {saving ? 'Deleting…' : 'Delete Forever'}
               </button>
             </div>
           </div>

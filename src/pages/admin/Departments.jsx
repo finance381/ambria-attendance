@@ -10,6 +10,7 @@ export default function Departments() {
   var [error, setError] = useState('')
   var [toast, setToast] = useState('')
   var [deleteTarget, setDeleteTarget] = useState(null)
+  var [permDelete, setPermDelete] = useState(null)
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -100,7 +101,7 @@ export default function Departments() {
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">Departments</h2>
       <p className="text-xs text-gray-500 mb-5">
-        {activeDepts.length} active · {inactiveDepts.length} inactive · Default departments are protected
+        {activeDepts.length} active · {inactiveDepts.length} inactive
       </p>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 shadow-sm">
@@ -169,29 +170,41 @@ export default function Departments() {
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    {dept.is_default ? (
-                      <span className="text-[10px] text-gray-300">Protected</span>
-                    ) : dept.active ? (
+                    <div className="flex items-center justify-end gap-1">
+                      {dept.active ? (
+                        <button
+                          onClick={function () {
+                            if (count > 0) {
+                              showToast('Reassign ' + count + ' employees first')
+                              return
+                            }
+                            setDeleteTarget(dept)
+                          }}
+                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={function () { handleReactivate(dept) }}
+                          className="px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                        >
+                          Reactivate
+                        </button>
+                      )}
                       <button
                         onClick={function () {
                           if (count > 0) {
                             showToast('Reassign ' + count + ' employees first')
                             return
                           }
-                          setDeleteTarget(dept)
+                          setPermDelete(dept)
                         }}
-                        className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                        className="px-2 py-1 text-xs text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                       >
-                        Deactivate
+                        Delete
                       </button>
-                    ) : (
-                      <button
-                        onClick={function () { handleReactivate(dept) }}
-                        className="px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                      >
-                        Reactivate
-                      </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -211,6 +224,33 @@ export default function Departments() {
               <button onClick={function () { setDeleteTarget(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
               <button onClick={handleDeactivate} disabled={saving} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors font-medium">
                 {saving ? 'Deactivating…' : 'Deactivate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {permDelete && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setPermDelete(null) }}>
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl p-5" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="text-sm font-bold text-red-600 mb-2">Permanently Delete Department</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Delete <strong>{permDelete.name}</strong> forever? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={function () { setPermDelete(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={async function () {
+                setSaving(true)
+                var { error: delErr } = await supabase.from('departments').delete().eq('id', permDelete.id)
+                setSaving(false)
+                if (delErr) {
+                  showToast('Delete failed: ' + delErr.message)
+                } else {
+                  showToast(permDelete.name + ' deleted permanently')
+                }
+                setPermDelete(null)
+                loadAll()
+              }} disabled={saving} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors font-medium">
+                {saving ? 'Deleting…' : 'Delete Forever'}
               </button>
             </div>
           </div>
