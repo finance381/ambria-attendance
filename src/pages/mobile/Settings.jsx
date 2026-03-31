@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../lib/useAuth'
+import { supabase } from '../../lib/supabase'
 
 export default function Settings() {
   var { employee, changePassword, logout } = useAuth()
@@ -67,6 +68,8 @@ export default function Settings() {
           </div>
         </div>
       </div>
+      {/* Leave balance */}
+      <LeaveBalance />
 
       {/* Change password */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
@@ -137,6 +140,45 @@ export default function Settings() {
       >
         Sign Out
       </button>
+    </div>
+  )
+}
+function LeaveBalance() {
+  var [data, setData] = useState(null)
+  var [loading, setLoading] = useState(true)
+
+  useEffect(function () {
+    supabase.rpc('my_leave_balance').then(function (res) {
+      if (res.data && !res.data.error) setData(res.data)
+      setLoading(false)
+    })
+  }, [])
+
+  if (loading) return null
+  if (!data) return null
+
+  var pct = data.annual_leaves > 0
+    ? Math.round((data.leaves_remaining / data.annual_leaves) * 100)
+    : 0
+  var barColor = pct > 40 ? 'bg-emerald-500' : pct > 15 ? 'bg-amber-500' : 'bg-red-500'
+  var fyLabel = data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(0, 4)
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-bold text-gray-900">Leave Balance</p>
+        <span className="text-[10px] text-gray-400 font-medium">FY {fyLabel}</span>
+      </div>
+      <div className="flex items-end justify-between mb-2">
+        <div>
+          <span className="text-2xl font-bold text-gray-900">{data.leaves_remaining}</span>
+          <span className="text-sm text-gray-400 ml-1">/ {data.annual_leaves}</span>
+        </div>
+        <span className="text-xs text-gray-500">{data.leaves_used} used</span>
+      </div>
+      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: pct + '%' }} />
+      </div>
     </div>
   )
 }

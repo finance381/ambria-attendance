@@ -30,6 +30,15 @@ var CONFIG_FIELDS = [
     max: 24,
     step: 0.5,
     fallback: '0.5'
+  },
+  {
+    key: 'annual_leaves',
+    label: 'Annual Leaves',
+    desc: 'Total leave days per employee per fiscal year (April–March). Each Absent day deducts 1 leave.',
+    type: 'int',
+    min: 0,
+    max: 365,
+    fallback: '24'
   }
 ]
 
