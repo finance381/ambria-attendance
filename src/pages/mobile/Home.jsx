@@ -46,6 +46,12 @@ export default function Home() {
         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
       </p>
       <InstallPrompt />
+      {status && status.has_stale_punch && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
+          <p className="text-sm font-semibold text-amber-800">⚠️ Unresolved punch from a previous day</p>
+          <p className="text-[11px] text-amber-600 mt-0.5">Submit a missed punch claim to resolve it.</p>
+        </div>
+      )}
 
       {/* Status card */}
       <div className={'rounded-2xl px-5 py-4 mb-5 border ' + (isPunchedIn

@@ -11,6 +11,9 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
   async function handlePunch() {
     setError('')
 
+    // Start GPS request immediately (runs in parallel with camera)
+    var gpsPromise = getLocation()
+
     // Step 1: Capture selfie
     setStep('capturing')
     var photo
@@ -30,8 +33,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     setPreview(photo.dataUrl)
     setStep('uploading')
 
-    // Step 2: Get GPS (parallel would be ideal but camera blocks it)
-    var gps = await getLocation()
+    // GPS should be ready by now (started before camera)
+    var gps = await gpsPromise
 
     // Step 3: Upload selfie to storage
     var timestamp = Date.now()

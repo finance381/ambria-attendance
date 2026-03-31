@@ -1,7 +1,3 @@
-/**
- * Open front camera, take a photo, return compressed JPEG as Blob + data URL.
- * Returns { blob, dataUrl } or throws on cancel/error.
- */
 export function capturePhoto() {
   return new Promise(function (resolve, reject) {
     var video = document.createElement('video')
@@ -24,8 +20,10 @@ export function capturePhoto() {
     overlay.appendChild(cancelBtn)
 
     var stream = null
+    var autoCloseTimer = null
 
     function cleanup() {
+      if (autoCloseTimer) clearTimeout(autoCloseTimer)
       if (stream) {
         stream.getTracks().forEach(function (t) { t.stop() })
       }
@@ -42,18 +40,25 @@ export function capturePhoto() {
       video.play()
       document.body.appendChild(video)
       document.body.appendChild(overlay)
+
+      // Auto-close after 60 seconds
+      autoCloseTimer = setTimeout(function () {
+        cleanup()
+        reject(new Error('Camera timed out — try again'))
+      }, 60000)
     }).catch(function (err) {
       cleanup()
       reject(new Error('Camera access denied: ' + err.message))
     })
 
     captureBtn.addEventListener('click', function () {
+      if (autoCloseTimer) clearTimeout(autoCloseTimer)
+
       var canvas = document.createElement('canvas')
       canvas.width = Math.min(video.videoWidth, 640)
       canvas.height = Math.round(canvas.width * (video.videoHeight / video.videoWidth))
       var ctx = canvas.getContext('2d')
 
-      // Mirror horizontally for front camera
       ctx.translate(canvas.width, 0)
       ctx.scale(-1, 1)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
