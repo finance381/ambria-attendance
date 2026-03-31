@@ -15,6 +15,7 @@ import MonthlyReport from './pages/admin/MonthlyReport'
 import PunchForTeam from './pages/mobile/PunchForTeam'
 import MyClaims from './pages/mobile/MyClaims'
 import ClaimsQueue from './pages/admin/ClaimsQueue'
+import AppConfig from './pages/admin/AppConfig'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -95,6 +96,11 @@ export default function App() {
         <Route path="venues" element={
           <ProtectedRoute roles={['admin']}>
             <Venues />
+          </ProtectedRoute>
+        } />
+        <Route path="config" element={
+          <ProtectedRoute roles={['admin']}>
+            <AppConfig />
           </ProtectedRoute>
         } />
         <Route path="attendance" element={

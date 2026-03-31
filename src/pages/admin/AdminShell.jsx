@@ -9,6 +9,7 @@ var NAV_ITEMS = [
   { to: '/admin/employees', label: 'Employees', icon: '👥' },
   { to: '/admin/departments', label: 'Departments', icon: '🏢' },
   { to: '/admin/venues', label: 'Venues', icon: '📍' },
+  { to: '/admin/config', label: 'Config', icon: '⚙️' },
 ]
 
 export default function AdminShell() {
