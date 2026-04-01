@@ -61,6 +61,14 @@ export default function MyAttendance() {
 
     var halfThreshold = halfConfig ? parseFloat(halfConfig.value) : 4
 
+    var { data: absentConfig } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'absent_threshold_hours')
+      .maybeSingle()
+
+    var absentThreshold = absentConfig ? parseFloat(absentConfig.value) : 0.5
+
     // Build day map
     var dayMap = {}
 
@@ -122,7 +130,7 @@ export default function MyAttendance() {
         d.status = 'Incomplete'
       } else if (totalHours >= halfThreshold) {
         d.status = 'Present'
-      } else if (totalHours > 0.5) {
+      } else if (totalHours >= absentThreshold) {
         d.status = 'Half Day'
       } else {
         d.status = 'Absent'

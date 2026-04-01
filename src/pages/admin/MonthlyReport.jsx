@@ -47,13 +47,12 @@ export default function MonthlyReport() {
   })
 
   // Totals
-  var totals = { effective: 0, present: 0, half: 0, absent: 0, leave: 0, incomplete: 0, hours: 0 }
+  var totals = { effective: 0, present: 0, half: 0, absent: 0, incomplete: 0, hours: 0 }
   filtered.forEach(function (r) {
     totals.effective += r.effective_days
     totals.present += r.days_present
     totals.half += r.days_half
     totals.absent += r.days_absent
-    totals.leave += r.days_leave
     totals.incomplete += r.days_incomplete
     totals.hours += r.total_hours
   })
@@ -66,7 +65,7 @@ export default function MonthlyReport() {
   // Export CSV
   function exportCSV() {
     var headers = ['Code', 'Name', 'Department', 'Designation', 'Type',
-      'Effective Days', 'Present', 'Half Day', 'Absent', 'Leave', 'Incomplete', 'Total Hours']
+      'Effective Days', 'Present', 'Half Day', 'Absent', 'Incomplete', 'Total Hours']
     var csvRows = [headers.join(',')]
 
     filtered.forEach(function (r) {
@@ -80,7 +79,6 @@ export default function MonthlyReport() {
         r.days_present,
         r.days_half,
         r.days_absent,
-        r.days_leave,
         r.days_incomplete,
         r.total_hours
       ].join(','))
@@ -90,7 +88,7 @@ export default function MonthlyReport() {
     csvRows.push([
       '', '"TOTAL"', '', '', '',
       totals.effective, totals.present, totals.half,
-      totals.absent, totals.leave, totals.incomplete,
+      totals.absent, totals.incomplete,
       Math.round(totals.hours * 10) / 10
     ].join(','))
 
@@ -185,7 +183,6 @@ export default function MonthlyReport() {
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider">P</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-orange-600 uppercase tracking-wider">H</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">A</th>
-                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-blue-600 uppercase tracking-wider">L</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-amber-600 uppercase tracking-wider">Inc</th>
                 <th className="text-right px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
               </tr>
@@ -193,7 +190,7 @@ export default function MonthlyReport() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
+                  <td colSpan={9} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
                 </tr>
               ) : (
                 <>
@@ -226,7 +223,6 @@ export default function MonthlyReport() {
                     <td className="px-3 py-2.5 text-xs text-center text-emerald-700">{totals.present}</td>
                     <td className="px-3 py-2.5 text-xs text-center text-orange-600">{totals.half}</td>
                     <td className="px-3 py-2.5 text-xs text-center text-red-600">{totals.absent}</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-blue-600">{totals.leave}</td>
                     <td className="px-3 py-2.5 text-xs text-center text-amber-600">{totals.incomplete}</td>
                     <td className="px-3 py-2.5 text-xs text-right font-mono text-gray-700">{Math.round(totals.hours * 10) / 10}</td>
                   </tr>
