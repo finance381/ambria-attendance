@@ -1,11 +1,9 @@
-var CACHE_NAME = 'ambria-att-v1'
-var SHELL_URLS = [
-  '/ambria-attendance/',
-  '/ambria-attendance/index.html'
-]
+var CACHE_NAME = 'ambria-v2'
+var SHELL_URLS = ['/ambria-attendance/']
 
-self.addEventListener('install', function (event) {
-  event.waitUntil(
+// Install — cache shell
+self.addEventListener('install', function (e) {
+  e.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
       return cache.addAll(SHELL_URLS)
     })
@@ -13,51 +11,68 @@ self.addEventListener('install', function (event) {
   self.skipWaiting()
 })
 
-self.addEventListener('activate', function (event) {
-  event.waitUntil(
-    caches.keys().then(function (names) {
+// Activate — clean old caches
+self.addEventListener('activate', function (e) {
+  e.waitUntil(
+    caches.keys().then(function (keys) {
       return Promise.all(
-        names.filter(function (n) { return n !== CACHE_NAME })
-          .map(function (n) { return caches.delete(n) })
+        keys.filter(function (k) { return k !== CACHE_NAME })
+          .map(function (k) { return caches.delete(k) })
       )
     })
   )
   self.clients.claim()
 })
 
-self.addEventListener('fetch', function (event) {
-  var url = new URL(event.request.url)
-
-  // Never cache API calls or Supabase requests
-  if (url.hostname.includes('supabase')) {
-    event.respondWith(fetch(event.request))
-    return
-  }
-
-  // For navigation requests, try network first, fall back to cached shell
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(function () {
-        return caches.match('/ambria-attendance/index.html')
+// Fetch — network first, fallback to cache for navigation
+self.addEventListener('fetch', function (e) {
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(function () {
+        return caches.match('/ambria-attendance/')
       })
     )
-    return
+  }
+})
+
+// Push notification handler
+self.addEventListener('push', function (e) {
+  var data = { title: 'Ambria Attendance', body: 'You have a notification', tag: 'ambria' }
+
+  if (e.data) {
+    try {
+      data = Object.assign(data, e.data.json())
+    } catch (err) {
+      data.body = e.data.text()
+    }
   }
 
-  // For assets, try cache first, then network
-  event.respondWith(
-    caches.match(event.request).then(function (cached) {
-      if (cached) return cached
-      return fetch(event.request).then(function (response) {
-        // Cache JS/CSS assets
-        if (response.ok && (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'))) {
-          var clone = response.clone()
-          caches.open(CACHE_NAME).then(function (cache) {
-            cache.put(event.request, clone)
-          })
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/ambria-attendance/pwa-192.png',
+      badge: '/ambria-attendance/pwa-192.png',
+      tag: data.tag || 'ambria',
+      data: { url: data.url || '/ambria-attendance/' },
+      vibrate: [200, 100, 200]
+    })
+  )
+})
+
+// Click notification — open the app
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close()
+
+  var url = (e.notification.data && e.notification.data.url) || '/ambria-attendance/'
+
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+      for (var i = 0; i < clients.length; i++) {
+        if (clients[i].url.includes('/ambria-attendance') && 'focus' in clients[i]) {
+          return clients[i].focus()
         }
-        return response
-      })
+      }
+      return self.clients.openWindow(url)
     })
   )
 })

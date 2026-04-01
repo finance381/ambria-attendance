@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../lib/useAuth'
 import { supabase } from '../../lib/supabase'
 
@@ -70,6 +70,9 @@ export default function Settings() {
       </div>
       {/* Leave balance */}
       <LeaveBalance />
+
+      {/* Notifications & Reminders */}
+      <NotificationSettings employeeId={employee.id} />
 
       {/* Change password */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
@@ -193,4 +196,229 @@ function LeaveBalance() {
       </div>
     </div>
   )
+}
+
+function NotificationSettings({ employeeId }) {
+  var [supported, setSupported] = useState(false)
+  var [subscribed, setSubscribed] = useState(false)
+  var [loading, setLoading] = useState(true)
+  var [saving, setSaving] = useState(false)
+  var [punchInTime, setPunchInTime] = useState('')
+  var [punchOutTime, setPunchOutTime] = useState('')
+  var [remindersEnabled, setRemindersEnabled] = useState(true)
+  var [toast, setToast] = useState('')
+
+  var showToast = useCallback(function (msg) {
+    setToast(msg)
+    setTimeout(function () { setToast('') }, 2500)
+  }, [])
+
+  useEffect(function () {
+    var isSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+    setSupported(isSupported)
+
+    if (!isSupported) { setLoading(false); return }
+
+    // Check existing subscription
+    navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription()
+    }).then(function (sub) {
+      setSubscribed(!!sub)
+      setLoading(false)
+    }).catch(function () {
+      setLoading(false)
+    })
+
+    // Load reminder preferences
+    supabase
+      .from('reminder_preferences')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .maybeSingle()
+      .then(function (res) {
+        if (res.data) {
+          setPunchInTime(res.data.punch_in_time ? res.data.punch_in_time.slice(0, 5) : '')
+          setPunchOutTime(res.data.punch_out_time ? res.data.punch_out_time.slice(0, 5) : '')
+          setRemindersEnabled(res.data.enabled !== false)
+        }
+      })
+  }, [employeeId])
+
+  async function handleSubscribe() {
+    setSaving(true)
+    try {
+      var permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        showToast('Notification permission denied')
+        setSaving(false)
+        return
+      }
+
+      var reg = await navigator.serviceWorker.ready
+      var sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY)
+      })
+
+      var subJson = sub.toJSON()
+
+      await supabase.from('push_subscriptions').upsert({
+        employee_id: employeeId,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth
+      }, { onConflict: 'employee_id,endpoint' })
+
+      setSubscribed(true)
+      showToast('Notifications enabled')
+    } catch (err) {
+      showToast('Failed: ' + err.message)
+    }
+    setSaving(false)
+  }
+
+  async function handleUnsubscribe() {
+    setSaving(true)
+    try {
+      var reg = await navigator.serviceWorker.ready
+      var sub = await reg.pushManager.getSubscription()
+      if (sub) {
+        await sub.unsubscribe()
+        await supabase
+          .from('push_subscriptions')
+          .delete()
+          .eq('employee_id', employeeId)
+          .eq('endpoint', sub.endpoint)
+      }
+      setSubscribed(false)
+      showToast('Notifications disabled')
+    } catch (err) {
+      showToast('Failed: ' + err.message)
+    }
+    setSaving(false)
+  }
+
+  async function handleSaveReminders() {
+    setSaving(true)
+    var { error } = await supabase
+      .from('reminder_preferences')
+      .upsert({
+        employee_id: employeeId,
+        punch_in_time: punchInTime ? punchInTime + ':00' : null,
+        punch_out_time: punchOutTime ? punchOutTime + ':00' : null,
+        enabled: remindersEnabled,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'employee_id' })
+
+    setSaving(false)
+    if (error) {
+      showToast('Save failed: ' + error.message)
+    } else {
+      showToast('Reminders saved')
+    }
+  }
+
+  if (!supported) return null
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900">🔔 Notifications</p>
+            <p className="text-[10px] text-gray-400">Get reminded to punch in and out</p>
+          </div>
+          {loading ? (
+            <span className="text-[10px] text-gray-400">Checking…</span>
+          ) : subscribed ? (
+            <button onClick={handleUnsubscribe} disabled={saving}
+              className="px-3 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-40">
+              {saving ? 'Saving…' : 'Turn Off'}
+            </button>
+          ) : (
+            <button onClick={handleSubscribe} disabled={saving}
+              className="px-3 py-1.5 text-[11px] font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors disabled:opacity-40">
+              {saving ? 'Saving…' : 'Enable'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {subscribed && (
+        <div className="px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-700">Daily Reminders</p>
+            <button
+              onClick={function () { setRemindersEnabled(!remindersEnabled) }}
+              className={'w-10 h-5 rounded-full transition-colors relative ' +
+                (remindersEnabled ? 'bg-emerald-500' : 'bg-gray-300')}
+            >
+              <div className={'w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform shadow-sm ' +
+                (remindersEnabled ? 'translate-x-5' : 'translate-x-0.5')} />
+            </button>
+          </div>
+
+          {remindersEnabled && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Punch In Reminder
+                  </label>
+                  <input
+                    type="time"
+                    value={punchInTime}
+                    onChange={function (e) { setPunchInTime(e.target.value) }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5">e.g. 09:00</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Punch Out Reminder
+                  </label>
+                  <input
+                    type="time"
+                    value={punchOutTime}
+                    onChange={function (e) { setPunchOutTime(e.target.value) }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5">e.g. 18:00</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveReminders}
+                disabled={saving}
+                className="w-full py-2 text-sm font-medium text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save Reminders'}
+              </button>
+            </>
+          )}
+
+          <p className="text-[10px] text-gray-400">
+            You'll also get notified when your claims are approved or rejected.
+          </p>
+        </div>
+      )}
+
+      {toast && (
+        <div className="px-4 py-2 bg-slate-800 text-white text-xs text-center">
+          {toast}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function urlBase64ToUint8Array(base64String) {
+  var padding = '='.repeat((4 - base64String.length % 4) % 4)
+  var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  var rawData = window.atob(base64)
+  var outputArray = new Uint8Array(rawData.length)
+  for (var i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
 }
