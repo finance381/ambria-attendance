@@ -158,6 +158,7 @@ export default function DailyAttendance() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Code</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Selfie</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">In</th>
@@ -171,7 +172,7 @@ export default function DailyAttendance() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-sm text-gray-400 italic">No records for this date</td>
+                  <td colSpan={10} className="text-center py-8 text-sm text-gray-400 italic">No records for this date</td>
                 </tr>
               ) : filtered.map(function (r) {
                 var isIncomplete = r.status === 'Incomplete'
@@ -180,6 +181,9 @@ export default function DailyAttendance() {
                     className={'border-b border-gray-100 hover:bg-gray-50 cursor-pointer' + (isIncomplete ? ' bg-amber-50/50' : '')}
                     onClick={function () { setDetailTarget(r) }}>
                     <td className="px-3 py-2 text-xs text-gray-400 font-mono">{r.emp_code}</td>
+                    <td className="px-3 py-2">
+                      <SelfieThumb punches={r.punches} onClick={function (e) { e.stopPropagation() }} />
+                    </td>
                     <td className="px-3 py-2 font-medium text-gray-900">
                       {r.name}
                       {r.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">casual</span>}
@@ -253,12 +257,19 @@ export default function DailyAttendance() {
                     return (
                       <div key={p.punch_id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <span className={'text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ' +
-                            (p.punch_type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
-                            {p.punch_type}
-                          </span>
-                          <span className="text-xs font-mono text-gray-700">{formatTime(p.punched_at)}</span>
-                          {p.venue && <span className="text-[10px] text-gray-400">{p.venue}</span>}
+                          {p.selfie_path && (
+                            <SelfieImg path={p.selfie_path} size="w-9 h-9" rounded="rounded-lg" />
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className={'text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ' +
+                                (p.punch_type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
+                                {p.punch_type}
+                              </span>
+                              <span className="text-xs font-mono text-gray-700">{formatTime(p.punched_at)}</span>
+                            </div>
+                            {p.venue && <span className="text-[10px] text-gray-400">{p.venue}</span>}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {p.is_proxy && <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 rounded">proxy</span>}
@@ -404,4 +415,57 @@ function formatTime(isoString) {
   if (!isoString) return '—'
   var d = new Date(isoString)
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+}
+
+var SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+
+function selfieUrl(path) {
+  if (!path) return null
+  return SUPABASE_URL + '/storage/v1/object/public/selfies/' + path
+}
+
+function SelfieImg({ path, size, rounded }) {
+  var [open, setOpen] = useState(false)
+  var url = selfieUrl(path)
+  if (!url) return null
+
+  return (
+    <>
+      <img
+        src={url}
+        alt="Selfie"
+        className={'object-cover cursor-pointer border border-gray-200 hover:border-slate-400 transition-colors ' + (size || 'w-8 h-8') + ' ' + (rounded || 'rounded-full')}
+        onClick={function (e) { e.stopPropagation(); setOpen(true) }}
+        loading="lazy"
+      />
+      {open && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
+          onClick={function () { setOpen(false) }}>
+          <div className="relative max-w-md w-full">
+            <img src={url} alt="Selfie" className="w-full rounded-xl shadow-2xl" />
+            <button onClick={function () { setOpen(false) }}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-lg hover:bg-gray-100 text-sm font-bold">
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function SelfieThumb({ punches }) {
+  if (!punches || punches.length === 0) return <span className="text-[10px] text-gray-300">—</span>
+
+  var inPunch = punches.find(function (p) { return p.punch_type === 'in' && p.selfie_path })
+  var outPunch = punches.find(function (p) { return p.punch_type === 'out' && p.selfie_path })
+
+  if (!inPunch && !outPunch) return <span className="text-[10px] text-gray-300">—</span>
+
+  return (
+    <div className="flex items-center gap-1">
+      {inPunch && <SelfieImg path={inPunch.selfie_path} size="w-7 h-7" rounded="rounded-full" />}
+      {outPunch && <SelfieImg path={outPunch.selfie_path} size="w-7 h-7" rounded="rounded-full" />}
+    </div>
+  )
 }
