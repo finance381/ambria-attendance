@@ -137,10 +137,19 @@ export default function MyAttendance() {
       }
     })
 
-    // Fill absent for past dates with no punches
+    // Fill absent for past working days with no punches
+    var { data: empData } = await supabase
+      .from('employees')
+      .select('date_of_joining')
+      .eq('id', (await supabase.auth.getUser()).data.user.id)
+      .maybeSingle()
+
+    var joiningDate = empData && empData.date_of_joining ? empData.date_of_joining : null
+
     for (var day = 1; day <= endDay; day++) {
       var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0')
       if (!dayMap[dateStr] && dateStr <= today) {
+        if (joiningDate && dateStr < joiningDate) continue
         dayMap[dateStr] = { punches: [], status: 'Absent', totalHours: 0, sessions: 0 }
       }
     }

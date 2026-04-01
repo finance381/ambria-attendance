@@ -17,14 +17,9 @@ export function getLocation() {
           accuracy: pos.coords.accuracy
         })
       },
-      function (err) {
+      function () {
         // Don't block punch on GPS failure — return nulls
-        if (err.code === 1) {
-          // Permission denied — still allow punch, just no GPS
-          resolve({ latitude: null, longitude: null, accuracy: null })
-        } else {
-          resolve({ latitude: null, longitude: null, accuracy: null })
-        }
+        resolve({ latitude: null, longitude: null, accuracy: null })
       },
       {
         enableHighAccuracy: true,
