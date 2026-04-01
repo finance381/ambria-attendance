@@ -3,10 +3,10 @@ export function capturePhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:9998;background:#000;transform:scaleX(-1)'
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000;transform:scaleX(-1)'
 
     var overlay = document.createElement('div')
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0'
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
 
     // Face guide oval
     var guideRing = document.createElement('div')
