@@ -100,7 +100,11 @@ export default function AdminDashboard() {
 
             {data.open_punches_past > 0 && (
               <button
-                onClick={function () { navigate('/admin/attendance') }}
+                onClick={function () {
+                  var yesterday = new Date()
+                  yesterday.setDate(yesterday.getDate() - 1)
+                  navigate('/admin/attendance?date=' + yesterday.toISOString().slice(0, 10) + '&status=Incomplete')
+                }}
                 className="w-full flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3 hover:bg-red-100 transition-colors text-left"
               >
                 <div className="flex items-center gap-3">
@@ -125,7 +129,7 @@ export default function AdminDashboard() {
       {data.incomplete_today > 0 && (
         <div className="mb-5">
           <button
-            onClick={function () { navigate('/admin/attendance') }}
+            onClick={function () { navigate('/admin/attendance?status=Incomplete') }}
             className="w-full flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 hover:bg-gray-100 transition-colors text-left"
           >
             <div className="flex items-center gap-3">

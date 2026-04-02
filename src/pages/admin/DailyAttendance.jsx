@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 var STATUS_COLORS = {
@@ -9,12 +10,15 @@ var STATUS_COLORS = {
   'Half Day': 'bg-orange-50 text-orange-600'
 }
 
+import { useSearchParams } from 'react-router-dom'
+
 export default function DailyAttendance() {
   var today = new Date().toISOString().slice(0, 10)
+  var [searchParams, setSearchParams] = useSearchParams()
 
-  var [date, setDate] = useState(today)
+  var [date, setDate] = useState(searchParams.get('date') || today)
   var [deptFilter, setDeptFilter] = useState('')
-  var [statusFilter, setStatusFilter] = useState('')
+  var [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   var [search, setSearch] = useState('')
   var [records, setRecords] = useState([])
   var [departments, setDepartments] = useState([])
