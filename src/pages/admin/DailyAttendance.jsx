@@ -10,7 +10,6 @@ var STATUS_COLORS = {
   'Half Day': 'bg-orange-50 text-orange-600'
 }
 
-import { useSearchParams } from 'react-router-dom'
 
 export default function DailyAttendance() {
   var today = new Date().toISOString().slice(0, 10)
