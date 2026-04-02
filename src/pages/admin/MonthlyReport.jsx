@@ -208,7 +208,6 @@ export default function MonthlyReport() {
                         <td className="px-3 py-2 text-xs text-center font-semibold text-emerald-700">{r.days_present || '—'}</td>
                         <td className="px-3 py-2 text-xs text-center font-semibold text-orange-600">{r.days_half || '—'}</td>
                         <td className="px-3 py-2 text-xs text-center font-semibold text-red-600">{r.days_absent || '—'}</td>
-                        <td className="px-3 py-2 text-xs text-center font-semibold text-blue-600">{r.days_leave || '—'}</td>
                         <td className="px-3 py-2 text-xs text-center font-semibold text-amber-600">
                           {r.days_incomplete > 0 ? r.days_incomplete : '—'}
                         </td>
