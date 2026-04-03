@@ -1,29 +1,34 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../../lib/useAuth'
+import { useLanguage, LanguageToggle } from '../../lib/i18n'
 
-var TABS = [
-  { to: '/', label: 'Home', icon: '🏠', roles: null },
-  { to: '/team', label: 'Team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
-  { to: '/claims', label: 'Claims', icon: '📝', roles: null },
-  { to: '/attendance', label: 'Attendance', icon: '📅', roles: null },
-  { to: '/settings', label: 'Settings', icon: '⚙️', roles: null },
+var TAB_KEYS = [
+  { to: '/', key: 'tab_home', icon: '🏠', roles: null },
+  { to: '/team', key: 'tab_team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
+  { to: '/claims', key: 'tab_claims', icon: '📝', roles: null },
+  { to: '/attendance', key: 'tab_attendance', icon: '📅', roles: null },
+  { to: '/settings', key: 'tab_settings', icon: '⚙️', roles: null },
 ]
 
 export default function MobileShell() {
   var { employee } = useAuth()
+  var { t } = useLanguage()
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
       <header className="bg-slate-800 text-white px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-            <span className="text-sm font-bold">A</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+              <span className="text-sm font-bold">A</span>
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold leading-tight">{t('app_name')}</h1>
+              <p className="text-[10px] text-white/50">{employee.name} · {employee.designation || employee.role}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-sm font-semibold leading-tight">Ambria Attendance</h1>
-            <p className="text-[10px] text-white/50">{employee.name} · {employee.designation || employee.role}</p>
-          </div>
+          <LanguageToggle />
         </div>
       </header>
 
@@ -34,7 +39,7 @@ export default function MobileShell() {
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-          {TABS.filter(function (tab) {
+          {TAB_KEYS.filter(function (tab) {
             if (!tab.roles) return true
             return tab.roles.includes(employee.role)
           }).map(function (tab) {
@@ -51,7 +56,7 @@ export default function MobileShell() {
                 }}
               >
                 <span className="text-xl leading-none">{tab.icon}</span>
-                <span className="text-[10px] font-semibold">{tab.label}</span>
+                <span className="text-[10px] font-semibold">{t(tab.key)}</span>
               </NavLink>
             )
           })}

@@ -91,21 +91,16 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { data: lastEmp } = await adminClient
-      .from('employees')
-      .select('emp_code')
-      .eq('is_casual', false)
-      .like('emp_code', 'AMB%')
-      .order('emp_code', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const { data: seqRow, error: seqError } = await adminClient
+      .rpc('next_emp_code')
 
-    let nextNum = 1
-    if (lastEmp && lastEmp.emp_code) {
-      const match = lastEmp.emp_code.match(/AMB(\d+)/)
-      if (match) nextNum = parseInt(match[1], 10) + 1
+    if (seqError || !seqRow) {
+      return new Response(JSON.stringify({ error: 'Failed to generate emp_code' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
-    const empCode = 'AMB' + String(nextNum).padStart(3, '0')
+    const empCode = seqRow
 
     const fakeEmail = '91' + cleanPhone + '@att.ambria.local'
     const initialPassword = 'ambria123'

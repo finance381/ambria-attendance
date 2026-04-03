@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { capturePhoto } from '../lib/camera'
 import { getLocation } from '../lib/gps'
+import { useLanguage } from '../lib/i18n'
 
 export default function PunchCapture({ punchType, onComplete, onCancel }) {
-  var [step, setStep] = useState('ready')  // ready | capturing | uploading | done | error
+  var [step, setStep] = useState('ready')
   var [preview, setPreview] = useState(null)
   var [error, setError] = useState('')
+  var { t } = useLanguage()
 
   async function handlePunch() {
     setError('')
@@ -97,7 +99,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
             : 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-200')
         }
       >
-        {punchType === 'in' ? '📸 Punch In' : '📸 Punch Out'}
+        {'📸 ' + (punchType === 'in' ? t('punch_btn_in') : t('punch_btn_out'))}
       </button>
     )
   }
@@ -106,7 +108,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     return (
       <div className="text-center py-6">
         <div className="w-8 h-8 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Opening camera…</p>
+        <p className="text-sm text-gray-500">{t('punch_opening_camera')}</p>
       </div>
     )
   }
@@ -118,7 +120,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-slate-200" />
         )}
         <div className="w-8 h-8 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Recording attendance…</p>
+        <p className="text-sm text-gray-500">{t('punch_recording')}</p>
       </div>
     )
   }
@@ -133,7 +135,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           <span className="text-2xl">✓</span>
         </div>
         <p className="text-sm font-semibold text-emerald-700">
-          {punchType === 'in' ? 'Punched In!' : 'Punched Out!'}
+          {punchType === 'in' ? t('punch_done_in') : t('punch_done_out')}
         </p>
       </div>
     )
@@ -150,7 +152,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           onClick={function () { setStep('ready'); setError(''); setPreview(null) }}
           className="px-4 py-2 text-sm text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
         >
-          Try Again
+          {t('punch_try_again')}
         </button>
       </div>
     )

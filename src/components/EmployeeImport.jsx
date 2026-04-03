@@ -128,32 +128,37 @@ export default function EmployeeImport({ departments, onClose, onDone }) {
   async function handleImport() {
     setImporting(true)
     setStep('importing')
-    var failed = []
+    setProgress({ done: 0, total: rows.length, failed: [] })
 
-    for (var i = 0; i < rows.length; i++) {
-      setProgress({ done: i, total: rows.length, failed: failed })
-
-      var row = rows[i]
-      var { data, error } = await supabase.functions.invoke('create-employee', {
-        body: {
-          name: row.name,
-          phone: row.phone,
-          department_id: row.department_id,
-          role: row.role,
-          designation: row.designation,
-          date_of_joining: row.date_of_joining
-        }
-      })
-
-      if (error || (data && data.error)) {
-        failed.push({
-          name: row.name,
-          msg: (data && data.error) || error.message || 'Unknown error'
+    var { data, error } = await supabase.functions.invoke('batch-import-employees', {
+      body: {
+        employees: rows.map(function (r) {
+          return {
+            name: r.name,
+            phone: r.phone,
+            department_id: r.department_id,
+            role: r.role,
+            designation: r.designation,
+            date_of_joining: r.date_of_joining
+          }
         })
       }
+    })
+
+    if (error || (data && data.error)) {
+      setProgress({
+        done: 0,
+        total: rows.length,
+        failed: [{ name: 'Batch import', msg: (data && data.error) || error.message || 'Import failed — nothing was created' }]
+      })
+    } else {
+      setProgress({
+        done: data.imported || rows.length,
+        total: rows.length,
+        failed: []
+      })
     }
 
-    setProgress({ done: rows.length, total: rows.length, failed: failed })
     setImporting(false)
     setStep('done')
   }

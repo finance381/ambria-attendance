@@ -2,31 +2,31 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { capturePhoto } from '../../lib/camera'
 import { getLocation } from '../../lib/gps'
+import { useLanguage } from '../../lib/i18n'
 
 export default function PunchForTeam() {
   var [departments, setDepartments] = useState([])
   var [casuals, setCasuals] = useState([])
   var [openPunches, setOpenPunches] = useState([])
   var [loading, setLoading] = useState(true)
-  var [tab, setTab] = useState('punch')  // punch | open | add
+  var [tab, setTab] = useState('punch')
   var [toast, setToast] = useState('')
 
-  // Add casual state
   var [newName, setNewName] = useState('')
   var [newDept, setNewDept] = useState('')
   var [addError, setAddError] = useState('')
   var [addSaving, setAddSaving] = useState(false)
   var [confirmExisting, setConfirmExisting] = useState(null)
 
-  // Punch state
   var [punchingId, setPunchingId] = useState(null)
   var [punchStep, setPunchStep] = useState('')
 
-  // Retroactive state
   var [retroTarget, setRetroTarget] = useState(null)
   var [retroTime, setRetroTime] = useState('')
   var [retroSaving, setRetroSaving] = useState(false)
   var [retroError, setRetroError] = useState('')
+
+  var { t } = useLanguage()
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -54,14 +54,12 @@ export default function PunchForTeam() {
     return d ? d.name : '—'
   }
 
-  // ── ADD CASUAL ────────────────────────────────────────────────────────
-
   async function handleAddCasual(e) {
     e.preventDefault()
     setAddError('')
 
-    if (!newName.trim()) return setAddError('Name is required')
-    if (!newDept) return setAddError('Select a department')
+    if (!newName.trim()) return setAddError(t('team_err_name'))
+    if (!newDept) return setAddError(t('team_err_dept'))
 
     setAddSaving(true)
 
@@ -80,7 +78,7 @@ export default function PunchForTeam() {
       return
     }
 
-    showToast(data.name + ' (' + data.emp_code + ') added')
+    showToast(data.name + ' (' + data.emp_code + ')')
     setNewName('')
     setNewDept('')
     loadAll()
@@ -102,21 +100,19 @@ export default function PunchForTeam() {
       return
     }
 
-    showToast(data.name + ' (' + data.emp_code + ') created as new')
+    showToast(data.name + ' (' + data.emp_code + ')')
     setNewName('')
     setNewDept('')
     loadAll()
   }
 
   function handleReuseExisting() {
-    showToast(confirmExisting.name + ' already exists — ready to punch')
+    showToast(confirmExisting.name)
     setConfirmExisting(null)
     setNewName('')
     setNewDept('')
     loadAll()
   }
-
-  // ── PROXY PUNCH ───────────────────────────────────────────────────────
 
   async function handleProxyPunch(employee, punchType) {
     setPunchingId(employee.id)
@@ -168,17 +164,15 @@ export default function PunchForTeam() {
       return
     }
 
-    showToast(data.target_name + ' — punched ' + punchType)
+    showToast(data.target_name + ' — ' + (punchType === 'in' ? t('team_punch_in') : t('team_punch_out')))
     loadAll()
   }
-
-  // ── RETROACTIVE PUNCH-OUT ─────────────────────────────────────────────
 
   async function handleRetroactive(e) {
     e.preventDefault()
     setRetroError('')
 
-    if (!retroTime) return setRetroError('Enter the out time from the register')
+    if (!retroTime) return setRetroError(t('team_err_retro_time'))
 
     setRetroSaving(true)
 
@@ -195,45 +189,42 @@ export default function PunchForTeam() {
       return
     }
 
-    showToast(data.target_name + ' punched out retroactively')
+    showToast(data.target_name)
     setRetroTarget(null)
     setRetroTime('')
     loadAll()
   }
 
-  // ── RENDER ────────────────────────────────────────────────────────────
-
   if (loading) {
-    return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
+    return <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
   }
 
-  // Figure out who needs punch-in vs punch-out
   var openIds = {}
   openPunches.forEach(function (op) { openIds[op.employee_id] = op })
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Punch for Team</h2>
-      <p className="text-xs text-gray-400 mb-4">Proxy punch for casuals and team members</p>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">{t('team_title')}</h2>
+      <p className="text-xs text-gray-400 mb-4">{t('team_subtitle')}</p>
 
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5">
         {[
-          { id: 'punch', label: 'Punch', count: casuals.length },
-          { id: 'open', label: 'Open', count: openPunches.length },
-          { id: 'add', label: '+ Add Casual' }
-        ].map(function (t) {
+          { id: 'punch', label: t('team_tab_punch'), count: casuals.length },
+          { id: 'open', label: t('team_tab_open'), count: openPunches.length },
+          { id: 'add', label: t('team_tab_add') }
+        ].map(function (tb) {
           return (
-            <button key={t.id}
-              onClick={function () { setTab(t.id) }}
+            <button key={tb.id}
+              onClick={function () { setTab(tb.id) }}
               className={'flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ' +
-                (tab === t.id ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}
+                (tab === tb.id ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}
             >
-              {t.label}
-              {t.count > 0 && (
+              {tb.label}
+              {tb.count > 0 && (
                 <span className={'ml-1 text-[10px] px-1.5 py-0.5 rounded-full ' +
-                  (tab === t.id ? 'bg-slate-800 text-white' : 'bg-gray-300 text-gray-600')}>
-                  {t.count}
+                  (tab === tb.id ? 'bg-slate-800 text-white' : 'bg-gray-300 text-gray-600')}>
+                  {tb.count}
                 </span>
               )}
             </button>
@@ -246,9 +237,9 @@ export default function PunchForTeam() {
         <div className="space-y-2">
           {casuals.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400 mb-2">No casuals registered</p>
+              <p className="text-sm text-gray-400 mb-2">{t('team_no_casuals')}</p>
               <button onClick={function () { setTab('add') }}
-                className="text-sm text-slate-700 underline">Add a casual worker</button>
+                className="text-sm text-slate-700 underline">{t('team_add_casual_link')}</button>
             </div>
           ) : casuals.map(function (c) {
             var isOpen = openIds[c.id]
@@ -263,21 +254,21 @@ export default function PunchForTeam() {
                 <div>
                   {isPunching ? (
                     <span className="text-xs text-gray-400">
-                      {punchStep === 'camera' ? 'Camera…' : 'Uploading…'}
+                      {punchStep === 'camera' ? t('team_camera') : t('team_uploading')}
                     </span>
                   ) : isOpen ? (
                     <button
                       onClick={function () { handleProxyPunch(c, 'out') }}
                       className="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
                     >
-                      Punch Out
+                      {t('team_punch_out')}
                     </button>
                   ) : (
                     <button
                       onClick={function () { handleProxyPunch(c, 'in') }}
                       className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
                     >
-                      Punch In
+                      {t('team_punch_in')}
                     </button>
                   )}
                 </div>
@@ -292,7 +283,7 @@ export default function PunchForTeam() {
         <div className="space-y-2">
           {openPunches.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400">No open punches — all resolved</p>
+              <p className="text-sm text-gray-400">{t('team_no_open')}</p>
             </div>
           ) : openPunches.map(function (op) {
             var hoursAgo = Math.round((Date.now() - new Date(op.punched_in_at).getTime()) / 3600000)
@@ -304,26 +295,26 @@ export default function PunchForTeam() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">
                       {op.name}
-                      {op.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">casual</span>}
+                      {op.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">{t('team_casual_tag')}</span>}
                     </p>
                     <p className="text-[11px] text-gray-400">
-                      {op.emp_code} · {op.department_name} · In at {formatTime(op.punched_in_at)}
+                      {op.emp_code} · {op.department_name} · {formatTime(op.punched_in_at)}
                     </p>
                   </div>
-                  <span className="text-[10px] text-amber-600 font-semibold">{hoursAgo}h ago</span>
+                  <span className="text-[10px] text-amber-600 font-semibold">{t('team_hours_ago', { n: hoursAgo })}</span>
                 </div>
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={function () { handleProxyPunch({ id: op.employee_id, name: op.name }, 'out') }}
                     className="flex-1 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
                   >
-                    Punch Out Now
+                    {t('team_punch_out_now')}
                   </button>
                   <button
                     onClick={function () { setRetroTarget(op); setRetroTime(''); setRetroError('') }}
                     className="flex-1 py-1.5 text-xs font-semibold text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                   >
-                    Enter Time from Register
+                    {t('team_enter_time')}
                   </button>
                 </div>
               </div>
@@ -337,17 +328,17 @@ export default function PunchForTeam() {
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <form onSubmit={handleAddCasual} className="space-y-3">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Name *</label>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('team_name')} *</label>
               <input type="text" value={newName} onChange={function (e) { setNewName(e.target.value) }}
-                placeholder="Full name"
+                placeholder={t('team_name_placeholder')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
                 autoFocus />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Department *</label>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('team_department')} *</label>
               <select value={newDept} onChange={function (e) { setNewDept(e.target.value) }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
-                <option value="">— Select —</option>
+                <option value="">{t('team_select_dept')}</option>
                 {departments.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
               </select>
             </div>
@@ -356,24 +347,23 @@ export default function PunchForTeam() {
 
             <button type="submit" disabled={addSaving}
               className="w-full py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
-              {addSaving ? 'Adding…' : 'Add Casual Worker'}
+              {addSaving ? t('team_adding') : t('team_add_casual_btn')}
             </button>
           </form>
 
-          {/* Confirmation for existing casual */}
           {confirmExisting && (
             <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
               <p className="text-sm text-amber-800 font-medium mb-2">
-                "{confirmExisting.name}" already exists in this department. Same person?
+                {t('team_name_exists', { name: confirmExisting.name })}
               </p>
               <div className="flex gap-2">
                 <button onClick={handleReuseExisting}
                   className="flex-1 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors">
-                  Yes, same person
+                  {t('team_yes_same')}
                 </button>
                 <button onClick={handleForceCreate} disabled={addSaving}
                   className="flex-1 py-1.5 text-xs font-semibold text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40">
-                  No, create new
+                  {t('team_no_create')}
                 </button>
               </div>
             </div>
@@ -386,13 +376,13 @@ export default function PunchForTeam() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4" onClick={function () { setRetroTarget(null) }}>
           <div className="bg-white rounded-t-2xl rounded-b-xl w-full max-w-md shadow-xl" onClick={function (e) { e.stopPropagation() }}>
             <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-900">Retroactive Punch-Out</h3>
+              <h3 className="text-sm font-bold text-gray-900">{t('team_retro_title')}</h3>
               <p className="text-xs text-gray-500">{retroTarget.name} · {retroTarget.attendance_date}</p>
             </div>
             <form onSubmit={handleRetroactive} className="px-5 py-4 space-y-3">
               <div>
                 <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Out Time (from physical register)
+                  {t('team_retro_time_label')}
                 </label>
                 <input type="time" value={retroTime} onChange={function (e) { setRetroTime(e.target.value) }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
@@ -400,17 +390,17 @@ export default function PunchForTeam() {
               </div>
 
               <p className="text-[10px] text-gray-400">
-                Punched in at {formatTime(retroTarget.punched_in_at)}. Enter the departure time from the register. This will be flagged as a late entry.
+                {t('team_retro_help', { time: formatTime(retroTarget.punched_in_at) })}
               </p>
 
               {retroError && <p className="text-xs text-red-600">{retroError}</p>}
 
               <div className="flex gap-2">
                 <button type="button" onClick={function () { setRetroTarget(null) }}
-                  className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+                  className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">{t('cancel')}</button>
                 <button type="submit" disabled={retroSaving}
                   className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
-                  {retroSaving ? 'Saving…' : 'Save'}
+                  {retroSaving ? t('saving') : t('save')}
                 </button>
               </div>
             </form>
@@ -418,7 +408,6 @@ export default function PunchForTeam() {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="fixed bottom-20 left-4 right-4 bg-slate-800 text-white px-5 py-3 rounded-xl text-sm shadow-lg z-50 text-center">
           {toast}

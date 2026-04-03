@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../lib/useAuth'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../lib/i18n'
 
 export default function Settings() {
   var { employee, changePassword, logout } = useAuth()
@@ -17,8 +18,8 @@ export default function Settings() {
     setError('')
     setSuccess('')
 
-    if (newPw.length < 6) return setError('Password must be at least 6 characters')
-    if (newPw !== confirmPw) return setError('Passwords do not match')
+    if (newPw.length < 6) return setError(t('settings_pw_err_length'))
+    if (newPw !== confirmPw) return setError(t('settings_pw_err_match'))
 
     setSaving(true)
     var result = await changePassword(newPw)
@@ -29,7 +30,7 @@ export default function Settings() {
       return
     }
 
-    setSuccess('Password changed successfully')
+    setSuccess(t('settings_pw_success'))
     setCurrentPw('')
     setNewPw('')
     setConfirmPw('')
@@ -38,9 +39,11 @@ export default function Settings() {
 
   var isAdminOrManager = employee.role === 'admin' || employee.role === 'manager'
 
+  var { t } = useLanguage()
+
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-5">Settings</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-5">{t('settings_title')}</h2>
 
       {/* Profile info */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
@@ -55,15 +58,15 @@ export default function Settings() {
         </div>
         <div className="space-y-2 text-xs">
           <div className="flex justify-between">
-            <span className="text-gray-400">Employee Code</span>
+            <span className="text-gray-400">{t('settings_emp_code')}</span>
             <span className="text-gray-700 font-mono">{employee.emp_code}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Phone</span>
+            <span className="text-gray-400">{t('settings_phone')}</span>
             <span className="text-gray-700">{employee.phone || '—'}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Role</span>
+            <span className="text-gray-400">{t('settings_role')}</span>
             <span className="text-gray-700 capitalize">{employee.role}</span>
           </div>
         </div>
@@ -80,29 +83,29 @@ export default function Settings() {
           onClick={function () { setShowChangePw(!showChangePw); setError(''); setSuccess('') }}
           className="w-full px-4 py-3 flex items-center justify-between text-sm text-gray-700 hover:bg-gray-50 transition-colors"
         >
-          <span className="font-medium">🔒 Change Password</span>
+          <span className="font-medium">🔒 {t('settings_change_pw')}</span>
           <span className="text-gray-400">{showChangePw ? '▲' : '▼'}</span>
         </button>
 
         {showChangePw && (
           <form onSubmit={handleChangePassword} className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">New Password</label>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('settings_new_pw')}</label>
               <input
                 type="password"
                 value={newPw}
                 onChange={function (e) { setNewPw(e.target.value) }}
-                placeholder="Min 6 characters"
+                placeholder={t('settings_pw_placeholder')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Confirm Password</label>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('settings_confirm_pw')}</label>
               <input
                 type="password"
                 value={confirmPw}
                 onChange={function (e) { setConfirmPw(e.target.value) }}
-                placeholder="Type again"
+                placeholder={t('settings_pw_confirm_placeholder')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
               />
             </div>
@@ -115,7 +118,7 @@ export default function Settings() {
               disabled={saving}
               className="w-full py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
             >
-              {saving ? 'Saving…' : 'Update Password'}
+              {saving ? t('saving') : t('settings_pw_update')}
             </button>
           </form>
         )}
@@ -130,8 +133,8 @@ export default function Settings() {
             }}
             className="w-full px-4 py-3 flex items-center justify-between text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <span className="font-medium">🖥️ Admin Dashboard</span>
-            <span className="text-xs text-gray-400">Opens in new tab →</span>
+            <span className="font-medium">🖥️ {t('settings_admin_link')}</span>
+            <span className="text-xs text-gray-400">{t('settings_admin_hint')}</span>
           </button>
         </div>
       )}
@@ -141,12 +144,13 @@ export default function Settings() {
         onClick={function () { logout() }}
         className="w-full py-3 text-sm text-red-600 bg-white border border-gray-200 rounded-xl hover:bg-red-50 transition-colors font-medium"
       >
-        Sign Out
+        {t('settings_signout')}
       </button>
     </div>
   )
 }
 function LeaveBalance() {
+  var { t } = useLanguage()
   var [data, setData] = useState(null)
   var [loading, setLoading] = useState(true)
   var [err, setErr] = useState('')
@@ -167,7 +171,7 @@ function LeaveBalance() {
   if (loading) return null
   if (err) return (
     <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-      <p className="text-xs text-red-600">Leave balance error: {err}</p>
+      <p className="text-xs text-red-600">{t('settings_leave_error')}: {err}</p>
     </div>
   )
   if (!data) return null
@@ -181,15 +185,15 @@ function LeaveBalance() {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-bold text-gray-900">Leave Balance</p>
-        <span className="text-[10px] text-gray-400 font-medium">FY {fyLabel}</span>
+        <p className="text-sm font-bold text-gray-900">{t('settings_leave_balance')}</p>
+        <span className="text-[10px] text-gray-400 font-medium">{t('settings_fy')} {fyLabel}</span>
       </div>
       <div className="flex items-end justify-between mb-2">
         <div>
           <span className="text-2xl font-bold text-gray-900">{data.leaves_remaining}</span>
           <span className="text-sm text-gray-400 ml-1">/ {data.annual_leaves}</span>
         </div>
-        <span className="text-xs text-gray-500">{data.leaves_used} used</span>
+        <span className="text-xs text-gray-500">{data.leaves_used} {t('settings_used')}</span>
       </div>
       <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: pct + '%' }} />
@@ -199,6 +203,7 @@ function LeaveBalance() {
 }
 
 function NotificationSettings({ employeeId }) {
+  var { t } = useLanguage()
   var [supported, setSupported] = useState(false)
   var [subscribed, setSubscribed] = useState(false)
   var [loading, setLoading] = useState(true)
@@ -325,20 +330,20 @@ function NotificationSettings({ employeeId }) {
       <div className="px-4 py-3 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-900">🔔 Notifications</p>
-            <p className="text-[10px] text-gray-400">Get reminded to punch in and out</p>
+            <p className="text-sm font-medium text-gray-900">🔔 {t('settings_notif_title')}</p>
+            <p className="text-[10px] text-gray-400">{t('settings_notif_desc')}</p>
           </div>
           {loading ? (
-            <span className="text-[10px] text-gray-400">Checking…</span>
+            <span className="text-[10px] text-gray-400">{t('settings_notif_checking')}</span>
           ) : subscribed ? (
             <button onClick={handleUnsubscribe} disabled={saving}
               className="px-3 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-40">
-              {saving ? 'Saving…' : 'Turn Off'}
+              {saving ? t('saving') : t('settings_notif_off')}
             </button>
           ) : (
             <button onClick={handleSubscribe} disabled={saving}
               className="px-3 py-1.5 text-[11px] font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors disabled:opacity-40">
-              {saving ? 'Saving…' : 'Enable'}
+              {saving ? t('saving') : t('settings_notif_enable')}
             </button>
           )}
         </div>
@@ -347,7 +352,7 @@ function NotificationSettings({ employeeId }) {
       {subscribed && (
         <div className="px-4 py-3 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-700">Daily Reminders</p>
+            <p className="text-xs font-semibold text-gray-700">{t('settings_reminders')}</p>
             <button
               onClick={function () { setRemindersEnabled(!remindersEnabled) }}
               className={'w-10 h-5 rounded-full transition-colors relative ' +
@@ -363,7 +368,7 @@ function NotificationSettings({ employeeId }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                    Punch In Reminder
+                    {t('settings_reminder_in')}
                   </label>
                   <input
                     type="time"
@@ -375,7 +380,7 @@ function NotificationSettings({ employeeId }) {
                 </div>
                 <div>
                   <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                    Punch Out Reminder
+                    {t('settings_reminder_out')}
                   </label>
                   <input
                     type="time"
@@ -392,13 +397,13 @@ function NotificationSettings({ employeeId }) {
                 disabled={saving}
                 className="w-full py-2 text-sm font-medium text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors"
               >
-                {saving ? 'Saving…' : 'Save Reminders'}
+                {saving ? t('saving') : t('settings_save_reminders')}
               </button>
             </>
           )}
 
           <p className="text-[10px] text-gray-400">
-            You'll also get notified when your claims are approved or rejected.
+            {t('settings_notif_also')}
           </p>
         </div>
       )}

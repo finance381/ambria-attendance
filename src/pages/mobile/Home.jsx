@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
+import { useLanguage } from '../../lib/i18n'
 import PunchCapture from '../../components/PunchCapture'
 import InstallPrompt from '../../components/InstallPrompt'
 
@@ -33,6 +34,7 @@ export default function Home() {
     return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
   }
 
+  var { t } = useLanguage()
   var isPunchedIn = status && status.is_punched_in
   var punchType = isPunchedIn ? 'out' : 'in'
 
@@ -40,7 +42,7 @@ export default function Home() {
     <div>
       {/* Greeting */}
       <h2 className="text-lg font-bold text-gray-900 mb-0.5">
-        Hi, {employee.name.split(' ')[0]}
+        {t('home_greeting')}, {employee.name.split(' ')[0]}
       </h2>
       <p className="text-xs text-gray-400 mb-5">
         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -48,8 +50,8 @@ export default function Home() {
       <InstallPrompt />
       {status && status.has_stale_punch && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
-          <p className="text-sm font-semibold text-amber-800">⚠️ Unresolved punch from a previous day</p>
-          <p className="text-[11px] text-amber-600 mt-0.5">Submit a missed punch claim to resolve it.</p>
+          <p className="text-sm font-semibold text-amber-800">⚠️ {t('home_stale_title')}</p>
+          <p className="text-[11px] text-amber-600 mt-0.5">{t('home_stale_desc')}</p>
         </div>
       )}
 
@@ -59,20 +61,20 @@ export default function Home() {
         : 'bg-gray-50 border-gray-200'
       )}>
         <div className="flex items-center justify-between mb-1">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('home_status')}</p>
           {status && status.sessions_today > 0 && (
             <p className="text-[10px] text-gray-400">
-              {status.sessions_today} session{status.sessions_today > 1 ? 's' : ''}
+              {status.sessions_today} {status.sessions_today > 1 ? t('home_sessions_plural') : t('home_sessions')}
             </p>
           )}
         </div>
         <div className="flex items-center justify-between">
           <p className={'text-base font-bold ' + (isPunchedIn ? 'text-emerald-700' : 'text-gray-500')}>
-            {isPunchedIn ? '🟢 Punched In' : '⚪ Not Punched In'}
+            {isPunchedIn ? '🟢 ' + t('home_punched_in') : '⚪ ' + t('home_not_punched_in')}
           </p>
           {status && status.last_in && (
             <div className="text-right">
-              <p className="text-[10px] text-gray-400">Since</p>
+              <p className="text-[10px] text-gray-400">{t('home_since')}</p>
               <p className="text-sm font-mono text-gray-700">{formatTime(status.last_in)}</p>
             </div>
           )}
@@ -90,7 +92,7 @@ export default function Home() {
       {/* Today's punches */}
       {punches.length > 0 && (
         <div>
-          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Today's Punches</h3>
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('home_today_punches')}</h3>
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="divide-y divide-gray-100">
               {punches.map(function (p) {
@@ -106,7 +108,7 @@ export default function Home() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-800">
-                          Punch {p.punch_type === 'in' ? 'In' : 'Out'}
+                          {p.punch_type === 'in' ? t('home_punch_in') : t('home_punch_out')}
                         </p>
                         <p className="text-[11px] text-gray-400">{p.nearest_venue || ''}</p>
                       </div>

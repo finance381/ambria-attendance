@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../lib/i18n'
 
 var STATUS_COLORS = {
   Present: 'bg-emerald-500',
@@ -15,9 +16,6 @@ var STATUS_DOT_COLORS = {
   Absent: 'text-red-500',
   Incomplete: 'text-amber-500'
 }
-
-var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
-var DAY_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
 export default function MyAttendance() {
   var now = new Date()
@@ -193,34 +191,39 @@ export default function MyAttendance() {
     else setMonth(month + 1)
   }
 
+  var { t } = useLanguage()
+
+  var MONTH_NAMES_T = [t('month_1'),t('month_2'),t('month_3'),t('month_4'),t('month_5'),t('month_6'),t('month_7'),t('month_8'),t('month_9'),t('month_10'),t('month_11'),t('month_12')]
+  var DAY_NAMES_T = [t('day_su'),t('day_mo'),t('day_tu'),t('day_we'),t('day_th'),t('day_fr'),t('day_sa')]
+
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-4">My Attendance</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-4">{t('attendance_title')}</h2>
 
       {/* Month/Year picker */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={prevMonth} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg">←</button>
-        <p className="text-sm font-bold text-gray-800">{MONTH_NAMES[month - 1]} {year}</p>
+        <p className="text-sm font-bold text-gray-800">{MONTH_NAMES_T[month - 1]} {year}</p>
         <button onClick={nextMonth} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg">→</button>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-4 gap-2 mb-4">
-        <MiniStat label="Present" value={stats.Present} color="text-emerald-600" />
-        <MiniStat label="Half" value={stats['Half Day']} color="text-orange-500" />
-        <MiniStat label="Absent" value={stats.Absent} color="text-red-500" />
-        <MiniStat label="Hours" value={Math.round(stats.hours * 10) / 10} color="text-slate-700" />
+        <MiniStat label={t('attendance_present')} value={stats.Present} color="text-emerald-600" />
+        <MiniStat label={t('attendance_half')} value={stats['Half Day']} color="text-orange-500" />
+        <MiniStat label={t('attendance_absent')} value={stats.Absent} color="text-red-500" />
+        <MiniStat label={t('attendance_hours')} value={Math.round(stats.hours * 10) / 10} color="text-slate-700" />
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400 text-center py-8">Loading…</p>
+        <p className="text-sm text-gray-400 text-center py-8">{t('loading')}</p>
       ) : (
         <>
           {/* Calendar grid */}
           <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4">
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-1">
-              {DAY_NAMES.map(function (d) {
+              {DAY_NAMES_T.map(function (d) {
                 return <div key={d} className="text-center text-[10px] font-bold text-gray-400 uppercase">{d}</div>
               })}
             </div>
@@ -264,11 +267,16 @@ export default function MyAttendance() {
 
             {/* Legend */}
             <div className="flex flex-wrap gap-3 mt-3 pt-2 border-t border-gray-100">
-              {['Present', 'Half Day', 'Absent', 'Incomplete'].map(function (s) {
+              {[
+                { key: 'Present', label: t('attendance_present') },
+                { key: 'Half Day', label: t('attendance_half_day') },
+                { key: 'Absent', label: t('attendance_absent') },
+                { key: 'Incomplete', label: t('attendance_incomplete') }
+              ].map(function (s) {
                 return (
-                  <div key={s} className="flex items-center gap-1">
-                    <div className={'w-2 h-2 rounded-full ' + (STATUS_COLORS[s] || 'bg-gray-300')} />
-                    <span className="text-[10px] text-gray-500">{s}</span>
+                  <div key={s.key} className="flex items-center gap-1">
+                    <div className={'w-2 h-2 rounded-full ' + (STATUS_COLORS[s.key] || 'bg-gray-300')} />
+                    <span className="text-[10px] text-gray-500">{s.label}</span>
                   </div>
                 )
               })}
@@ -292,7 +300,7 @@ export default function MyAttendance() {
 
               {days[selectedDay].totalHours > 0 && (
                 <p className="text-xs text-gray-500 mb-2">
-                  {days[selectedDay].sessions} session{days[selectedDay].sessions > 1 ? 's' : ''} · {days[selectedDay].totalHours} hours
+                  {days[selectedDay].sessions} {days[selectedDay].sessions > 1 ? t('attendance_sessions_plural') : t('attendance_sessions')} · {days[selectedDay].totalHours} {t('attendance_hours')}
                 </p>
               )}
 
@@ -313,7 +321,7 @@ export default function MyAttendance() {
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-gray-400 italic">No punches recorded</p>
+                <p className="text-xs text-gray-400 italic">{t('attendance_no_punches')}</p>
               )}
             </div>
           )}
