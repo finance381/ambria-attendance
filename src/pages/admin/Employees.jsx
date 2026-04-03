@@ -19,6 +19,11 @@ export default function Employees() {
   var [saving, setSaving] = useState(false)
   var [toast, setToast] = useState('')
   var [showImport, setShowImport] = useState(false)
+  var [selected, setSelected] = useState({})
+  var [bulkAction, setBulkAction] = useState(null) // 'deactivate' | 'department' | 'role' | null
+  var [bulkDept, setBulkDept] = useState('')
+  var [bulkRole, setBulkRole] = useState('staff')
+  var [bulkSaving, setBulkSaving] = useState(false)
 
   var [form, setForm] = useState({
     name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: ''
@@ -44,6 +49,81 @@ export default function Employees() {
   }, [])
 
   useEffect(function () { loadAll() }, [loadAll])
+
+  var selectedIds = Object.keys(selected).filter(function (k) { return selected[k] })
+  var selectedCount = selectedIds.length
+
+  function toggleSelect(id) {
+    setSelected(function (prev) {
+      var next = Object.assign({}, prev)
+      next[id] = !next[id]
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedCount === filtered.length && filtered.length > 0) {
+      setSelected({})
+    } else {
+      var next = {}
+      filtered.forEach(function (e) { next[e.id] = true })
+      setSelected(next)
+    }
+  }
+
+  function clearSelection() {
+    setSelected({})
+    setBulkAction(null)
+  }
+
+  async function handleBulkDeactivate() {
+    setBulkSaving(true)
+    var failed = 0
+    for (var i = 0; i < selectedIds.length; i++) {
+      var { error } = await supabase
+        .from('employees')
+        .update({ active: false })
+        .eq('id', selectedIds[i])
+      if (error) failed++
+    }
+    setBulkSaving(false)
+    showToast((selectedIds.length - failed) + ' employees deactivated' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    clearSelection()
+    loadAll()
+  }
+
+  async function handleBulkDepartment() {
+    if (!bulkDept) return
+    setBulkSaving(true)
+    var failed = 0
+    for (var i = 0; i < selectedIds.length; i++) {
+      var { error } = await supabase
+        .from('employees')
+        .update({ department_id: Number(bulkDept) })
+        .eq('id', selectedIds[i])
+      if (error) failed++
+    }
+    setBulkSaving(false)
+    showToast((selectedIds.length - failed) + ' employees reassigned' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    clearSelection()
+    loadAll()
+  }
+
+  async function handleBulkRole() {
+    setBulkSaving(true)
+    var failed = 0
+    for (var i = 0; i < selectedIds.length; i++) {
+      var { error } = await supabase
+        .from('employees')
+        .update({ role: bulkRole })
+        .eq('id', selectedIds[i])
+      if (error) failed++
+    }
+    setBulkSaving(false)
+    showToast((selectedIds.length - failed) + ' roles updated' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    clearSelection()
+    loadAll()
+  }
 
   var filtered = employees.filter(function (e) {
     var matchSearch = !search ||
@@ -297,10 +377,42 @@ export default function Employees() {
         </select>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedCount > 0 && (
+        <div className="bg-slate-800 text-white rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm font-medium">{selectedCount} employee{selectedCount > 1 ? 's' : ''} selected</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={function () { setBulkAction('department'); setBulkDept('') }}
+              className="px-3 py-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg transition-colors">
+              Change Department
+            </button>
+            <button onClick={function () { setBulkAction('role'); setBulkRole('staff') }}
+              className="px-3 py-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg transition-colors">
+              Change Role
+            </button>
+            <button onClick={function () { setBulkAction('deactivate') }}
+              className="px-3 py-1.5 text-xs font-semibold bg-red-500/80 hover:bg-red-500 rounded-lg transition-colors">
+              Deactivate All
+            </button>
+            <button onClick={clearSelection}
+              className="px-3 py-1.5 text-xs text-white/50 hover:text-white/80 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="px-3 py-3 w-8">
+                <input type="checkbox"
+                  checked={selectedCount > 0 && selectedCount === filtered.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-gray-300 text-slate-800 focus:ring-slate-700 cursor-pointer"
+                />
+              </th>
               <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Code</th>
               <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
               <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Phone</th>
@@ -313,13 +425,20 @@ export default function Employees() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-sm text-gray-400 italic">
+                <td colSpan={8} className="text-center py-8 text-sm text-gray-400 italic">
                   {employees.length ? 'No matching employees' : 'No employees yet — add one above'}
                 </td>
               </tr>
             ) : filtered.map(function (emp) {
               return (
-                <tr key={emp.id} className={'border-b border-gray-100 hover:bg-gray-50' + (!emp.active ? ' opacity-50' : '')}>
+                <tr key={emp.id} className={'border-b border-gray-100 hover:bg-gray-50' + (!emp.active ? ' opacity-50' : '') + (selected[emp.id] ? ' bg-slate-50' : '')}>
+                  <td className="px-3 py-2.5">
+                    <input type="checkbox"
+                      checked={!!selected[emp.id]}
+                      onChange={function () { toggleSelect(emp.id) }}
+                      className="rounded border-gray-300 text-slate-800 focus:ring-slate-700 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">{emp.emp_code}</td>
                   <td className="px-4 py-2.5 font-medium text-gray-900">
                     {emp.name}
@@ -505,6 +624,63 @@ export default function Employees() {
                 loadAll()
               }} disabled={saving} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors font-medium">
                 {saving ? 'Deleting…' : 'Delete Forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK ACTION MODALS */}
+      {bulkAction === 'deactivate' && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setBulkAction(null) }}>
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl p-5" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="text-sm font-bold text-red-600 mb-2">Bulk Deactivate</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Deactivate <strong>{selectedCount}</strong> selected employee{selectedCount > 1 ? 's' : ''}? They will not be able to log in or punch.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={function () { setBulkAction(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={handleBulkDeactivate} disabled={bulkSaving} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors font-medium">
+                {bulkSaving ? 'Processing…' : 'Deactivate ' + selectedCount}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkAction === 'department' && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setBulkAction(null) }}>
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl p-5" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="text-sm font-bold text-gray-900 mb-3">Change Department</h3>
+            <p className="text-xs text-gray-500 mb-3">Move {selectedCount} employee{selectedCount > 1 ? 's' : ''} to:</p>
+            <select value={bulkDept} onChange={function (e) { setBulkDept(e.target.value) }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-slate-700">
+              <option value="">— Select Department —</option>
+              {departments.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button onClick={function () { setBulkAction(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={handleBulkDepartment} disabled={bulkSaving || !bulkDept} className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
+                {bulkSaving ? 'Processing…' : 'Reassign ' + selectedCount}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkAction === 'role' && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setBulkAction(null) }}>
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl p-5" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="text-sm font-bold text-gray-900 mb-3">Change Role</h3>
+            <p className="text-xs text-gray-500 mb-3">Set role for {selectedCount} employee{selectedCount > 1 ? 's' : ''}:</p>
+            <select value={bulkRole} onChange={function (e) { setBulkRole(e.target.value) }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-slate-700">
+              {ROLES.map(function (r) { return <option key={r} value={r}>{r}</option> })}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button onClick={function () { setBulkAction(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={handleBulkRole} disabled={bulkSaving} className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
+                {bulkSaving ? 'Processing…' : 'Update ' + selectedCount}
               </button>
             </div>
           </div>
