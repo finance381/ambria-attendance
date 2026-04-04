@@ -168,7 +168,7 @@ export default function DailyAttendance() {
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Out</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sessions</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Flags</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Venue</th>
                 <th className="px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
@@ -201,7 +201,7 @@ export default function DailyAttendance() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {r.gps_suspicious && <span className="text-amber-500" title="GPS accuracy low">⚠️</span>}
+                      <VenueFlag punches={r.punches} status={r.status} />
                       {r.has_override && <span className="text-blue-500 ml-1" title="Has override">✏️</span>}
                     </td>
                     <td className="px-3 py-2 text-right" onClick={function (e) { e.stopPropagation() }}>
@@ -454,6 +454,31 @@ function SelfieImg({ path, size, rounded }) {
         </div>
       )}
     </>
+  )
+}
+
+function VenueFlag({ punches, status }) {
+  if (!punches || punches.length === 0 || status === 'Absent') return null
+
+  // Get venue from first punch-in, fallback to any punch with a venue
+  var venuePunch = punches.find(function (p) { return p.punch_type === 'in' && p.venue })
+  if (!venuePunch) {
+    venuePunch = punches.find(function (p) { return p.venue })
+  }
+
+  if (venuePunch && venuePunch.venue) {
+    return (
+      <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded" title={venuePunch.venue}>
+        {venuePunch.venue.length > 18 ? venuePunch.venue.slice(0, 18) + '…' : venuePunch.venue}
+      </span>
+    )
+  }
+
+  // Has punches but no venue match
+  return (
+    <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+      Not in Venue
+    </span>
   )
 }
 
