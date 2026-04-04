@@ -101,9 +101,7 @@ export default function AdminDashboard() {
             {data.open_punches_past > 0 && (
               <button
                 onClick={function () {
-                  var yesterday = new Date()
-                  yesterday.setDate(yesterday.getDate() - 1)
-                  navigate('/admin/attendance?date=' + yesterday.toISOString().slice(0, 10) + '&status=Incomplete')
+                  navigate('/admin/attendance?status=Incomplete')
                 }}
                 className="w-full flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3 hover:bg-red-100 transition-colors text-left"
               >
