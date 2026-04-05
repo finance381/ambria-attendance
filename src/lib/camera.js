@@ -10,7 +10,7 @@ export function capturePhoto() {
 
     // Face guide oval
     var guideRing = document.createElement('div')
-    guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:40px;transition:border-color 0.3s'
+    guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:100px;transition:border-color 0.3s,box-shadow 0.3s;box-shadow:0 0 0 9999px rgba(255,255,255,0.55)'
 
     var faceStatus = document.createElement('div')
     faceStatus.style.cssText = 'color:#fff;font-size:14px;font-weight:600;text-align:center;padding:6px 16px;border-radius:20px;background:rgba(0,0,0,0.5);margin-top:12px'
@@ -58,6 +58,7 @@ export function capturePhoto() {
       if (found) {
         guideRing.style.borderColor = '#22c55e'
         guideRing.style.borderStyle = 'solid'
+        guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.55)'
         faceStatus.textContent = '✓ Face detected'
         faceStatus.style.background = 'rgba(22,163,74,0.7)'
         captureBtn.disabled = false
@@ -65,6 +66,7 @@ export function capturePhoto() {
       } else {
         guideRing.style.borderColor = 'rgba(255,255,255,0.5)'
         guideRing.style.borderStyle = 'dashed'
+        guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.55)'
         faceStatus.textContent = 'Position your face in the oval'
         faceStatus.style.background = 'rgba(0,0,0,0.5)'
         captureBtn.disabled = true
@@ -102,10 +104,10 @@ export function capturePhoto() {
           for (var i = 0; i < pixels.length; i += 4) {
             var r = pixels[i], g = pixels[i + 1], b = pixels[i + 2]
             // Skin tone detection in RGB
-            if (r > 60 && g > 40 && b > 20 &&
+            if (r > 40 && g > 25 && b > 10 &&
                 r > g && r > b &&
-                Math.abs(r - g) > 15 &&
-                r - b > 15) {
+                Math.abs(r - g) > 10 &&
+                r - b > 10) {
               skinCount++
             }
           }
