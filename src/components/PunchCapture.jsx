@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { capturePhoto } from '../lib/camera'
 import { getLocation } from '../lib/gps'
 import { useLanguage } from '../lib/i18n'
+import { queuePunch, registerBackgroundSync } from '../lib/offlineQueue'
 
 export default function PunchCapture({ punchType, onComplete, onCancel }) {
   var [step, setStep] = useState('ready')
@@ -37,6 +38,30 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
 
     // GPS should be ready by now (started before camera)
     var gps = await gpsPromise
+
+    // Offline detection — queue locally if no network
+    if (!navigator.onLine) {
+      try {
+        await queuePunch({
+          punchType: punchType,
+          selfieBlob: photo.blob,
+          selfieDataUrl: photo.dataUrl,
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          gpsAccuracy: gps.accuracy,
+          deviceInfo: navigator.userAgent,
+          clientTimestamp: new Date().toISOString()
+        })
+        await registerBackgroundSync()
+        setStep('queued')
+        if (onComplete) onComplete({ queued: true })
+        return
+      } catch (qErr) {
+        setError('Failed to save offline: ' + qErr.message)
+        setStep('error')
+        return
+      }
+    }
 
     // Step 3: Upload selfie to storage
     var timestamp = Date.now()
@@ -136,6 +161,25 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         </div>
         <p className="text-sm font-semibold text-emerald-700">
           {punchType === 'in' ? t('punch_done_in') : t('punch_done_out')}
+        </p>
+      </div>
+    )
+  }
+
+  if (step === 'queued') {
+    return (
+      <div className="text-center py-6">
+        {preview && (
+          <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-amber-300" />
+        )}
+        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <span className="text-2xl">📶</span>
+        </div>
+        <p className="text-sm font-semibold text-amber-700">
+          {t('punch_queued') || 'Punch saved offline'}
+        </p>
+        <p className="text-[11px] text-amber-500 mt-1">
+          {t('punch_queued_desc') || 'Will sync automatically when back online'}
         </p>
       </div>
     )

@@ -4,12 +4,15 @@ import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
 import PunchCapture from '../../components/PunchCapture'
 import InstallPrompt from '../../components/InstallPrompt'
+import { getPendingPunches, removePunch } from '../../lib/offlineQueue'
 
 export default function Home() {
   var { employee } = useAuth()
   var [status, setStatus] = useState(null)
   var [punches, setPunches] = useState([])
   var [loading, setLoading] = useState(true)
+  var [pendingCount, setPendingCount] = useState(0)
+  var [syncing, setSyncing] = useState(false)
 
   var loadStatus = useCallback(async function () {
     var [statusRes, punchesRes] = await Promise.all([
@@ -25,6 +28,62 @@ export default function Home() {
   useEffect(function () {
     loadStatus()
   }, [loadStatus])
+
+  var syncOfflinePunches = useCallback(async function () {
+    var pending = await getPendingPunches()
+    setPendingCount(pending.length)
+    if (pending.length === 0 || syncing) return
+
+    setSyncing(true)
+    for (var i = 0; i < pending.length; i++) {
+      var p = pending[i]
+      try {
+        // Upload selfie
+        var { data: { user } } = await supabase.auth.getUser()
+        if (!user) break
+
+        var filePath = user.id + '/' + p.clientTimestamp.slice(0, 10) + '_' + p.punchType + '_' + Date.now() + '.jpg'
+        var { error: upErr } = await supabase.storage
+          .from('selfies')
+          .upload(filePath, p.selfieBlob, { contentType: 'image/jpeg', upsert: false })
+
+        if (upErr) continue
+
+        // Call punch RPC with client timestamp
+        var { data: result, error: rpcErr } = await supabase.rpc('punch', {
+          p_punch_type: p.punchType,
+          p_selfie_path: filePath,
+          p_latitude: p.latitude,
+          p_longitude: p.longitude,
+          p_gps_accuracy: p.gpsAccuracy,
+          p_device_info: p.deviceInfo,
+          p_client_timestamp: p.clientTimestamp
+        })
+
+        if (!rpcErr && (!result || !result.error)) {
+          await removePunch(p.id)
+        }
+      } catch (e) {
+        // Skip this punch, retry next time
+      }
+    }
+    setSyncing(false)
+    var remaining = await getPendingPunches()
+    setPendingCount(remaining.length)
+    if (remaining.length === 0) loadStatus()
+  }, [syncing, loadStatus])
+
+  // Sync on mount + when coming back online
+  useEffect(function () {
+    syncOfflinePunches()
+    window.addEventListener('online', syncOfflinePunches)
+    function onSWMessage(e) { if (e.data && e.data.type === 'sync-punches') syncOfflinePunches() }
+    navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', onSWMessage)
+    return function () {
+      window.removeEventListener('online', syncOfflinePunches)
+      navigator.serviceWorker && navigator.serviceWorker.removeEventListener('message', onSWMessage)
+    }
+  }, [syncOfflinePunches])
 
   function handlePunchComplete() {
     setTimeout(function () { loadStatus() }, 1500)
@@ -48,6 +107,25 @@ export default function Home() {
         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
       </p>
       <InstallPrompt />
+      {pendingCount > 0 && (
+        <div className={'rounded-2xl px-4 py-3 mb-4 border ' + (syncing ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200')}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={'text-sm font-semibold ' + (syncing ? 'text-blue-800' : 'text-amber-800')}>
+                {syncing ? '⟳ Syncing...' : '📶 ' + pendingCount + ' punch' + (pendingCount > 1 ? 'es' : '') + ' waiting'}
+              </p>
+              <p className={'text-[11px] mt-0.5 ' + (syncing ? 'text-blue-600' : 'text-amber-600')}>
+                {syncing ? 'Uploading offline punches' : 'Will sync when back online'}
+              </p>
+            </div>
+            {!syncing && navigator.onLine && (
+              <button onClick={syncOfflinePunches} className="text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg">
+                Sync now
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {status && status.has_stale_punch && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
           <p className="text-sm font-semibold text-amber-800">⚠️ {t('home_stale_title')}</p>

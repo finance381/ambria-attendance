@@ -59,6 +59,20 @@ self.addEventListener('push', function (e) {
   )
 })
 
+// Background sync — retry offline punches
+self.addEventListener('sync', function (e) {
+  if (e.tag === 'sync-punches') {
+    e.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+        for (var i = 0; i < clients.length; i++) {
+          clients[i].postMessage({ type: 'sync-punches' })
+          return
+        }
+      })
+    )
+  }
+})
+
 // Click notification — open the app
 self.addEventListener('notificationclick', function (e) {
   e.notification.close()
