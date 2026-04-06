@@ -224,14 +224,36 @@ function NotificationSettings({ employeeId }) {
 
     if (!isSupported) { setLoading(false); return }
 
-    // Check existing subscription
+    // Check existing subscription — browser first, DB fallback
     navigator.serviceWorker.ready.then(function (reg) {
       return reg.pushManager.getSubscription()
     }).then(function (sub) {
-      setSubscribed(!!sub)
-      setLoading(false)
+      if (sub) {
+        setSubscribed(true)
+        setLoading(false)
+      } else {
+        // Browser lost local state — check DB as fallback
+        supabase
+          .from('push_subscriptions')
+          .select('id')
+          .eq('employee_id', employeeId)
+          .limit(1)
+          .then(function (res) {
+            setSubscribed(res.data && res.data.length > 0)
+            setLoading(false)
+          })
+      }
     }).catch(function () {
-      setLoading(false)
+      // SW not ready — check DB
+      supabase
+        .from('push_subscriptions')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .limit(1)
+        .then(function (res) {
+          setSubscribed(res.data && res.data.length > 0)
+          setLoading(false)
+        })
     })
 
     // Load reminder preferences
