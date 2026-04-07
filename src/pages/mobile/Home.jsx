@@ -13,6 +13,7 @@ export default function Home() {
   var [loading, setLoading] = useState(true)
   var [pendingCount, setPendingCount] = useState(0)
   var [syncing, setSyncing] = useState(false)
+  var [syncError, setSyncError] = useState('')
 
   var loadStatus = useCallback(async function () {
     var [statusRes, punchesRes] = await Promise.all([
@@ -70,7 +71,12 @@ export default function Home() {
     setSyncing(false)
     var remaining = await getPendingPunches()
     setPendingCount(remaining.length)
-    if (remaining.length === 0) loadStatus()
+    if (remaining.length === 0) {
+      loadStatus()
+    } else if (navigator.onLine) {
+      // Some punches failed to sync even though we're online — likely duplicates or expired
+      setSyncError(remaining.length + ' punch' + (remaining.length > 1 ? 'es' : '') + ' failed to sync — may be duplicates')
+    }
   }, [syncing, loadStatus])
 
   // Sync on mount + when coming back online
@@ -123,6 +129,23 @@ export default function Home() {
                 Sync now
               </button>
             )}
+          </div>
+        </div>
+      )}
+      
+      {syncError && (
+        <div className="rounded-2xl px-4 py-3 mb-4 border bg-red-50 border-red-200">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-red-700">{syncError}</p>
+            <button onClick={async function () {
+              var { getPendingPunches: gp, removePunch: rp } = await import('../../lib/offlineQueue')
+              var all = await gp()
+              for (var i = 0; i < all.length; i++) { await rp(all[i].id) }
+              setPendingCount(0)
+              setSyncError('')
+            }} className="text-xs font-semibold text-red-600 bg-red-100 px-3 py-1.5 rounded-lg">
+              Clear queue
+            </button>
           </div>
         </div>
       )}
