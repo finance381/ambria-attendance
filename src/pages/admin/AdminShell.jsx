@@ -9,7 +9,6 @@ var NAV_ITEMS = [
   { to: '/admin/employees', label: 'Employees', icon: '👥' },
   { to: '/admin/departments', label: 'Departments', icon: '🏢' },
   { to: '/admin/venues', label: 'Venues', icon: '📍' },
-  { to: '/admin/config', label: 'Config', icon: '⚙️' },
 ]
 
 export default function AdminShell() {
@@ -53,7 +52,9 @@ export default function AdminShell() {
 
       <nav className="bg-white border-b border-gray-200 overflow-x-auto">
         <div className="max-w-5xl mx-auto px-4 flex">
-          {NAV_ITEMS.map(function (item) {
+          {NAV_ITEMS.concat(
+            employee.role === 'admin' ? [{ to: '/admin/config', label: 'Config', icon: '⚙️' }] : []
+          ).map(function (item) {
             return (
               <NavLink
                 key={item.to}

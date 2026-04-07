@@ -70,7 +70,11 @@ export default function App() {
         </ProtectedRoute>
       }>
         <Route index element={<Home />} />
-        <Route path="team" element={<PunchForTeam />} />
+        <Route path="team" element={
+          <ProtectedRoute roles={['supervisor', 'manager', 'admin']}>
+            <PunchForTeam />
+          </ProtectedRoute>
+        } />
         <Route path="attendance" element={<MyAttendance />} />
         <Route path="claims" element={<MyClaims />} />
         <Route path="settings" element={<Settings />} />

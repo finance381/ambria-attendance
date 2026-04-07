@@ -7,7 +7,6 @@ var STATUS_COLORS = {
   'Half Day': 'bg-orange-400',
   Absent: 'bg-red-400',
   Incomplete: 'bg-amber-400',
-  Leave: 'bg-blue-400'
 }
 
 var STATUS_DOT_COLORS = {
@@ -33,11 +32,15 @@ export default function MyAttendance() {
     var endDay = new Date(year, month, 0).getDate()
     var endDate = year + '-' + String(month).padStart(2, '0') + '-' + String(endDay).padStart(2, '0')
 
+    // Get user once
+    var { data: { user } } = await supabase.auth.getUser()
+    var userId = user.id
+
     // Get all my punches for this month
     var { data: punches } = await supabase
       .from('punches')
       .select('attendance_date, punch_type, punched_at, nearest_venue_id')
-      .eq('employee_id', (await supabase.auth.getUser()).data.user.id)
+      .eq('employee_id', userId)
       .gte('attendance_date', startDate)
       .lte('attendance_date', endDate)
       .order('punched_at')
@@ -46,7 +49,7 @@ export default function MyAttendance() {
     var { data: overrides } = await supabase
       .from('attendance_overrides')
       .select('attendance_date, override_type, override_value')
-      .eq('employee_id', (await supabase.auth.getUser()).data.user.id)
+      .eq('employee_id', userId)
       .gte('attendance_date', startDate)
       .lte('attendance_date', endDate)
 

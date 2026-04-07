@@ -6,7 +6,6 @@ var STATUS_COLORS = {
   Present: 'bg-emerald-50 text-emerald-700',
   Absent: 'bg-red-50 text-red-600',
   Incomplete: 'bg-amber-50 text-amber-700',
-  Leave: 'bg-blue-50 text-blue-600',
   'Half Day': 'bg-orange-50 text-orange-600'
 }
 
