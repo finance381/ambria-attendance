@@ -10,7 +10,7 @@ export function capturePhoto() {
 
     // Face guide oval
     var guideRing = document.createElement('div')
-    guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:100px;transition:border-color 0.3s,box-shadow 0.3s;box-shadow:0 0 0 9999px rgba(255,255,255,0.55)'
+    guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:40px;transition:border-color 0.3s;box-shadow:0 0 0 9999px rgba(255,255,255,0.25)'
 
     var faceStatus = document.createElement('div')
     faceStatus.style.cssText = 'color:#fff;font-size:14px;font-weight:600;text-align:center;padding:6px 16px;border-radius:20px;background:rgba(0,0,0,0.5);margin-top:12px'
@@ -146,7 +146,17 @@ export function capturePhoto() {
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
       if (faceDetectInterval) clearInterval(faceDetectInterval)
 
-      var canvas = document.createElement('canvas')
+      // Screen flash — use phone display as front flash
+      var flash = document.createElement('div')
+      flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:10000;background:#fff;opacity:0;transition:opacity 0.05s'
+      document.body.appendChild(flash)
+      // Force reflow then flash to full white
+      flash.offsetHeight
+      flash.style.opacity = '1'
+
+      // Wait 300ms for the bright screen to illuminate the face, then capture
+      setTimeout(function () {
+        var canvas = document.createElement('canvas')
       canvas.width = Math.min(video.videoWidth, 640)
       canvas.height = Math.round(canvas.width * (video.videoHeight / video.videoWidth))
       var ctx = canvas.getContext('2d')
@@ -156,9 +166,11 @@ export function capturePhoto() {
 
       canvas.toBlob(function (blob) {
         var dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+        if (flash.parentNode) flash.parentNode.removeChild(flash)
         cleanup()
         resolve({ blob: blob, dataUrl: dataUrl })
       }, 'image/jpeg', 0.6)
+      }, 300) // end of flash setTimeout
     })
 
     cancelBtn.addEventListener('click', function () {

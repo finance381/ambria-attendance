@@ -488,7 +488,7 @@ export default function Employees() {
             </div>
             <form onSubmit={editId ? handleUpdate : handleCreate} className="px-5 py-4 space-y-3">
               <Field label="Full Name *">
-                <input type="text" value={form.name} onChange={function (e) { setForm({ ...form, name: e.target.value }) }} className="form-input" autoFocus />
+                <input type="text" value={form.name} onChange={function (e) { setForm({ ...form, name: e.target.value }) }} className="form-input" autoFocus maxLength={100}/>
               </Field>
 
               {!editId && (
@@ -516,7 +516,7 @@ export default function Employees() {
                   </select>
                 </Field>
                 <Field label="Designation">
-                  <input type="text" value={form.designation} onChange={function (e) { setForm({ ...form, designation: e.target.value }) }} className="form-input" placeholder="e.g. Chef de Partie" />
+                  <input type="text" value={form.designation} onChange={function (e) { setForm({ ...form, designation: e.target.value }) }} className="form-input" placeholder="e.g. Chef de Partie" maxLength={100}/>
                 </Field>
               </div>
 

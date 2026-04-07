@@ -138,7 +138,7 @@ export default function MyClaims() {
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('claims_reason')} *</label>
               <textarea value={formReason} onChange={function (e) { setFormReason(e.target.value) }}
-                rows={2} placeholder={t('claims_reason_placeholder')}
+                rows={2} maxLength={500} placeholder={t('claims_reason_placeholder')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 resize-none" />
             </div>
 

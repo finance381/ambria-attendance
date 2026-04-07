@@ -330,7 +330,7 @@ export default function PunchForTeam() {
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('team_name')} *</label>
               <input type="text" value={newName} onChange={function (e) { setNewName(e.target.value) }}
-                placeholder={t('team_name_placeholder')}
+                placeholder={t('team_name_placeholder')} maxLength={100}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
                 autoFocus />
             </div>

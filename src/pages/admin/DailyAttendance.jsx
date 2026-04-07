@@ -368,7 +368,7 @@ export default function DailyAttendance() {
                 <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Reason *</label>
                 <textarea value={overrideReason} onChange={function (e) { setOverrideReason(e.target.value) }}
                   rows={2} placeholder="Why are you overriding this record?"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 resize-none" />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 resize-none" maxLength={500}/>
               </div>
 
               {overrideError && (
