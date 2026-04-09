@@ -206,7 +206,7 @@ export default function ClaimsQueue() {
               <div>
                 <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Reason for rejection *</label>
                 <textarea value={rejectReason} onChange={function (e) { setRejectReason(e.target.value) }}
-                  rows={2} placeholder="Why is this claim being rejected?"
+                  rows={2} maxLength={500} placeholder="Why is this claim being rejected?"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 resize-none"
                   autoFocus />
               </div>

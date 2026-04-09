@@ -78,6 +78,7 @@ self.addEventListener('notificationclick', function (e) {
   e.notification.close()
 
   var url = (e.notification.data && e.notification.data.url) || '/ambria-attendance/'
+  if (!url.startsWith('/ambria-attendance')) url = '/ambria-attendance/'
 
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
