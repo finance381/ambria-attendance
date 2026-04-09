@@ -43,7 +43,17 @@ var CONFIG_FIELDS = [
     max: 365,
     unit: 'leaves/year',
     fallback: '24'
-  }
+  },
+  {
+    key: 'annual_half_days',
+    label: 'Annual Half Days',
+    desc: 'Total half-day allowance per employee per fiscal year (April–March).',
+    type: 'int',
+    min: 0,
+    max: 99,
+    unit: 'half days/year',
+    fallback: '6'
+  },
 ]
 
 export default function AppConfig() {

@@ -74,6 +74,9 @@ export default function Settings() {
       {/* Leave balance */}
       <LeaveBalance />
 
+      {/* Half day balance */}
+      <HalfDayBalance />
+
       {/* Notifications & Reminders */}
       <NotificationSettings employeeId={employee.id} />
 
@@ -194,6 +197,46 @@ function LeaveBalance() {
           <span className="text-sm text-gray-400 ml-1">/ {data.annual_leaves}</span>
         </div>
         <span className="text-xs text-gray-500">{data.leaves_used} {t('settings_used')}</span>
+      </div>
+      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: pct + '%' }} />
+      </div>
+    </div>
+  )
+}
+
+function HalfDayBalance() {
+  var { t } = useLanguage()
+  var [data, setData] = useState(null)
+  var [loading, setLoading] = useState(true)
+
+  useEffect(function () {
+    supabase.rpc('my_half_day_balance').then(function (res) {
+      if (!res.error && res.data && !res.data.error) setData(res.data)
+      setLoading(false)
+    })
+  }, [])
+
+  if (loading || !data) return null
+
+  var pct = data.annual_half_days > 0
+    ? Math.round((data.half_days_remaining / data.annual_half_days) * 100)
+    : 0
+  var barColor = pct > 40 ? 'bg-orange-400' : pct > 15 ? 'bg-amber-500' : 'bg-red-500'
+  var fyLabel = data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(0, 4)
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-bold text-gray-900">{t('settings_halfday_balance') || 'Half Day Balance'}</p>
+        <span className="text-[10px] text-gray-400 font-medium">{t('settings_fy')} {fyLabel}</span>
+      </div>
+      <div className="flex items-end justify-between mb-2">
+        <div>
+          <span className="text-2xl font-bold text-gray-900">{data.half_days_remaining}</span>
+          <span className="text-sm text-gray-400 ml-1">/ {data.annual_half_days}</span>
+        </div>
+        <span className="text-xs text-gray-500">{data.half_days_used} {t('settings_used')}</span>
       </div>
       <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: pct + '%' }} />

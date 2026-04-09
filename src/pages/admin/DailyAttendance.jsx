@@ -65,7 +65,7 @@ export default function DailyAttendance() {
   })
 
   // Stats
-  var stats = { total: filtered.length, Present: 0, Absent: 0, Incomplete: 0, Leave: 0 }
+  var stats = { total: filtered.length, Present: 0, Absent: 0, Incomplete: 0, 'Half Day': 0 }
   filtered.forEach(function (r) {
     if (stats[r.status] !== undefined) stats[r.status]++
   })
@@ -131,7 +131,7 @@ export default function DailyAttendance() {
             <option value="Present">Present</option>
             <option value="Absent">Absent</option>
             <option value="Incomplete">Incomplete</option>
-            <option value="Leave">Leave</option>
+            <option value="Half Day">Half Day</option>
           </select>
         </div>
         <div>
@@ -148,7 +148,7 @@ export default function DailyAttendance() {
         <MiniStat label="Present" value={stats.Present} color="text-emerald-600" />
         <MiniStat label="Absent" value={stats.Absent} color="text-red-600" />
         <MiniStat label="Incomplete" value={stats.Incomplete} color="text-amber-600" />
-        <MiniStat label="Leave" value={stats.Leave} color="text-blue-600" />
+        <MiniStat label="Half Day" value={stats['Half Day']} color="text-orange-600" />
       </div>
 
       {/* Table */}
