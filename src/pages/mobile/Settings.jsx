@@ -74,33 +74,6 @@ export default function Settings() {
       {/* Leave balance */}
       <LeaveBalance />
 
-      {/* Quarterly balance */}
-      {data.quarter_label && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-700">{data.quarter_label} {t('settings_quarterly')}</p>
-            <span className="text-[10px] text-gray-400">
-              {new Date(data.quarter_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-              {' – '}
-              {new Date(data.quarter_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-            </span>
-          </div>
-          <div className="flex items-end justify-between mb-2">
-            <div>
-              <span className="text-lg font-bold text-gray-900">{data.quarter_remaining}</span>
-              <span className="text-xs text-gray-400 ml-1">/ {data.quarter_total}</span>
-            </div>
-            <span className="text-[10px] text-gray-500">{data.quarter_used} {t('settings_used')}</span>
-          </div>
-          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className={'h-full rounded-full transition-all ' + (
-              data.quarter_remaining / data.quarter_total > 0.4 ? 'bg-blue-500' :
-              data.quarter_remaining / data.quarter_total > 0.15 ? 'bg-amber-500' : 'bg-red-500'
-            )} style={{ width: Math.round((data.quarter_remaining / data.quarter_total) * 100) + '%' }} />
-          </div>
-        </div>
-      )}
-
       {/* Half day balance */}
       <HalfDayBalance />
 
@@ -228,6 +201,33 @@ function LeaveBalance() {
       <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: pct + '%' }} />
       </div>
+
+      {data.quarter_label && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-700">{data.quarter_label} {t('settings_quarterly') || 'Quarterly'}</p>
+            <span className="text-[10px] text-gray-400">
+              {new Date(data.quarter_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+              {' – '}
+              {new Date(data.quarter_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+          <div className="flex items-end justify-between mb-2">
+            <div>
+              <span className="text-lg font-bold text-gray-900">{data.quarter_remaining}</span>
+              <span className="text-xs text-gray-400 ml-1">/ {data.quarter_total}</span>
+            </div>
+            <span className="text-[10px] text-gray-500">{data.quarter_used} {t('settings_used')}</span>
+          </div>
+          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className={'h-full rounded-full transition-all ' + (
+              data.quarter_remaining / data.quarter_total > 0.4 ? 'bg-blue-500' :
+              data.quarter_remaining / data.quarter_total > 0.15 ? 'bg-amber-500' : 'bg-red-500'
+            )} style={{ width: Math.round((data.quarter_remaining / data.quarter_total) * 100) + '%' }} />
+          </div>
+        </div>
+      )}
+
     </div>
     
   )
