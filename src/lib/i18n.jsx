@@ -166,6 +166,7 @@ var translations = {
     settings_notif_also: "You'll also get notified when your claims are approved or rejected.",
     settings_leave_error: 'Leave balance error',
     settings_quarterly: 'Quarterly',
+    settings_halfday_balance: 'Half Day Balance',
     
 
     // ── Install Prompt ───────────────────────
@@ -351,6 +352,7 @@ var translations = {
     settings_notif_also: 'क्लेम स्वीकृत या अस्वीकृत होने पर भी आपको सूचना मिलेगी।',
     settings_leave_error: 'छुट्टी बैलेंस में त्रुटि',
     settings_quarterly: 'तिमाही',
+    settings_halfday_balance: 'हाफ डे बैलेंस',
 
     // ── Install Prompt ───────────────────────
     install_title: 'ऐप इंस्टॉल करें',
