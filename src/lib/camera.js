@@ -100,32 +100,43 @@ export function capturePhoto() {
           var pixels = centerData.data
           var w = 80
           var totalPixels = pixels.length / 4
+          var lumValues = []
+          var lumSum = 0
+
+          // First pass: compute average luminance
+          for (var i = 0; i < pixels.length; i += 4) {
+            var lum = pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114
+            lumValues.push(lum)
+            lumSum += lum
+          }
+          var lumMean = lumSum / totalPixels
+          var isLowLight = lumMean < 60
+
+          var skinMinR = isLowLight ? 40 : 80
+          var skinMinG = isLowLight ? 25 : 50
+          var skinMinB = isLowLight ? 15 : 30
+
           var skinCount = 0
           var midSkin = 0
           var brightCount = 0
-          var lumValues = []
 
+          // Second pass: skin detection with adaptive thresholds
           for (var i = 0; i < pixels.length; i += 4) {
             var r = pixels[i], g = pixels[i + 1], b = pixels[i + 2]
-            var lum = r * 0.299 + g * 0.587 + b * 0.114
-            lumValues.push(lum)
             var pixRow = Math.floor((i / 4) / w)
 
-            // Reject overexposed pixels (lights, reflections)
             if (r > 220 && g > 220 && b > 220) {
               brightCount++
               continue
             }
 
-            // Tighter skin tone rules
-            if (r > 80 && g > 50 && b > 30 &&
+            if (r > skinMinR && g > skinMinG && b > skinMinB &&
                 r > g && r > b &&
-                Math.abs(r - g) > 15 &&
-                r - b > 20 &&
-                r - g < 80 &&
-                r - b < 120) {
+                Math.abs(r - g) > (isLowLight ? 8 : 15) &&
+                r - b > (isLowLight ? 10 : 20) &&
+                r - g < (isLowLight ? 100 : 80) &&
+                r - b < (isLowLight ? 140 : 120)) {
               skinCount++
-              // Middle 60% of rows (face centered in oval)
               if (pixRow >= 16 && pixRow < 64) midSkin++
             }
           }
@@ -134,26 +145,26 @@ export function capturePhoto() {
           var brightRatio = brightCount / totalPixels
           var midSkinRatio = skinCount > 0 ? midSkin / skinCount : 0
 
-          // Texture: faces have brightness variation (eyes, nose, shadows)
-          var lumSum = 0, lumSqSum = 0
+          var lumSqSum = 0
           for (var j = 0; j < lumValues.length; j++) {
-            lumSum += lumValues[j]
             lumSqSum += lumValues[j] * lumValues[j]
           }
-          var lumMean = lumSum / lumValues.length
           var lumVar = (lumSqSum / lumValues.length) - (lumMean * lumMean)
 
-          // All 4 checks must pass:
-          // 1) 22%+ skin pixels (was 15%)
-          // 2) <40% blown-out pixels (rejects ceilings with lights)
-          // 3) 55%+ of skin in middle rows (face centered, not edge)
-          // 4) Brightness variance >400 (face has texture, flat surfaces don't)
-          setFaceFound(
-            skinRatio > 0.22 &&
-            brightRatio < 0.40 &&
-            midSkinRatio > 0.55 &&
-            lumVar > 400
-          )
+          if (isLowLight) {
+            setFaceFound(
+              skinRatio > 0.10 &&
+              midSkinRatio > 0.45 &&
+              lumVar > 100
+            )
+          } else {
+            setFaceFound(
+              skinRatio > 0.22 &&
+              brightRatio < 0.40 &&
+              midSkinRatio > 0.55 &&
+              lumVar > 400
+            )
+          }
         }, 500)
       }
     }

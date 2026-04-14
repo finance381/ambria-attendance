@@ -416,7 +416,7 @@ function MiniStat({ label, value, color }) {
 function formatTime(isoString) {
   if (!isoString) return '—'
   var d = new Date(isoString)
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
 }
 
 var SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL

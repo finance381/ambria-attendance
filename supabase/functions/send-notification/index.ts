@@ -5,7 +5,7 @@ const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@ambria.local"
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SRK_AUTH")!
 
 // Web Push crypto utilities
 async function generatePushHeaders(endpoint: string, p256dh: string, auth: string) {
@@ -31,7 +31,11 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization') || ''
     const token = authHeader.replace('Bearer ', '')
     if (token !== SUPABASE_SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Unauthorized',
+        token_start: token.substring(0, 20),
+        env_start: SUPABASE_SERVICE_ROLE_KEY.substring(0, 20)
+      }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
