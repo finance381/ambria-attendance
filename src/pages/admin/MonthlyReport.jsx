@@ -13,6 +13,12 @@ export default function MonthlyReport() {
   var [departments, setDepartments] = useState([])
   var [loading, setLoading] = useState(true)
   var [toast, setToast] = useState('')
+  var [showExport, setShowExport] = useState(false)
+  var [exportFromYear, setExportFromYear] = useState(now.getFullYear())
+  var [exportFromMonth, setExportFromMonth] = useState(now.getMonth() + 1)
+  var [exportToYear, setExportToYear] = useState(now.getFullYear())
+  var [exportToMonth, setExportToMonth] = useState(now.getMonth() + 1)
+  var [exporting, setExporting] = useState(false)
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -62,42 +68,86 @@ export default function MonthlyReport() {
     return r.is_casual && r.days_incomplete > 0
   }).length
 
-  // Export CSV
-  function exportCSV() {
-    var headers = ['Code', 'Name', 'Department', 'Designation', 'Type',
-      'Effective Days', 'Present', 'Half Day', 'Absent', 'Incomplete', 'Total Hours']
+  // Export CSV — supports multi-month range
+  async function exportCSV() {
+    setExporting(true)
+
+    // Build list of year/month pairs from → to
+    var months = []
+    var fy = exportFromYear, fm = exportFromMonth
+    var ty = exportToYear, tm = exportToMonth
+    var cy = fy, cm = fm
+    while (cy < ty || (cy === ty && cm <= tm)) {
+      months.push({ year: cy, month: cm })
+      cm++
+      if (cm > 12) { cm = 1; cy++ }
+    }
+
+    if (months.length === 0) { setExporting(false); return }
+
+    var isSingleMonth = months.length === 1
+    var headers = isSingleMonth
+      ? ['Code', 'Name', 'Department', 'Designation', 'Type',
+         'Effective Days', 'Present', 'Half Day', 'Absent', 'Incomplete', 'Total Hours']
+      : ['Month', 'Code', 'Name', 'Department', 'Designation', 'Type',
+         'Effective Days', 'Present', 'Half Day', 'Absent', 'Incomplete', 'Total Hours']
     var csvRows = [headers.join(',')]
+    var grandTotals = { effective: 0, present: 0, half: 0, absent: 0, incomplete: 0, hours: 0 }
 
-    filtered.forEach(function (r) {
-      csvRows.push([
-        r.emp_code,
-        '"' + (r.name || '').replace(/"/g, '""') + '"',
-        '"' + (r.department_name || '').replace(/"/g, '""') + '"',
-        '"' + (r.designation || '').replace(/"/g, '""') + '"',
-        r.is_casual ? 'Casual' : 'Permanent',
-        r.effective_days,
-        r.days_present,
-        r.days_half,
-        r.days_absent,
-        r.days_incomplete,
-        r.total_hours
-      ].join(','))
-    })
+    for (var i = 0; i < months.length; i++) {
+      var m = months[i]
+      var { data: mData } = await supabase.rpc('monthly_summary', {
+        p_year: m.year, p_month: m.month,
+        p_department_id: deptFilter ? Number(deptFilter) : null
+      })
 
-    // Add totals row
-    csvRows.push([
+      var rows = mData || []
+      var monthLabel = MONTHS[m.month - 1] + ' ' + m.year
+
+      rows.forEach(function (r) {
+        grandTotals.effective += r.effective_days
+        grandTotals.present += r.days_present
+        grandTotals.half += r.days_half
+        grandTotals.absent += r.days_absent
+        grandTotals.incomplete += r.days_incomplete
+        grandTotals.hours += r.total_hours
+
+        var row = [
+          r.emp_code,
+          '"' + (r.name || '').replace(/"/g, '""') + '"',
+          '"' + (r.department_name || '').replace(/"/g, '""') + '"',
+          '"' + (r.designation || '').replace(/"/g, '""') + '"',
+          r.is_casual ? 'Casual' : 'Permanent',
+          r.effective_days, r.days_present, r.days_half,
+          r.days_absent, r.days_incomplete, r.total_hours
+        ]
+        if (!isSingleMonth) row.unshift('"' + monthLabel + '"')
+        csvRows.push(row.join(','))
+      })
+    }
+
+    // Grand totals
+    var totRow = [
       '', '"TOTAL"', '', '', '',
-      totals.effective, totals.present, totals.half,
-      totals.absent, totals.incomplete,
-      Math.round(totals.hours * 10) / 10
-    ].join(','))
+      grandTotals.effective, grandTotals.present, grandTotals.half,
+      grandTotals.absent, grandTotals.incomplete,
+      Math.round(grandTotals.hours * 10) / 10
+    ]
+    if (!isSingleMonth) totRow.unshift('')
+    csvRows.push(totRow.join(','))
 
     var blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
     var a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = 'attendance_' + MONTHS[month - 1] + '_' + year + '.csv'
+    var fileName = isSingleMonth
+      ? 'attendance_' + MONTHS[fm - 1] + '_' + fy + '.csv'
+      : 'attendance_' + MONTHS[fm - 1] + fy + '_to_' + MONTHS[tm - 1] + ty + '.csv'
+    a.download = fileName
     a.click()
-    showToast('CSV exported')
+
+    setExporting(false)
+    setShowExport(false)
+    showToast('CSV exported — ' + months.length + ' month' + (months.length > 1 ? 's' : ''))
   }
 
   // Year options
@@ -111,7 +161,7 @@ export default function MonthlyReport() {
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-lg font-bold text-gray-900">Monthly Report</h2>
         <button
-          onClick={exportCSV}
+          onClick={function () { setShowExport(true); setExportFromYear(year); setExportFromMonth(month); setExportToYear(year); setExportToMonth(month) }}
           disabled={loading || filtered.length === 0}
           className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
         >
@@ -229,6 +279,65 @@ export default function MonthlyReport() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {showExport && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { if (!exporting) setShowExport(false) }}>
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl" onClick={function (e) { e.stopPropagation() }}>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900">Export CSV</h3>
+              <p className="text-xs text-gray-500">Select month range for export</p>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">From Month</label>
+                  <select value={exportFromMonth} onChange={function (e) { setExportFromMonth(Number(e.target.value)) }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    {MONTHS.map(function (m, i) { return <option key={i} value={i + 1}>{m}</option> })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">From Year</label>
+                  <select value={exportFromYear} onChange={function (e) { setExportFromYear(Number(e.target.value)) }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    {yearOptions.map(function (y) { return <option key={y} value={y}>{y}</option> })}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">To Month</label>
+                  <select value={exportToMonth} onChange={function (e) { setExportToMonth(Number(e.target.value)) }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    {MONTHS.map(function (m, i) { return <option key={i} value={i + 1}>{m}</option> })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">To Year</label>
+                  <select value={exportToYear} onChange={function (e) { setExportToYear(Number(e.target.value)) }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    {yearOptions.map(function (y) { return <option key={y} value={y}>{y}</option> })}
+                  </select>
+                </div>
+              </div>
+
+              {(exportToYear < exportFromYear || (exportToYear === exportFromYear && exportToMonth < exportFromMonth)) && (
+                <p className="text-xs text-red-600">To month must be same or after From month</p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={function () { setShowExport(false) }} disabled={exporting}
+                  className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40">Cancel</button>
+                <button onClick={exportCSV}
+                  disabled={exporting || exportToYear < exportFromYear || (exportToYear === exportFromYear && exportToMonth < exportFromMonth)}
+                  className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
+                  {exporting ? 'Exporting…' : '⬇ Export'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

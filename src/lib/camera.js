@@ -90,8 +90,6 @@ export function capturePhoto() {
         guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.25)'
         faceStatus.textContent = 'Position your face in the oval'
         faceStatus.style.background = 'rgba(0,0,0,0.5)'
-        captureBtn.disabled = true
-        captureBtn.style.opacity = '0.4'
       }
     }
 
@@ -102,7 +100,18 @@ export function capturePhoto() {
         if (video.readyState < 2) return
         try {
           var result = await faceapi.detectSingleFace(video, options)
-          setFaceFound(!!result)
+          if (result) {
+            var box = result.box
+            var vw = video.videoWidth || 640
+            var vh = video.videoHeight || 480
+            var cx = (box.x + box.width / 2) / vw
+            var cy = (box.y + box.height / 2) / vh
+            var faceW = box.width / vw
+            // Face center must be: horizontally centered (25-75%), upper half (5-55%), large enough (>12% of frame)
+            setFaceFound(cx > 0.25 && cx < 0.75 && cy > 0.05 && cy < 0.55 && faceW > 0.12)
+          } else {
+            setFaceFound(false)
+          }
         } catch (e) {
           // transient error, ignore
         }
