@@ -14,6 +14,12 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
   async function handlePunch() {
     setError('')
 
+    // Quick DAR reminder on punch-in
+    if (punchType === 'in') {
+      setStep('dar')
+      await new Promise(function (r) { setTimeout(r, 1800) })
+    }
+
     // Start GPS request immediately (runs in parallel with camera)
     var gpsPromise = getLocation()
 
@@ -126,6 +132,17 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
       >
         {'📸 ' + (punchType === 'in' ? t('punch_btn_in') : t('punch_btn_out'))}
       </button>
+    )
+  }
+
+  if (step === 'dar') {
+    return (
+      <div className="text-center py-6">
+        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <span className="text-2xl">📝</span>
+        </div>
+        <p className="text-sm font-semibold text-amber-700">{t('dar_reminder') || 'Remember to write your DAR in the group!'}</p>
+      </div>
     )
   }
 
