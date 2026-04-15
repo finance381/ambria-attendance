@@ -132,7 +132,6 @@ export default function PunchForTeam() {
 
     var gps = await getLocation()
 
-    var { data: { user } } = await supabase.auth.getUser()
     var today = new Date().toISOString().slice(0, 10)
     var filePath = employee.id + '/' + today + '_' + punchType + '_proxy_' + Date.now() + '.jpg'
 

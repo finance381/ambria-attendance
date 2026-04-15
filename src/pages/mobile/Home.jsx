@@ -78,7 +78,7 @@ export default function Home() {
       setSyncError(remaining.length + ' punch' + (remaining.length > 1 ? 'es' : '') + ' failed to sync — may be duplicates')
     }
   }, [syncing, loadStatus])
-
+  var { t } = useLanguage()
   // Sync on mount + when coming back online
   useEffect(function () {
     syncOfflinePunches()
@@ -99,7 +99,7 @@ export default function Home() {
     return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
   }
 
-  var { t } = useLanguage()
+  
   var isPunchedIn = status && status.is_punched_in
   var punchType = isPunchedIn ? 'out' : 'in'
 
@@ -138,9 +138,8 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <p className="text-sm text-red-700">{syncError}</p>
             <button onClick={async function () {
-              var { getPendingPunches: gp, removePunch: rp } = await import('../../lib/offlineQueue')
-              var all = await gp()
-              for (var i = 0; i < all.length; i++) { await rp(all[i].id) }
+              var all = await getPendingPunches()
+              for (var i = 0; i < all.length; i++) { await removePunch(all[i].id) }
               setPendingCount(0)
               setSyncError('')
             }} className="text-xs font-semibold text-red-600 bg-red-100 px-3 py-1.5 rounded-lg">

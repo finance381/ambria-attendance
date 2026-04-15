@@ -6,7 +6,6 @@ import { useLanguage } from '../../lib/i18n'
 export default function Settings() {
   var { employee, changePassword, logout } = useAuth()
   var [showChangePw, setShowChangePw] = useState(false)
-  var [currentPw, setCurrentPw] = useState('')
   var [newPw, setNewPw] = useState('')
   var [confirmPw, setConfirmPw] = useState('')
   var [error, setError] = useState('')

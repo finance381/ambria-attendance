@@ -142,7 +142,7 @@ export default function MyAttendance() {
     var { data: empData } = await supabase
       .from('employees')
       .select('date_of_joining')
-      .eq('id', (await supabase.auth.getUser()).data.user.id)
+      .eq('id', userId)
       .maybeSingle()
 
     var joiningDate = empData && empData.date_of_joining ? empData.date_of_joining : null

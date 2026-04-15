@@ -87,7 +87,7 @@ export function capturePhoto() {
       } else {
         guideRing.style.borderColor = 'rgba(255,255,255,0.5)'
         guideRing.style.borderStyle = 'dashed'
-        guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.55)'
+        guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.25)'
         faceStatus.textContent = 'Position your face in the oval'
         faceStatus.style.background = 'rgba(0,0,0,0.5)'
         captureBtn.disabled = true

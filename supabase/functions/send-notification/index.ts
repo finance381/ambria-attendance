@@ -7,15 +7,6 @@ const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@ambria.loca
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SRK_AUTH")!
 
-// Web Push crypto utilities
-async function generatePushHeaders(endpoint: string, p256dh: string, auth: string) {
-  // Import the web-push library for Deno
-  const webPush = await import("https://esm.sh/web-push@3.6.7")
-  
-  webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
-  
-  return webPush
-}
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://finance381.github.io',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -32,9 +23,7 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '')
     if (token !== SUPABASE_SERVICE_ROLE_KEY) {
       return new Response(JSON.stringify({ 
-        error: 'Unauthorized',
-        token_start: token.substring(0, 20),
-        env_start: SUPABASE_SERVICE_ROLE_KEY.substring(0, 20)
+        error: 'Unauthorized'
       }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
