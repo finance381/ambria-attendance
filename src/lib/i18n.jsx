@@ -212,6 +212,7 @@ var translations = {
     dar_no_history: 'No DARs submitted yet',
     dar_err_tasks: 'Please enter your tasks',
     dar_err_punchin: 'Please enter punch-in time',
+    dar_preview: 'Preview DAR',
   },
 
   hi: {
@@ -423,6 +424,7 @@ var translations = {
     dar_no_history: 'अभी तक कोई DAR जमा नहीं',
     dar_err_tasks: 'कृपया अपने कार्य दर्ज करें',
     dar_err_punchin: 'कृपया पंच-इन समय दर्ज करें',
+    dar_preview: 'DAR पूर्वावलोकन',
   }
 }
 

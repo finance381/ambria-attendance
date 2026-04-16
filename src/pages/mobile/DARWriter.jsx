@@ -145,7 +145,7 @@ export default function DARWriter() {
       setError(t('dar_err_punchin'))
       return
     }
-    setConfirmStep('first')
+    setConfirmStep('preview')
   }
 
   async function handleFinalSubmit() {
@@ -232,6 +232,41 @@ export default function DARWriter() {
     if (!confirmStep) return null
 
     var bullets = formatTasksBullets(tasks)
+
+    if (confirmStep === 'preview') {
+     return (
+       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+         <div className="bg-white rounded-2xl p-5 w-full max-w-sm space-y-4 max-h-[80vh] overflow-y-auto">
+           <h3 className="text-base font-bold text-slate-800">{t('dar_preview')}</h3>
+
+           <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm border font-mono">
+             <p className="font-semibold">DAR: {formatDisplayDate(selectedDate)}</p>
+             <p>Name: {employee.name}</p>
+             <p></p>
+             <p>{t('dar_punch_in')}: {formatTime12(punchIn)}</p>
+             <p></p>
+             <p className="font-medium">{t('dar_tasks')}:</p>
+             {bullets.map(function (b, i) {
+               return <p key={i}>{b}</p>
+             })}
+             <p></p>
+             {punchOut && <p>{t('dar_punch_out')}: {formatTime12(punchOut)}</p>}
+           </div>
+
+           <div className="flex gap-3">
+             <button onClick={function () { setConfirmStep(null) }}
+               className="flex-1 py-2.5 text-sm font-medium text-slate-600 bg-gray-100 rounded-xl">
+               {t('dar_confirm_back')}
+             </button>
+             <button onClick={function () { setConfirmStep('first') }}
+               className="flex-1 py-2.5 text-sm font-medium text-white bg-slate-800 rounded-xl">
+               {t('dar_submit')}
+             </button>
+           </div>
+         </div>
+       </div>
+     )
+   }
 
     if (confirmStep === 'first') {
       return (
@@ -384,7 +419,7 @@ export default function DARWriter() {
           {/* Submit */}
           <button onClick={handleSubmitClick}
             className="w-full py-3 bg-slate-800 text-white text-sm font-semibold rounded-xl active:bg-slate-700">
-            {t('dar_submit')}
+            {t('dar_preview')}
           </button>
         </>
       )}
