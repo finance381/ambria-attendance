@@ -17,6 +17,7 @@ import MyClaims from './pages/mobile/MyClaims'
 import ClaimsQueue from './pages/admin/ClaimsQueue'
 import AppConfig from './pages/admin/AppConfig'
 import DARWriter from './pages/mobile/DARWriter'
+import AdminDARs from './pages/admin/AdminDARs'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -128,7 +129,13 @@ export default function App() {
             <ClaimsQueue />
           </ProtectedRoute>
         } />
+        <Route path="dars" element={
+          <ProtectedRoute roles={['admin']}>
+            <AdminDARs />
+          </ProtectedRoute>
+        } />
       </Route>
+      
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
