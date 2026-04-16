@@ -3,9 +3,6 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
 
-if (employee.emp_code !== 'AMB001') {
-   return <Navigate to="/" replace />
- }
 
 function formatDate(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
@@ -29,6 +26,10 @@ function formatDisplayDate(dateStr) {
 export default function DARWriter() {
   var { employee, session } = useAuth()
   var { t } = useLanguage()
+
+  if (employee.emp_code !== 'AMB001') {
+   return <Navigate to="/" replace />
+ }
 
   var [selectedDate, setSelectedDate] = useState(formatDate(new Date()))
   var [punchIn, setPunchIn] = useState('')
