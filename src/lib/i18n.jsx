@@ -55,6 +55,9 @@ var translations = {
     punch_done_in: 'Punched In!',
     punch_done_out: 'Punched Out!',
     punch_try_again: 'Try Again',
+    dar_reminder_title: 'DAR Reminder',
+    dar_reminder: 'Remember to write your DAR in the group!',
+    dar_ok: 'OK, Got it',
 
     // ── My Attendance ────────────────────────
     attendance_title: 'My Attendance',
@@ -241,6 +244,9 @@ var translations = {
     punch_done_in: 'पंच इन हो गया!',
     punch_done_out: 'पंच आउट हो गया!',
     punch_try_again: 'फिर कोशिश करें',
+    dar_reminder_title: 'DAR रिमाइंडर',
+    dar_reminder: 'अपने ग्रुप में DAR लिखना न भूलें!',
+    dar_ok: 'ठीक है',
 
     // ── My Attendance ────────────────────────
     attendance_title: 'मेरी हाज़िरी',
