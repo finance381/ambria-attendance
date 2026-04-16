@@ -201,6 +201,8 @@ export default function DARWriter() {
 
         <div className="flex items-center gap-2">
           <input type="date" value={selectedDate} onChange={handleDateChange}
+            min={formatDate(new Date(Date.now() - 86400000))}
+            max={formatDate(new Date())}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1" />
         </div>
 
@@ -366,6 +368,7 @@ export default function DARWriter() {
       <div>
         <label className="text-xs font-medium text-slate-500 mb-1 block">{t('dar_date')}</label>
         <input type="date" value={selectedDate} onChange={handleDateChange}
+          min={formatDate(new Date(Date.now() - 86400000))}
           max={formatDate(new Date())}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       </div>
