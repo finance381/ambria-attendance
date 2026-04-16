@@ -16,6 +16,7 @@ import PunchForTeam from './pages/mobile/PunchForTeam'
 import MyClaims from './pages/mobile/MyClaims'
 import ClaimsQueue from './pages/admin/ClaimsQueue'
 import AppConfig from './pages/admin/AppConfig'
+import DARWriter from './pages/mobile/DARWriter'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -77,6 +78,11 @@ export default function App() {
         } />
         <Route path="attendance" element={<MyAttendance />} />
         <Route path="claims" element={<MyClaims />} />
+        <Route path="dar" element={
+           <ProtectedRoute>
+             <DARWriter />
+           </ProtectedRoute>
+         } />
         <Route path="settings" element={<Settings />} />
       </Route>
 

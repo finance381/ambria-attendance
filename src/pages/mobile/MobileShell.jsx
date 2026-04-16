@@ -6,6 +6,7 @@ var TAB_KEYS = [
   { to: '/', key: 'tab_home', icon: '🏠', roles: null },
   { to: '/team', key: 'tab_team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
   { to: '/claims', key: 'tab_claims', icon: '📝', roles: null },
+  { to: '/dar', key: 'tab_dar', icon: '📋', roles: null, empCodes: ['AMB001'] },
   { to: '/attendance', key: 'tab_attendance', icon: '📅', roles: null },
   { to: '/settings', key: 'tab_settings', icon: '⚙️', roles: null },
 ]
@@ -40,6 +41,7 @@ export default function MobileShell() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
           {TAB_KEYS.filter(function (tab) {
+            if (tab.empCodes) return tab.empCodes.includes(employee.emp_code)
             if (!tab.roles) return true
             return tab.roles.includes(employee.role)
           }).map(function (tab) {
