@@ -15,10 +15,30 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     setError('')
 
     // Quick DAR reminder on punch-in
+    // DAR reminder popup on punch-in — blocks until user dismisses
     if (punchType === 'in') {
-      setStep('dar')
-      await new Promise(function (r) { setTimeout(r, 1800) })
+      await new Promise(function (resolve) {
+        var overlay = document.createElement('div')
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:16px'
+        var card = document.createElement('div')
+        card.style.cssText = 'background:#fff;border-radius:16px;padding:24px;max-width:300px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.25);text-align:center'
+        card.innerHTML = '<div style="width:48px;height:48px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><span style="font-size:24px">📝</span></div>'
+          + '<p style="font-size:15px;font-weight:700;color:#92400e;margin:0 0 6px">' + (t('dar_reminder_title') || 'DAR Reminder') + '</p>'
+          + '<p style="font-size:13px;color:#78716c;margin:0 0 20px">' + (t('dar_reminder') || 'Remember to write your DAR in the group!') + '</p>'
+        var btn = document.createElement('button')
+        btn.textContent = t('dar_ok') || 'OK, Got it'
+        btn.style.cssText = 'width:100%;padding:12px;font-size:14px;font-weight:700;color:#fff;background:#f59e0b;border:none;border-radius:10px;cursor:pointer'
+        card.appendChild(btn)
+        overlay.appendChild(card)
+        document.body.appendChild(overlay)
+        btn.addEventListener('click', function () {
+          document.body.removeChild(overlay)
+          resolve()
+        })
+      })
     }
+
+    // Start GPS request immediately (runs in parallel with camera)
 
     // Start GPS request immediately (runs in parallel with camera)
     var gpsPromise = getLocation()
