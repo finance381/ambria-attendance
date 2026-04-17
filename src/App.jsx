@@ -16,6 +16,7 @@ import PunchForTeam from './pages/mobile/PunchForTeam'
 import MyClaims from './pages/mobile/MyClaims'
 import ClaimsQueue from './pages/admin/ClaimsQueue'
 import AppConfig from './pages/admin/AppConfig'
+import LeaveBalances from './pages/admin/LeaveBalances'
 import DARWriter from './pages/mobile/DARWriter'
 import AdminDARs from './pages/admin/AdminDARs'
 
@@ -127,6 +128,11 @@ export default function App() {
         <Route path="claims" element={
           <ProtectedRoute roles={['admin', 'manager']}>
             <ClaimsQueue />
+          </ProtectedRoute>
+        } />
+        <Route path="leaves" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <LeaveBalances />
           </ProtectedRoute>
         } />
         <Route path="dars" element={

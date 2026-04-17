@@ -6,6 +6,7 @@ var NAV_ITEMS = [
   { to: '/admin/attendance', label: 'Daily Attendance', icon: '📋' },
   { to: '/admin/monthly', label: 'Monthly Report', icon: '📊' },
   { to: '/admin/claims', label: 'Claims', icon: '📝' },
+  { to: '/admin/leaves', label: 'Leave Balances', icon: '🏖️' },
   { to: '/admin/employees', label: 'Employees', icon: '👥' },
   { to: '/admin/departments', label: 'Departments', icon: '🏢' },
   { to: '/admin/venues', label: 'Venues', icon: '📍' },
