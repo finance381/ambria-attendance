@@ -8,9 +8,6 @@ var NAV_ITEMS = [
   { to: '/admin/claims', label: 'Claims', icon: '📝' },
   { to: '/admin/leaves', label: 'Leave Balances', icon: '🏖️' },
   { to: '/admin/employees', label: 'Employees', icon: '👥' },
-  { to: '/admin/departments', label: 'Departments', icon: '🏢' },
-  { to: '/admin/venues', label: 'Venues', icon: '📍' },
-  { to: '/admin/dars', label: 'DARs', icon: '📋', empCodes: ['AMB001'] },
 ]
 
 export default function AdminShell() {

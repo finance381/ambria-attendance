@@ -8,14 +8,12 @@ import Settings from './pages/mobile/Settings'
 import AdminShell from './pages/admin/AdminShell'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import Employees from './pages/admin/Employees'
-import Departments from './pages/admin/Departments'
-import Venues from './pages/admin/Venues'
 import DailyAttendance from './pages/admin/DailyAttendance'
 import MonthlyReport from './pages/admin/MonthlyReport'
 import PunchForTeam from './pages/mobile/PunchForTeam'
 import MyClaims from './pages/mobile/MyClaims'
 import ClaimsQueue from './pages/admin/ClaimsQueue'
-import AppConfig from './pages/admin/AppConfig'
+import ConfigHub from './pages/admin/ConfigHub'
 import LeaveBalances from './pages/admin/LeaveBalances'
 import DARWriter from './pages/mobile/DARWriter'
 import AdminDARs from './pages/admin/AdminDARs'
@@ -100,19 +98,9 @@ export default function App() {
             <Employees />
           </ProtectedRoute>
         } />
-        <Route path="departments" element={
-          <ProtectedRoute roles={['admin']}>
-            <Departments />
-          </ProtectedRoute>
-        } />
-        <Route path="venues" element={
-          <ProtectedRoute roles={['admin']}>
-            <Venues />
-          </ProtectedRoute>
-        } />
         <Route path="config" element={
           <ProtectedRoute roles={['admin']}>
-            <AppConfig />
+            <ConfigHub />
           </ProtectedRoute>
         } />
         <Route path="attendance" element={
