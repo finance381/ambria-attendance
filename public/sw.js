@@ -1,5 +1,5 @@
-var CACHE_NAME = 'ambria-v3'
-var SHELL_URLS = ['/ambria-attendance/']
+var CACHE_NAME = 'ambria-v4'
+var SHELL_URLS = ['/ambria-attendance/', '/ambria-attendance/index.html']
 
 // Install — cache shell
 self.addEventListener('install', function (e) {
@@ -24,12 +24,45 @@ self.addEventListener('activate', function (e) {
   self.clients.claim()
 })
 
-// Fetch — network first, fallback to cache for navigation
+// Fetch strategy:
+// - navigation requests: network-first → cache fallback
+// - same-origin JS/CSS/assets: stale-while-revalidate (serve cached, update in bg)
+// - Supabase/API calls: always network (never cache)
 self.addEventListener('fetch', function (e) {
+  var url = new URL(e.request.url)
+
+  // Never intercept Supabase/external API calls
+  if (url.origin !== self.location.origin) return
+
+  // Navigation: network-first
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      fetch(e.request).catch(function () {
-        return caches.match('/ambria-attendance/')
+      fetch(e.request)
+        .then(function (res) {
+          var clone = res.clone()
+          caches.open(CACHE_NAME).then(function (cache) { cache.put(e.request, clone) })
+          return res
+        })
+        .catch(function () {
+          return caches.match(e.request).then(function (cached) {
+            return cached || caches.match('/ambria-attendance/')
+          })
+        })
+    )
+    return
+  }
+
+  // Static assets: stale-while-revalidate
+  if (/\.(js|css|png|jpg|jpeg|svg|woff2?|json)$/.test(url.pathname)) {
+    e.respondWith(
+      caches.open(CACHE_NAME).then(function (cache) {
+        return cache.match(e.request).then(function (cached) {
+          var fetchPromise = fetch(e.request).then(function (res) {
+            if (res && res.status === 200) cache.put(e.request, res.clone())
+            return res
+          }).catch(function () { return cached })
+          return cached || fetchPromise
+        })
       })
     )
   }

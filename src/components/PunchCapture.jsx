@@ -13,6 +13,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
 
   async function handlePunch() {
     setError('')
+    var clientPunchId = (crypto && crypto.randomUUID) ? crypto.randomUUID() :
+      (Date.now() + '_' + Math.random().toString(36).slice(2))
 
     // Quick DAR reminder on punch-in
     // DAR reminder popup on punch-in — blocks until user dismisses
@@ -76,7 +78,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           longitude: gps.longitude,
           gpsAccuracy: gps.accuracy,
           deviceInfo: navigator.userAgent,
-          clientTimestamp: new Date().toISOString()
+          clientTimestamp: new Date().toISOString(),
+          clientPunchId: clientPunchId
         })
         await registerBackgroundSync()
         setStep('queued')
@@ -108,21 +111,70 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         upsert: false
       })
 
+    // If upload fails (network issue), queue for offline sync
     if (uploadError) {
-      setError('Upload failed: ' + uploadError.message)
-      setStep('error')
-      return
+      try {
+        await queuePunch({
+          punchType: punchType,
+          selfieBlob: photo.blob,
+          selfieDataUrl: photo.dataUrl,
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          gpsAccuracy: gps.accuracy,
+          deviceInfo: navigator.userAgent,
+          clientTimestamp: new Date().toISOString(),
+          clientPunchId: clientPunchId
+        })
+        await registerBackgroundSync()
+        setStep('queued')
+        if (onComplete) onComplete({ queued: true })
+        return
+      } catch (qErr) {
+        setError('Network issue — try again: ' + uploadError.message)
+        setStep('error')
+        return
+      }
     }
 
     // Step 4: Call punch RPC
-    var { data, error: rpcError } = await supabase.rpc('punch', {
-      p_punch_type: punchType,
-      p_selfie_path: filePath,
-      p_latitude: gps.latitude,
-      p_longitude: gps.longitude,
-      p_gps_accuracy: gps.accuracy,
-      p_device_info: navigator.userAgent
-    })
+    var rpcResult
+    try {
+      rpcResult = await supabase.rpc('punch', {
+        p_punch_type: punchType,
+        p_selfie_path: filePath,
+        p_latitude: gps.latitude,
+        p_longitude: gps.longitude,
+        p_gps_accuracy: gps.accuracy,
+        p_device_info: navigator.userAgent,
+        p_client_punch_id: clientPunchId
+      })
+    } catch (netErr) {
+      // Network threw before reaching server — queue it
+      try {
+        await queuePunch({
+          punchType: punchType,
+          selfieBlob: photo.blob,
+          selfieDataUrl: photo.dataUrl,
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          gpsAccuracy: gps.accuracy,
+          deviceInfo: navigator.userAgent,
+          clientTimestamp: new Date().toISOString(),
+          clientPunchId: clientPunchId
+        })
+        await registerBackgroundSync()
+        setStep('queued')
+        if (onComplete) onComplete({ queued: true })
+        return
+      } catch (qErr) {
+        setError('Network issue — try again')
+        setStep('error')
+        return
+      }
+    }
+
+    var data = rpcResult.data
+    var rpcError = rpcResult.error
 
     if (rpcError) {
       setError('Punch failed: ' + rpcError.message)
