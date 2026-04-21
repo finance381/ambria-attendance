@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, HeadingLevel, WidthType, BorderStyle } from 'docx'
 
 var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -68,11 +69,10 @@ export default function MonthlyReport() {
     return r.is_casual && r.days_incomplete > 0
   }).length
 
-  // Export CSV — supports multi-month range + search/dept filters
+  // Export DOCX — supports multi-month range + search/dept filters
   async function exportCSV() {
     setExporting(true)
 
-    // Build list of year/month pairs from → to
     var months = []
     var fy = exportFromYear, fm = exportFromMonth
     var ty = exportToYear, tm = exportToMonth
@@ -88,7 +88,6 @@ export default function MonthlyReport() {
     var isSingleMonth = months.length === 1
     var searchLower = search.trim().toLowerCase()
 
-    // Apply same filters as on-screen table
     function applyFilters(rows) {
       return rows.filter(function (r) {
         if (!searchLower) return true
@@ -97,30 +96,8 @@ export default function MonthlyReport() {
       })
     }
 
-    var csvRows = []
-
-    // Header block
-    csvRows.push('GET YOUR VENUE EVENTS PVT LTD')
-    csvRows.push('Attendance Report')
-
-    var periodLabel
-    if (isSingleMonth) {
-      var daysInMonth = new Date(fy, fm, 0).getDate()
-      periodLabel = '01 ' + MONTHS[fm - 1] + ' - ' + daysInMonth + ' ' + MONTHS[fm - 1] + ' ' + fy
-    } else {
-      var lastDay = new Date(ty, tm, 0).getDate()
-      periodLabel = '01 ' + MONTHS[fm - 1] + ' ' + fy + ' - ' + lastDay + ' ' + MONTHS[tm - 1] + ' ' + ty
-    }
-    csvRows.push('Period: ' + periodLabel)
-    csvRows.push('')
-
-    // Column headers
-    if (isSingleMonth) {
-      csvRows.push(['S.No.', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days'].join(','))
-    } else {
-      csvRows.push(['S.No.', 'Month', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days'].join(','))
-    }
-
+    // Collect all rows
+    var allRows = []
     var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, total: 0 }
     var serial = 1
 
@@ -147,44 +124,150 @@ export default function MonthlyReport() {
         grandTotals.incomplete += incomplete
         grandTotals.total += total
 
-        var row = [
-          serial++,
-          '"' + (r.name || '').replace(/"/g, '""') + '"',
-          present, absent, half, incomplete, total
-        ]
-        if (!isSingleMonth) row.splice(1, 0, '"' + monthLabel + '"')
-        csvRows.push(row.join(','))
+        allRows.push({
+          serial: serial++,
+          month: monthLabel,
+          name: r.name,
+          present: present,
+          absent: absent,
+          half: half,
+          incomplete: incomplete,
+          total: total
+        })
       })
     }
 
-    // If no rows matched
-    if (serial === 1) {
+    if (allRows.length === 0) {
       setExporting(false)
       showToast('No employees match current filters')
       return
     }
 
-    // Totals row
-    csvRows.push('')
-    var totRow = isSingleMonth
-      ? ['', '"TOTAL"', grandTotals.present, grandTotals.absent, grandTotals.half, grandTotals.incomplete, grandTotals.total]
-      : ['', '', '"TOTAL"', grandTotals.present, grandTotals.absent, grandTotals.half, grandTotals.incomplete, grandTotals.total]
-    csvRows.push(totRow.join(','))
+    // Period line
+    var periodLabel
+    if (isSingleMonth) {
+      var daysInMonth = new Date(fy, fm, 0).getDate()
+      periodLabel = '01 ' + MONTHS[fm - 1] + ' – ' + daysInMonth + ' ' + MONTHS[fm - 1] + ' ' + fy
+    } else {
+      var lastDay = new Date(ty, tm, 0).getDate()
+      periodLabel = '01 ' + MONTHS[fm - 1] + ' ' + fy + ' – ' + lastDay + ' ' + MONTHS[tm - 1] + ' ' + ty
+    }
 
-    var blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+    // Helpers to build table cells
+    function textRun(text, opts) {
+      opts = opts || {}
+      return new TextRun({ text: String(text), bold: !!opts.bold, size: opts.size || 20 })
+    }
+    function headerCell(text) {
+      return new TableCell({
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [textRun(text, { bold: true })] })],
+        shading: { fill: 'E7E6E6' }
+      })
+    }
+    function dataCell(text, opts) {
+      opts = opts || {}
+      return new TableCell({
+        children: [new Paragraph({ alignment: opts.align || AlignmentType.CENTER, children: [textRun(text, { bold: !!opts.bold })] })]
+      })
+    }
+
+    // Build header row
+    var headerCells = isSingleMonth
+      ? ['S.No.', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days']
+      : ['S.No.', 'Month', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days']
+
+    var tableRows = [
+      new TableRow({ children: headerCells.map(headerCell), tableHeader: true })
+    ]
+
+    // Data rows
+    allRows.forEach(function (r) {
+      var cells = isSingleMonth
+        ? [
+            dataCell(r.serial),
+            dataCell(r.name, { align: AlignmentType.LEFT, bold: true }),
+            dataCell(r.present),
+            dataCell(r.absent),
+            dataCell(r.half),
+            dataCell(r.incomplete),
+            dataCell(r.total)
+          ]
+        : [
+            dataCell(r.serial),
+            dataCell(r.month),
+            dataCell(r.name, { align: AlignmentType.LEFT, bold: true }),
+            dataCell(r.present),
+            dataCell(r.absent),
+            dataCell(r.half),
+            dataCell(r.incomplete),
+            dataCell(r.total)
+          ]
+      tableRows.push(new TableRow({ children: cells }))
+    })
+
+    // Totals row
+    var totCells = isSingleMonth
+      ? [
+          dataCell('', { bold: true }),
+          dataCell('TOTAL', { align: AlignmentType.LEFT, bold: true }),
+          dataCell(grandTotals.present, { bold: true }),
+          dataCell(grandTotals.absent, { bold: true }),
+          dataCell(grandTotals.half, { bold: true }),
+          dataCell(grandTotals.incomplete, { bold: true }),
+          dataCell(grandTotals.total, { bold: true })
+        ]
+      : [
+          dataCell('', { bold: true }),
+          dataCell('', { bold: true }),
+          dataCell('TOTAL', { align: AlignmentType.LEFT, bold: true }),
+          dataCell(grandTotals.present, { bold: true }),
+          dataCell(grandTotals.absent, { bold: true }),
+          dataCell(grandTotals.half, { bold: true }),
+          dataCell(grandTotals.incomplete, { bold: true }),
+          dataCell(grandTotals.total, { bold: true })
+        ]
+    tableRows.push(new TableRow({ children: totCells }))
+
+    var table = new Table({
+      rows: tableRows,
+      width: { size: 100, type: WidthType.PERCENTAGE }
+    })
+
+    // Build document
+    var doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'GET YOUR VENUE EVENTS PVT LTD', bold: true, size: 28 })]
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'Attendance Report', bold: true, size: 24 })]
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'Period: ' + periodLabel + '  |  Total Employees: ' + allRows.length, size: 20 })]
+          }),
+          new Paragraph({ children: [new TextRun({ text: '', size: 20 })] }),
+          table
+        ]
+      }]
+    })
+
+    var blob = await Packer.toBlob(doc)
     var a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-
     var filterSuffix = searchLower ? '_' + searchLower.replace(/[^a-z0-9]/g, '') : ''
-    var fileName = isSingleMonth
-      ? 'attendance_' + MONTHS[fm - 1] + '_' + fy + filterSuffix + '.csv'
-      : 'attendance_' + MONTHS[fm - 1] + fy + '_to_' + MONTHS[tm - 1] + ty + filterSuffix + '.csv'
-    a.download = fileName
+    a.download = isSingleMonth
+      ? 'attendance_' + MONTHS[fm - 1] + '_' + fy + filterSuffix + '.docx'
+      : 'attendance_' + MONTHS[fm - 1] + fy + '_to_' + MONTHS[tm - 1] + ty + filterSuffix + '.docx'
     a.click()
 
     setExporting(false)
     setShowExport(false)
-    showToast('CSV exported — ' + (serial - 1) + ' row' + (serial - 1 !== 1 ? 's' : ''))
+    showToast('DOCX exported — ' + allRows.length + ' row' + (allRows.length !== 1 ? 's' : ''))
   }
 
   // Year options
@@ -202,7 +285,7 @@ export default function MonthlyReport() {
           disabled={loading || filtered.length === 0}
           className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
         >
-          ⬇ Export CSV
+          ⬇ Export DOCX
         </button>
       </div>
       <p className="text-xs text-gray-500 mb-4">Attendance summary for payroll</p>
