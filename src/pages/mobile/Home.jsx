@@ -58,7 +58,8 @@ export default function Home() {
           p_longitude: p.longitude,
           p_gps_accuracy: p.gpsAccuracy,
           p_device_info: p.deviceInfo,
-          p_client_timestamp: p.clientTimestamp
+          p_client_timestamp: p.clientTimestamp,
+          p_client_punch_id: p.clientPunchId
         })
 
         if (!rpcErr && (!result || !result.error)) {
