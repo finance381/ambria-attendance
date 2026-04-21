@@ -68,7 +68,7 @@ export default function MonthlyReport() {
     return r.is_casual && r.days_incomplete > 0
   }).length
 
-  // Export CSV — supports multi-month range
+  // Export CSV — supports multi-month range + search/dept filters
   async function exportCSV() {
     setExporting(true)
 
@@ -86,13 +86,43 @@ export default function MonthlyReport() {
     if (months.length === 0) { setExporting(false); return }
 
     var isSingleMonth = months.length === 1
-    var headers = isSingleMonth
-      ? ['Code', 'Name', 'Department', 'Designation', 'Type',
-         'Effective Days', 'Present', 'Half Day', 'Absent', 'Incomplete', 'Total Hours']
-      : ['Month', 'Code', 'Name', 'Department', 'Designation', 'Type',
-         'Effective Days', 'Present', 'Half Day', 'Absent', 'Incomplete', 'Total Hours']
-    var csvRows = [headers.join(',')]
-    var grandTotals = { effective: 0, present: 0, half: 0, absent: 0, incomplete: 0, hours: 0 }
+    var searchLower = search.trim().toLowerCase()
+
+    // Apply same filters as on-screen table
+    function applyFilters(rows) {
+      return rows.filter(function (r) {
+        if (!searchLower) return true
+        return (r.name && r.name.toLowerCase().includes(searchLower)) ||
+               (r.emp_code && r.emp_code.toLowerCase().includes(searchLower))
+      })
+    }
+
+    var csvRows = []
+
+    // Header block
+    csvRows.push('GET YOUR VENUE EVENTS PVT LTD')
+    csvRows.push('Attendance Report')
+
+    var periodLabel
+    if (isSingleMonth) {
+      var daysInMonth = new Date(fy, fm, 0).getDate()
+      periodLabel = '01 ' + MONTHS[fm - 1] + ' - ' + daysInMonth + ' ' + MONTHS[fm - 1] + ' ' + fy
+    } else {
+      var lastDay = new Date(ty, tm, 0).getDate()
+      periodLabel = '01 ' + MONTHS[fm - 1] + ' ' + fy + ' - ' + lastDay + ' ' + MONTHS[tm - 1] + ' ' + ty
+    }
+    csvRows.push('Period: ' + periodLabel)
+    csvRows.push('')
+
+    // Column headers
+    if (isSingleMonth) {
+      csvRows.push(['S.No.', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days'].join(','))
+    } else {
+      csvRows.push(['S.No.', 'Month', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days'].join(','))
+    }
+
+    var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, total: 0 }
+    var serial = 1
 
     for (var i = 0; i < months.length; i++) {
       var m = months[i]
@@ -101,53 +131,60 @@ export default function MonthlyReport() {
         p_department_id: deptFilter ? Number(deptFilter) : null
       })
 
-      var rows = mData || []
+      var rows = applyFilters(mData || [])
       var monthLabel = MONTHS[m.month - 1] + ' ' + m.year
 
       rows.forEach(function (r) {
-        grandTotals.effective += r.effective_days
-        grandTotals.present += r.days_present
-        grandTotals.half += r.days_half
-        grandTotals.absent += r.days_absent
-        grandTotals.incomplete += r.days_incomplete
-        grandTotals.hours += r.total_hours
+        var present = r.days_present || 0
+        var absent = r.days_absent || 0
+        var half = r.days_half || 0
+        var incomplete = r.days_incomplete || 0
+        var total = present + absent + half + incomplete
+
+        grandTotals.present += present
+        grandTotals.absent += absent
+        grandTotals.half += half
+        grandTotals.incomplete += incomplete
+        grandTotals.total += total
 
         var row = [
-          r.emp_code,
+          serial++,
           '"' + (r.name || '').replace(/"/g, '""') + '"',
-          '"' + (r.department_name || '').replace(/"/g, '""') + '"',
-          '"' + (r.designation || '').replace(/"/g, '""') + '"',
-          r.is_casual ? 'Casual' : 'Permanent',
-          r.effective_days, r.days_present, r.days_half,
-          r.days_absent, r.days_incomplete, r.total_hours
+          present, absent, half, incomplete, total
         ]
-        if (!isSingleMonth) row.unshift('"' + monthLabel + '"')
+        if (!isSingleMonth) row.splice(1, 0, '"' + monthLabel + '"')
         csvRows.push(row.join(','))
       })
     }
 
-    // Grand totals
-    var totRow = [
-      '', '"TOTAL"', '', '', '',
-      grandTotals.effective, grandTotals.present, grandTotals.half,
-      grandTotals.absent, grandTotals.incomplete,
-      Math.round(grandTotals.hours * 10) / 10
-    ]
-    if (!isSingleMonth) totRow.unshift('')
+    // If no rows matched
+    if (serial === 1) {
+      setExporting(false)
+      showToast('No employees match current filters')
+      return
+    }
+
+    // Totals row
+    csvRows.push('')
+    var totRow = isSingleMonth
+      ? ['', '"TOTAL"', grandTotals.present, grandTotals.absent, grandTotals.half, grandTotals.incomplete, grandTotals.total]
+      : ['', '', '"TOTAL"', grandTotals.present, grandTotals.absent, grandTotals.half, grandTotals.incomplete, grandTotals.total]
     csvRows.push(totRow.join(','))
 
     var blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
     var a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
+
+    var filterSuffix = searchLower ? '_' + searchLower.replace(/[^a-z0-9]/g, '') : ''
     var fileName = isSingleMonth
-      ? 'attendance_' + MONTHS[fm - 1] + '_' + fy + '.csv'
-      : 'attendance_' + MONTHS[fm - 1] + fy + '_to_' + MONTHS[tm - 1] + ty + '.csv'
+      ? 'attendance_' + MONTHS[fm - 1] + '_' + fy + filterSuffix + '.csv'
+      : 'attendance_' + MONTHS[fm - 1] + fy + '_to_' + MONTHS[tm - 1] + ty + filterSuffix + '.csv'
     a.download = fileName
     a.click()
 
     setExporting(false)
     setShowExport(false)
-    showToast('CSV exported — ' + months.length + ' month' + (months.length > 1 ? 's' : ''))
+    showToast('CSV exported — ' + (serial - 1) + ' row' + (serial - 1 !== 1 ? 's' : ''))
   }
 
   // Year options
