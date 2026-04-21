@@ -133,13 +133,19 @@ export default function ClaimsQueue() {
           {claims.map(function (c) {
             var isPending = c.status === 'pending'
             return (
-              <div key={c.claim_id} className="bg-white border border-gray-200 rounded-xl p-4">
+              <div key={c.claim_id} className={'border rounded-xl p-4 ' +
+                (c.is_over_limit ? 'bg-red-50/30 border-red-200' : 'bg-white border-gray-200')}>
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{c.employee_name}</p>
                     <p className="text-[11px] text-gray-400">{c.emp_code} · {c.department_name}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {c.is_over_limit && (
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-red-600 text-white">
+                        ⚠ Over Limit
+                      </span>
+                    )}
                     <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' +
                       (c.claim_type === 'missed_in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
                       {c.claim_type === 'missed_in' ? 'Missed In' : 'Missed Out'}

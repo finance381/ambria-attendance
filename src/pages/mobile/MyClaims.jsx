@@ -82,6 +82,8 @@ export default function MyClaims() {
   }
 
   var remaining = limit - used
+  var overBy = Math.max(0, used - limit)
+  var isOverLimit = overBy > 0
 
   return (
     <div>
@@ -90,21 +92,36 @@ export default function MyClaims() {
           <h2 className="text-lg font-bold text-gray-900">{t('claims_title')}</h2>
           <p className="text-xs text-gray-400">
             {t('claims_used', { used: used, limit: limit })}
-            <span className={'ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full ' +
-              (remaining <= 1 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700')}>
-              {t('claims_remaining', { n: remaining })}
-            </span>
+            {isOverLimit ? (
+              <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-50 text-red-600">
+                {t('claims_over_by', { n: overBy }) || ('+' + overBy + ' over limit')}
+              </span>
+            ) : (
+              <span className={'ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full ' +
+                (remaining <= 1 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>
+                {t('claims_remaining', { n: remaining })}
+              </span>
+            )}
           </p>
         </div>
-        {remaining > 0 && (
-          <button
-            onClick={function () { setShowNew(true); setFormError('') }}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors"
-          >
-            {t('claims_new')}
-          </button>
-        )}
+        <button
+          onClick={function () { setShowNew(true); setFormError('') }}
+          className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors"
+        >
+          {t('claims_new')}
+        </button>
       </div>
+
+      {isOverLimit && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+          <p className="text-sm font-semibold text-red-800">
+            ⚠️ {t('claims_over_banner_title', { n: overBy }) || 'You are ' + overBy + ' claim' + (overBy > 1 ? 's' : '') + ' over the limit'}
+          </p>
+          <p className="text-[11px] text-red-600 mt-0.5">
+            {t('claims_over_banner_desc') || 'Monthly limit is ' + limit + '. Extra claims will still be submitted but flagged for admin review.'}
+          </p>
+        </div>
+      )}
 
       {/* New claim form */}
       {showNew && (
