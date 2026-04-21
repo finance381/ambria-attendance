@@ -54,7 +54,7 @@ export default function MonthlyReport() {
   })
 
   // Totals
-  var totals = { effective: 0, present: 0, half: 0, absent: 0, incomplete: 0, hours: 0 }
+  var totals = { effective: 0, present: 0, half: 0, absent: 0, incomplete: 0, hours: 0, claims: 0 }
   filtered.forEach(function (r) {
     totals.effective += r.effective_days
     totals.present += r.days_present
@@ -62,6 +62,7 @@ export default function MonthlyReport() {
     totals.absent += r.days_absent
     totals.incomplete += r.days_incomplete
     totals.hours += r.total_hours
+    totals.claims += (r.claims_used || 0)
   })
 
   // Casual incomplete count
@@ -355,12 +356,13 @@ export default function MonthlyReport() {
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">A</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-amber-600 uppercase tracking-wider">Inc</th>
                 <th className="text-right px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
+                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-purple-600 uppercase tracking-wider">Claims</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
+                  <td colSpan={10} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
                 </tr>
               ) : (
                 <>
@@ -382,6 +384,17 @@ export default function MonthlyReport() {
                           {r.days_incomplete > 0 ? r.days_incomplete : '—'}
                         </td>
                         <td className="px-3 py-2 text-xs text-right font-mono text-gray-700">{r.total_hours}</td>
+                        <td className="px-3 py-2 text-xs text-center">
+                          {r.claims_over_limit ? (
+                            <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded" title={'Over limit of ' + r.claims_limit}>
+                              ⚠ {r.claims_used}/{r.claims_limit}
+                            </span>
+                          ) : r.claims_used > 0 ? (
+                            <span className="font-semibold text-purple-600">{r.claims_used}/{r.claims_limit}</span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -394,6 +407,7 @@ export default function MonthlyReport() {
                     <td className="px-3 py-2.5 text-xs text-center text-red-600">{totals.absent}</td>
                     <td className="px-3 py-2.5 text-xs text-center text-amber-600">{totals.incomplete}</td>
                     <td className="px-3 py-2.5 text-xs text-right font-mono text-gray-700">{Math.round(totals.hours * 10) / 10}</td>
+                    <td className="px-3 py-2.5 text-xs text-center text-purple-600">{totals.claims}</td>
                   </tr>
                 </>
               )}
