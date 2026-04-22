@@ -167,14 +167,15 @@ export default function DailyAttendance() {
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Out</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sessions</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Venue</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Venue In</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Venue Out</th>
                 <th className="px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-8 text-sm text-gray-400 italic">No records for this date</td>
+                  <td colSpan={11} className="text-center py-8 text-sm text-gray-400 italic">No records for this date</td>
                 </tr>
               ) : filtered.map(function (r) {
                 var isIncomplete = r.status === 'Incomplete'
@@ -200,7 +201,10 @@ export default function DailyAttendance() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      <VenueFlag punches={r.punches} status={r.status} />
+                      <VenueCell venue={r.venue_in} status={r.status} type="in" />
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      <VenueCell venue={r.venue_out} status={r.status} type="out" />
                       {r.has_override && <span className="text-blue-500 ml-1" title="Has override">✏️</span>}
                     </td>
                     <td className="px-3 py-2 text-right" onClick={function (e) { e.stopPropagation() }}>
@@ -456,24 +460,18 @@ function SelfieImg({ path, size, rounded }) {
   )
 }
 
-function VenueFlag({ punches, status }) {
-  if (!punches || punches.length === 0 || status === 'Absent') return null
+function VenueCell({ venue, status, type }) {
+  if (status === 'Absent') return <span className="text-[10px] text-gray-300">—</span>
+  if (status === 'Incomplete' && type === 'out') return <span className="text-[10px] text-gray-300">—</span>
 
-  // Get venue from first punch-in, fallback to any punch with a venue
-  var venuePunch = punches.find(function (p) { return p.punch_type === 'in' && p.venue })
-  if (!venuePunch) {
-    venuePunch = punches.find(function (p) { return p.venue })
-  }
-
-  if (venuePunch && venuePunch.venue) {
+  if (venue) {
     return (
-      <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded" title={venuePunch.venue}>
-        {venuePunch.venue.length > 18 ? venuePunch.venue.slice(0, 18) + '…' : venuePunch.venue}
+      <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded" title={venue}>
+        {venue.length > 15 ? venue.slice(0, 15) + '…' : venue}
       </span>
     )
   }
 
-  // Has punches but no venue match
   return (
     <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
       Not in Venue
