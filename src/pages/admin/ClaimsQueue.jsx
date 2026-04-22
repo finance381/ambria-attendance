@@ -147,8 +147,8 @@ export default function ClaimsQueue() {
                       </span>
                     )}
                     <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' +
-                      (c.claim_type === 'missed_in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
-                      {c.claim_type === 'missed_in' ? 'Missed In' : 'Missed Out'}
+                      (c.claim_type === 'missed_both' ? 'bg-purple-100 text-purple-700' : c.claim_type === 'missed_in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
+                      {c.claim_type === 'missed_both' ? 'In & Out' : c.claim_type === 'missed_in' ? 'Missed In' : 'Missed Out'}
                     </span>
                     <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ' +
                       (STATUS_COLORS[c.status] || 'bg-gray-100 text-gray-500 border-gray-200')}>
@@ -160,7 +160,13 @@ export default function ClaimsQueue() {
                 <div className="bg-gray-50 rounded-lg px-3 py-2 mb-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">Date: <strong className="text-gray-700">{c.attendance_date}</strong></span>
-                    <span className="text-gray-500">Time: <strong className="font-mono text-gray-700">{c.claimed_time}</strong></span>
+                    <span className="text-gray-500">
+                      {c.claim_type === 'missed_both' ? (
+                        <>In: <strong className="font-mono text-gray-700">{c.claimed_time}</strong> · Out: <strong className="font-mono text-gray-700">{c.claimed_out_time}</strong></>
+                      ) : (
+                        <>Time: <strong className="font-mono text-gray-700">{c.claimed_time}</strong></>
+                      )}
+                    </span>
                   </div>
                   <p className="text-xs text-gray-600 mt-1">Reason: {c.reason}</p>
                   <p className="text-[10px] text-gray-400 mt-1">

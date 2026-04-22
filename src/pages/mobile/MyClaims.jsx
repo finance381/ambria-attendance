@@ -96,43 +96,38 @@ export default function MyClaims() {
 
     if (!formDate) return setFormError(t('claims_err_date'))
 
-    var claimsToSubmit = []
-    if (!existingIn && formInTime && !pendingIn) {
-      claimsToSubmit.push({ type: 'missed_in', time: formInTime })
-    }
-    if (!existingOut && formOutTime && !pendingOut) {
-      claimsToSubmit.push({ type: 'missed_out', time: formOutTime })
-    }
+    var inChanged = formInTime && !pendingIn && formInTime !== existingIn
+    var outChanged = formOutTime && !pendingOut && formOutTime !== existingOut
 
-    if (claimsToSubmit.length === 0) {
-      return setFormError('Fill at least one missing punch time')
+    if (!inChanged && !outChanged) {
+      return setFormError('Change at least one punch time to submit a claim')
     }
     if (!formReason.trim()) return setFormError(t('claims_err_reason'))
 
     setSaving(true)
 
-    var lastResult = null
-    for (var i = 0; i < claimsToSubmit.length; i++) {
-      var c = claimsToSubmit[i]
-      var { data, error } = await supabase.rpc('submit_claim', {
-        p_attendance_date: formDate,
-        p_claim_type: c.type,
-        p_claimed_time: c.time + ':00',
-        p_reason: formReason.trim()
-      })
+    var claimType = (inChanged && outChanged) ? 'missed_both' : inChanged ? 'missed_in' : 'missed_out'
+    var primaryTime = inChanged ? formInTime + ':00' : formOutTime + ':00'
+    var outTime = (claimType === 'missed_both') ? formOutTime + ':00' : null
 
-      if (error || (data && data.error)) {
-        setSaving(false)
-        setFormError((data && data.error) || error.message)
-        return
-      }
-      lastResult = data
+    var rpcParams = {
+      p_attendance_date: formDate,
+      p_claim_type: claimType,
+      p_claimed_time: primaryTime,
+      p_reason: formReason.trim()
+    }
+    if (outTime) rpcParams.p_claimed_out_time = outTime
+
+    var { data, error } = await supabase.rpc('submit_claim', rpcParams)
+
+    if (error || (data && data.error)) {
+      setSaving(false)
+      setFormError((data && data.error) || error.message)
+      return
     }
 
     setSaving(false)
-    var label = claimsToSubmit.length === 1
-      ? (claimsToSubmit[0].type === 'missed_in' ? 'Punch In' : 'Punch Out')
-      : 'Punch In & Out'
+    var label = claimType === 'missed_both' ? 'In & Out' : claimType === 'missed_in' ? 'Punch In' : 'Punch Out'
     showToast(label + ' claim submitted')
     setShowNew(false)
     resetForm()
@@ -202,22 +197,14 @@ export default function MyClaims() {
               <p className="text-xs text-gray-400 text-center py-2">Checking punches…</p>
             )}
 
-            {formDate && !fetchingPunches && existingIn && existingOut && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                <p className="text-xs text-emerald-700 font-medium">✓ Both punches recorded for this date</p>
-                <p className="text-[10px] text-emerald-600 mt-0.5">In: {existingIn} · Out: {existingOut}</p>
-              </div>
-            )}
-
-            {formDate && !fetchingPunches && !(existingIn && existingOut) && (
+            {formDate && !fetchingPunches && (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Punch In</label>
                     {existingIn ? (
-                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 font-mono">
-                        {existingIn} <span className="text-[9px] text-emerald-600 font-sans ml-1">✓</span>
-                      </div>
+                      <input type="time" value={formInTime} onChange={function (e) { setFormInTime(e.target.value) }}
+                        className="w-full px-3 py-2 border border-emerald-300 bg-emerald-50/50 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-700" />
                     ) : pendingIn ? (
                       <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 font-mono">
                         ⏳ <span className="text-[10px] font-sans">claim pending</span>
@@ -230,9 +217,8 @@ export default function MyClaims() {
                   <div>
                     <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Punch Out</label>
                     {existingOut ? (
-                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 font-mono">
-                        {existingOut} <span className="text-[9px] text-emerald-600 font-sans ml-1">✓</span>
-                      </div>
+                      <input type="time" value={formOutTime} onChange={function (e) { setFormOutTime(e.target.value) }}
+                        className="w-full px-3 py-2 border border-emerald-300 bg-emerald-50/50 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-700" />
                     ) : pendingOut ? (
                       <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 font-mono">
                         ⏳ <span className="text-[10px] font-sans">claim pending</span>
@@ -258,7 +244,7 @@ export default function MyClaims() {
             <div className="flex gap-2">
               <button type="button" onClick={function () { setShowNew(false) }}
                 className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">{t('cancel')}</button>
-              <button type="submit" disabled={saving || !formDate || fetchingPunches || (existingIn && existingOut)}
+              <button type="submit" disabled={saving || !formDate || fetchingPunches}
                 className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
                 {saving ? t('claims_submitting') : t('claims_submit')}
               </button>
