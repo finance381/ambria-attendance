@@ -18,8 +18,13 @@ export default function MyClaims() {
 
   // Form
   var [formDate, setFormDate] = useState('')
-  var [formType, setFormType] = useState('missed_out')
-  var [formTime, setFormTime] = useState('')
+  var [formInTime, setFormInTime] = useState('')
+  var [formOutTime, setFormOutTime] = useState('')
+  var [existingIn, setExistingIn] = useState(null)
+  var [existingOut, setExistingOut] = useState(null)
+  var [pendingIn, setPendingIn] = useState(false)
+  var [pendingOut, setPendingOut] = useState(false)
+  var [fetchingPunches, setFetchingPunches] = useState(false)
   var [formReason, setFormReason] = useState('')
   var [formError, setFormError] = useState('')
   var [saving, setSaving] = useState(false)
@@ -42,36 +47,95 @@ export default function MyClaims() {
 
   useEffect(function () { loadClaims() }, [loadClaims])
 
+  async function handleDateChange(dateVal) {
+    setFormDate(dateVal)
+    setFormInTime('')
+    setFormOutTime('')
+    setExistingIn(null)
+    setExistingOut(null)
+    setPendingIn(false)
+    setPendingOut(false)
+    setFormError('')
+    if (!dateVal) return
+
+    setFetchingPunches(true)
+    var { data } = await supabase.rpc('punches_for_date', { p_date: dateVal })
+    setFetchingPunches(false)
+
+    if (data && !data.error) {
+      if (data.punch_in) {
+        var inT = String(data.punch_in).slice(0, 5)
+        setExistingIn(inT)
+        setFormInTime(inT)
+      }
+      if (data.punch_out) {
+        var outT = String(data.punch_out).slice(0, 5)
+        setExistingOut(outT)
+        setFormOutTime(outT)
+      }
+      if (data.pending_in) setPendingIn(true)
+      if (data.pending_out) setPendingOut(true)
+    }
+  }
+
+  function resetForm() {
+    setFormDate('')
+    setFormInTime('')
+    setFormOutTime('')
+    setExistingIn(null)
+    setExistingOut(null)
+    setPendingIn(false)
+    setPendingOut(false)
+    setFormReason('')
+    setFormError('')
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setFormError('')
 
     if (!formDate) return setFormError(t('claims_err_date'))
-    if (!formTime) return setFormError(t('claims_err_time'))
+
+    var claimsToSubmit = []
+    if (!existingIn && formInTime && !pendingIn) {
+      claimsToSubmit.push({ type: 'missed_in', time: formInTime })
+    }
+    if (!existingOut && formOutTime && !pendingOut) {
+      claimsToSubmit.push({ type: 'missed_out', time: formOutTime })
+    }
+
+    if (claimsToSubmit.length === 0) {
+      return setFormError('Fill at least one missing punch time')
+    }
     if (!formReason.trim()) return setFormError(t('claims_err_reason'))
 
     setSaving(true)
 
-    var { data, error } = await supabase.rpc('submit_claim', {
-      p_attendance_date: formDate,
-      p_claim_type: formType,
-      p_claimed_time: formTime + ':00',
-      p_reason: formReason.trim()
-    })
+    var lastResult = null
+    for (var i = 0; i < claimsToSubmit.length; i++) {
+      var c = claimsToSubmit[i]
+      var { data, error } = await supabase.rpc('submit_claim', {
+        p_attendance_date: formDate,
+        p_claim_type: c.type,
+        p_claimed_time: c.time + ':00',
+        p_reason: formReason.trim()
+      })
 
-    setSaving(false)
-
-    if (error || (data && data.error)) {
-      setFormError((data && data.error) || error.message)
-      return
+      if (error || (data && data.error)) {
+        setSaving(false)
+        setFormError((data && data.error) || error.message)
+        return
+      }
+      lastResult = data
     }
 
-    showToast(t('claims_toast_submitted', { used: data.used, limit: data.limit }))
+    setSaving(false)
+    var label = claimsToSubmit.length === 1
+      ? (claimsToSubmit[0].type === 'missed_in' ? 'Punch In' : 'Punch Out')
+      : 'Punch In & Out'
+    showToast(label + ' claim submitted')
     setShowNew(false)
-    setFormDate('')
-    setFormType('missed_out')
-    setFormTime('')
-    setFormReason('')
+    resetForm()
     loadClaims()
   }
 
@@ -105,7 +169,7 @@ export default function MyClaims() {
           </p>
         </div>
         <button
-          onClick={function () { setShowNew(true); setFormError('') }}
+          onClick={function () { setShowNew(true); resetForm() }}
           className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors"
         >
           {t('claims_new')}
@@ -127,44 +191,74 @@ export default function MyClaims() {
       {showNew && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5">
           <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('claims_date')} *</label>
-                <input type="date" value={formDate} onChange={function (e) { setFormDate(e.target.value) }}
-                  max={new Date().toISOString().slice(0, 10)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('claims_type')} *</label>
-                <select value={formType} onChange={function (e) { setFormType(e.target.value) }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
-                  <option value="missed_out">{t('claims_missed_out')}</option>
-                  <option value="missed_in">{t('claims_missed_in')}</option>
-                </select>
-              </div>
-            </div>
-
             <div>
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                {t('claims_time')} *
-              </label>
-              <input type="time" value={formTime} onChange={function (e) { setFormTime(e.target.value) }}
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('claims_date')} *</label>
+              <input type="date" value={formDate} onChange={function (e) { handleDateChange(e.target.value) }}
+                max={new Date().toISOString().slice(0, 10)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
             </div>
 
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('claims_reason')} *</label>
-              <textarea value={formReason} onChange={function (e) { setFormReason(e.target.value) }}
-                rows={2} maxLength={500} placeholder={t('claims_reason_placeholder')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 resize-none" />
-            </div>
+            {fetchingPunches && (
+              <p className="text-xs text-gray-400 text-center py-2">Checking punches…</p>
+            )}
+
+            {formDate && !fetchingPunches && existingIn && existingOut && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-emerald-700 font-medium">✓ Both punches recorded for this date</p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">In: {existingIn} · Out: {existingOut}</p>
+              </div>
+            )}
+
+            {formDate && !fetchingPunches && !(existingIn && existingOut) && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Punch In</label>
+                    {existingIn ? (
+                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 font-mono">
+                        {existingIn} <span className="text-[9px] text-emerald-600 font-sans ml-1">✓</span>
+                      </div>
+                    ) : pendingIn ? (
+                      <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 font-mono">
+                        ⏳ <span className="text-[10px] font-sans">claim pending</span>
+                      </div>
+                    ) : (
+                      <input type="time" value={formInTime} onChange={function (e) { setFormInTime(e.target.value) }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Punch Out</label>
+                    {existingOut ? (
+                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 font-mono">
+                        {existingOut} <span className="text-[9px] text-emerald-600 font-sans ml-1">✓</span>
+                      </div>
+                    ) : pendingOut ? (
+                      <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 font-mono">
+                        ⏳ <span className="text-[10px] font-sans">claim pending</span>
+                      </div>
+                    ) : (
+                      <input type="time" value={formOutTime} onChange={function (e) { setFormOutTime(e.target.value) }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('claims_reason')} *</label>
+                  <textarea value={formReason} onChange={function (e) { setFormReason(e.target.value) }}
+                    rows={2} maxLength={500} placeholder={t('claims_reason_placeholder')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 resize-none" />
+                </div>
+              </>
+            )}
 
             {formError && <p className="text-xs text-red-600">{formError}</p>}
 
             <div className="flex gap-2">
               <button type="button" onClick={function () { setShowNew(false) }}
                 className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">{t('cancel')}</button>
-              <button type="submit" disabled={saving}
+              <button type="submit" disabled={saving || !formDate || fetchingPunches || (existingIn && existingOut)}
                 className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
                 {saving ? t('claims_submitting') : t('claims_submit')}
               </button>
