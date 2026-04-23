@@ -29,7 +29,12 @@ export default function MobileShell() {
               <p className="text-[10px] text-white/50">{employee.name} · {employee.designation || employee.role}</p>
             </div>
           </div>
-          <LanguageToggle />
+          <div className="flex items-center gap-2">
+            <a href="/"
+              className="px-2 py-1 rounded-lg border border-white/10 text-white/50 text-xs font-semibold no-underline hover:text-white transition-colors"
+            >⌂ Hub</a>
+            <LanguageToggle />
+          </div>
         </div>
       </header>
 
