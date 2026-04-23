@@ -33,6 +33,9 @@ export default function AdminShell() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <a href="/"
+              className="px-2 py-1 rounded-lg border border-white/10 text-white/50 text-xs font-semibold no-underline hover:text-white transition-colors"
+            >⌂ Hub</a>
             <button
               onClick={function () { navigate('/') }}
               className="text-xs text-white/60 hover:text-white transition-colors px-2 py-1"
