@@ -20,6 +20,8 @@ export default function MonthlyReport() {
   var [exportToYear, setExportToYear] = useState(now.getFullYear())
   var [exportToMonth, setExportToMonth] = useState(now.getMonth() + 1)
   var [exporting, setExporting] = useState(false)
+var [sortCol, setSortCol] = useState('name')
+var [sortDir, setSortDir] = useState('asc')
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -53,6 +55,29 @@ export default function MonthlyReport() {
     return true
   })
 
+  // Sort
+  filtered.sort(function (a, b) {
+    var va, vb
+    switch (sortCol) {
+      case 'emp_code': va = a.emp_code; vb = b.emp_code; break
+      case 'name': va = a.name; vb = b.name; break
+      case 'department_name': va = a.department_name || ''; vb = b.department_name || ''; break
+      case 'effective_days': va = a.effective_days; vb = b.effective_days; break
+      case 'days_present': va = a.days_present || 0; vb = b.days_present || 0; break
+      case 'days_half': va = a.days_half || 0; vb = b.days_half || 0; break
+      case 'days_absent': va = a.days_absent || 0; vb = b.days_absent || 0; break
+      case 'days_incomplete': va = a.days_incomplete || 0; vb = b.days_incomplete || 0; break
+      case 'total_hours': va = a.total_hours || 0; vb = b.total_hours || 0; break
+      case 'claims_used': va = a.claims_used || 0; vb = b.claims_used || 0; break
+      default: va = a.name; vb = b.name
+    }
+    if (typeof va === 'string') {
+      var cmp = va.localeCompare(vb)
+      return sortDir === 'asc' ? cmp : -cmp
+    }
+    return sortDir === 'asc' ? va - vb : vb - va
+  })
+
   // Totals
   var totals = { effective: 0, present: 0, half: 0, absent: 0, incomplete: 0, hours: 0, claims: 0 }
   filtered.forEach(function (r) {
@@ -69,6 +94,15 @@ export default function MonthlyReport() {
   var casualIncompleteCount = filtered.filter(function (r) {
     return r.is_casual && r.days_incomplete > 0
   }).length
+
+  function handleSort(col) {
+    if (sortCol === col) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
+  }
 
   // Export DOCX — supports multi-month range + search/dept filters
   async function exportCSV() {
@@ -347,16 +381,27 @@ export default function MonthlyReport() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Code</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department</th>
-                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Days</th>
-                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider">P</th>
-                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-orange-600 uppercase tracking-wider">H</th>
-                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">A</th>
-                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-amber-600 uppercase tracking-wider">Inc</th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
-                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-purple-600 uppercase tracking-wider">Claims</th>
+                {[
+                  { key: 'emp_code', label: 'Code', align: 'text-left', color: 'text-gray-500' },
+                  { key: 'name', label: 'Name', align: 'text-left', color: 'text-gray-500' },
+                  { key: 'department_name', label: 'Department', align: 'text-left', color: 'text-gray-500' },
+                  { key: 'effective_days', label: 'Days', align: 'text-center', color: 'text-gray-500' },
+                  { key: 'days_present', label: 'P', align: 'text-center', color: 'text-emerald-600' },
+                  { key: 'days_half', label: 'H', align: 'text-center', color: 'text-orange-600' },
+                  { key: 'days_absent', label: 'A', align: 'text-center', color: 'text-red-600' },
+                  { key: 'days_incomplete', label: 'Inc', align: 'text-center', color: 'text-amber-600' },
+                  { key: 'total_hours', label: 'Hours', align: 'text-right', color: 'text-gray-500' },
+                  { key: 'claims_used', label: 'Claims', align: 'text-center', color: 'text-purple-600' }
+                ].map(function (col) {
+                  var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                  return (
+                    <th key={col.key}
+                      onClick={function () { handleSort(col.key) }}
+                      className={col.align + ' px-3 py-2.5 text-[10px] font-bold ' + col.color + ' uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none transition-colors'}>
+                      {col.label}{arrow}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
