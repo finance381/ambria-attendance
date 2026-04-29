@@ -20,8 +20,9 @@ export default function MonthlyReport() {
   var [exportToYear, setExportToYear] = useState(now.getFullYear())
   var [exportToMonth, setExportToMonth] = useState(now.getMonth() + 1)
   var [exporting, setExporting] = useState(false)
-var [sortCol, setSortCol] = useState('name')
-var [sortDir, setSortDir] = useState('asc')
+  var [sortCol, setSortCol] = useState('name')
+  var [sortDir, setSortDir] = useState('asc')
+  var [selected, setSelected] = useState([])
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -41,6 +42,7 @@ var [sortDir, setSortDir] = useState('asc')
 
     setRecords(summaryRes.data || [])
     setDepartments(deptRes.data || [])
+    setSelected([])
     setLoading(false)
   }, [year, month, deptFilter])
 
@@ -104,6 +106,23 @@ var [sortDir, setSortDir] = useState('asc')
     }
   }
 
+  var allIds = filtered.map(function (r) { return r.employee_id })
+  var allSelected = filtered.length > 0 && selected.length === filtered.length && allIds.every(function (id) { return selected.includes(id) })
+
+  function toggleOne(id) {
+    setSelected(function (prev) {
+      return prev.includes(id) ? prev.filter(function (x) { return x !== id }) : prev.concat(id)
+    })
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected([])
+    } else {
+      setSelected(allIds)
+    }
+  }
+
   // Export DOCX — supports multi-month range + search/dept filters
   async function exportCSV() {
     setExporting(true)
@@ -123,8 +142,11 @@ var [sortDir, setSortDir] = useState('asc')
     var isSingleMonth = months.length === 1
     var searchLower = search.trim().toLowerCase()
 
+    var exportSelected = selected.length > 0 ? selected.slice() : null
+
     function applyFilters(rows) {
       return rows.filter(function (r) {
+        if (exportSelected && !exportSelected.includes(r.employee_id)) return false
         if (!searchLower) return true
         return (r.name && r.name.toLowerCase().includes(searchLower)) ||
                (r.emp_code && r.emp_code.toLowerCase().includes(searchLower))
@@ -315,13 +337,21 @@ var [sortDir, setSortDir] = useState('asc')
     <div>
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-lg font-bold text-gray-900">Monthly Report</h2>
-        <button
-          onClick={function () { setShowExport(true); setExportFromYear(year); setExportFromMonth(month); setExportToYear(year); setExportToMonth(month) }}
-          disabled={loading || filtered.length === 0}
-          className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
-        >
-          ⬇ Export DOCX
-        </button>
+        <div className="flex items-center gap-3">
+          {selected.length > 0 && (
+            <span className="text-xs text-slate-600 bg-slate-100 px-2.5 py-1.5 rounded-lg font-medium">
+              {selected.length} selected
+              <button onClick={function () { setSelected([]) }} className="ml-2 text-slate-400 hover:text-slate-700">✕</button>
+            </span>
+          )}
+          <button
+            onClick={function () { setShowExport(true); setExportFromYear(year); setExportFromMonth(month); setExportToYear(year); setExportToMonth(month) }}
+            disabled={loading || filtered.length === 0}
+            className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
+          >
+            ⬇ Export {selected.length > 0 ? selected.length + ' Selected' : 'DOCX'}
+          </button>
+        </div>
       </div>
       <p className="text-xs text-gray-500 mb-4">Attendance summary for payroll</p>
 
@@ -381,6 +411,10 @@ var [sortDir, setSortDir] = useState('asc')
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-3 py-2.5 w-10">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                    className="w-4 h-4 rounded border-gray-300 text-slate-700 focus:ring-slate-700 cursor-pointer" />
+                </th>
                 {[
                   { key: 'emp_code', label: 'Code', align: 'text-left', color: 'text-gray-500' },
                   { key: 'name', label: 'Name', align: 'text-left', color: 'text-gray-500' },
@@ -407,7 +441,7 @@ var [sortDir, setSortDir] = useState('asc')
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
+                  <td colSpan={11} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
                 </tr>
               ) : (
                 <>
@@ -415,6 +449,10 @@ var [sortDir, setSortDir] = useState('asc')
                     var hasIssue = r.days_incomplete > 0
                     return (
                       <tr key={r.employee_id} className={'border-b border-gray-100 hover:bg-gray-50' + (hasIssue ? ' bg-amber-50/40' : '')}>
+                        <td className="px-3 py-2">
+                          <input type="checkbox" checked={selected.includes(r.employee_id)} onChange={function () { toggleOne(r.employee_id) }}
+                            className="w-4 h-4 rounded border-gray-300 text-slate-700 focus:ring-slate-700 cursor-pointer" />
+                        </td>
                         <td className="px-3 py-2 text-xs text-gray-400 font-mono">{r.emp_code}</td>
                         <td className="px-3 py-2 font-medium text-gray-900">
                           {r.name}
@@ -445,7 +483,7 @@ var [sortDir, setSortDir] = useState('asc')
                   })}
                   {/* Totals row */}
                   <tr className="bg-gray-50 border-t-2 border-gray-300 font-bold">
-                    <td className="px-3 py-2.5 text-xs text-gray-500" colSpan={3}>TOTAL ({filtered.length} employees)</td>
+                    <td className="px-3 py-2.5 text-xs text-gray-500" colSpan={4}>TOTAL ({filtered.length} employees)</td>
                     <td className="px-3 py-2.5 text-xs text-center text-gray-600">{totals.effective}</td>
                     <td className="px-3 py-2.5 text-xs text-center text-emerald-700">{totals.present}</td>
                     <td className="px-3 py-2.5 text-xs text-center text-orange-600">{totals.half}</td>
