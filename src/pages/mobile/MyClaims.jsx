@@ -189,6 +189,16 @@ export default function MyClaims() {
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('claims_date')} *</label>
               <input type="date" value={formDate} onChange={function (e) { handleDateChange(e.target.value) }}
+                min={function () {
+                  var now = new Date()
+                  var ist = new Date(now.getTime() + (330 * 60000))
+                  var day = ist.getUTCDate()
+                  var hour = ist.getUTCHours()
+                  if (day === 1 && hour < 15) {
+                    return new Date(ist.getUTCFullYear(), ist.getUTCMonth() - 1, 1).toISOString().slice(0, 10)
+                  }
+                  return new Date(ist.getUTCFullYear(), ist.getUTCMonth(), 1).toISOString().slice(0, 10)
+                }()}
                 max={new Date().toISOString().slice(0, 10)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
             </div>
