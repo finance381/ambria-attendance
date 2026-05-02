@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../../lib/useAuth'
+import { refreshPushSubscription } from '../../lib/pushRefresh'
 import { useLanguage, LanguageToggle } from '../../lib/i18n'
 
 var TAB_KEYS = [
@@ -14,6 +15,10 @@ var TAB_KEYS = [
 export default function MobileShell() {
   var { employee } = useAuth()
   var { t } = useLanguage()
+
+  useEffect(function () {
+    if (employee) refreshPushSubscription(employee.id)
+  }, [employee])
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
