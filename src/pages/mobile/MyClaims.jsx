@@ -194,10 +194,16 @@ export default function MyClaims() {
                   var ist = new Date(now.getTime() + (330 * 60000))
                   var day = ist.getUTCDate()
                   var hour = ist.getUTCHours()
+                  var y, m
                   if (day === 1 && hour < 15) {
-                    return new Date(ist.getUTCFullYear(), ist.getUTCMonth() - 1, 1).toISOString().slice(0, 10)
+                    y = ist.getUTCFullYear()
+                    m = ist.getUTCMonth()
+                    if (m === 0) { m = 12; y-- }
+                    return y + '-' + String(m).padStart(2, '0') + '-01'
                   }
-                  return new Date(ist.getUTCFullYear(), ist.getUTCMonth(), 1).toISOString().slice(0, 10)
+                  y = ist.getUTCFullYear()
+                  m = ist.getUTCMonth() + 1
+                  return y + '-' + String(m).padStart(2, '0') + '-01'
                 }()}
                 max={new Date().toISOString().slice(0, 10)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
