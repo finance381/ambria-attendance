@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      Deno.env.get('SRK_AUTH')!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 

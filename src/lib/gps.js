@@ -17,9 +17,8 @@ export function getLocation() {
           accuracy: pos.coords.accuracy
         })
       },
-      function () {
-        // Don't block punch on GPS failure — return nulls
-        resolve({ latitude: null, longitude: null, accuracy: null })
+      function (err) {
+        reject(new Error('GPS unavailable: ' + (err.message || 'Location denied')))
       },
       {
         enableHighAccuracy: true,

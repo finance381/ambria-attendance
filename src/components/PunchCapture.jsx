@@ -65,7 +65,41 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     setStep('uploading')
 
     // GPS should be ready by now (started before camera)
-    var gps = await gpsPromise
+    var gps
+    try {
+      gps = await gpsPromise
+    } catch (gpsErr) {
+      var proceed = await new Promise(function (res) {
+        var overlay = document.createElement('div')
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:16px'
+        var card = document.createElement('div')
+        card.style.cssText = 'background:#fff;border-radius:16px;padding:24px;max-width:300px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.25);text-align:center'
+        card.innerHTML = '<div style="width:48px;height:48px;background:#fef2f2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><span style="font-size:24px">📍</span></div>'
+          + '<p style="font-size:15px;font-weight:700;color:#dc2626;margin:0 0 6px">GPS Unavailable</p>'
+          + '<p style="font-size:13px;color:#78716c;margin:0 0 20px">Your location could not be detected. Punch will be recorded without venue info and flagged for review.</p>'
+        var btnRow = document.createElement('div')
+        btnRow.style.cssText = 'display:flex;gap:10px'
+        var cancelB = document.createElement('button')
+        cancelB.textContent = 'Cancel'
+        cancelB.style.cssText = 'flex:1;padding:12px;font-size:14px;font-weight:600;color:#64748b;background:#f1f5f9;border:none;border-radius:10px;cursor:pointer'
+        var proceedB = document.createElement('button')
+        proceedB.textContent = 'Punch Anyway'
+        proceedB.style.cssText = 'flex:1;padding:12px;font-size:14px;font-weight:700;color:#fff;background:#dc2626;border:none;border-radius:10px;cursor:pointer'
+        btnRow.appendChild(cancelB)
+        btnRow.appendChild(proceedB)
+        card.appendChild(btnRow)
+        overlay.appendChild(card)
+        document.body.appendChild(overlay)
+        cancelB.addEventListener('click', function () { document.body.removeChild(overlay); res(false) })
+        proceedB.addEventListener('click', function () { document.body.removeChild(overlay); res(true) })
+      })
+      if (!proceed) {
+        setStep('ready')
+        if (onCancel) onCancel()
+        return
+      }
+      gps = { latitude: null, longitude: null, accuracy: null }
+    }
 
     // Offline detection — queue locally if no network
     if (!navigator.onLine) {

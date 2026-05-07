@@ -5,7 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-Deno.serve(async (req) => {
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -65,7 +67,7 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      Deno.env.get('SRK_AUTH')!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
@@ -120,11 +122,3 @@ Deno.serve(async (req) => {
     })
   }
 })
-```
-
----
-
-### `.gitignore` (add these lines to the existing one Vite created)
-```
-.env
-.env.local

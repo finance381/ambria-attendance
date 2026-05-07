@@ -63,6 +63,8 @@ export function capturePhoto() {
     var autoCloseTimer = null
     var faceDetectInterval = null
     var faceDetected = false
+    var positionHistory = []
+    var motionConfirmed = false
 
     function cleanup() {
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
@@ -80,7 +82,7 @@ export function capturePhoto() {
         guideRing.style.borderColor = '#22c55e'
         guideRing.style.borderStyle = 'solid'
         guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.55)'
-        faceStatus.textContent = '✓ Face detected'
+        faceStatus.textContent = motionConfirmed ? '✓ Face detected' : '↔ Hold still — detecting motion...'
         faceStatus.style.background = 'rgba(22,163,74,0.7)'
         captureBtn.disabled = false
         captureBtn.style.opacity = '1'
@@ -108,7 +110,23 @@ export function capturePhoto() {
             var cy = (box.y + box.height / 2) / vh
             var faceW = box.width / vw
             // Face center must be: horizontally centered (25-75%), upper half (5-55%), large enough (>12% of frame)
-            setFaceFound(cx > 0.25 && cx < 0.75 && cy > 0.05 && cy < 0.55 && faceW > 0.12)
+            var positionOk = cx > 0.25 && cx < 0.75 && cy > 0.05 && cy < 0.55 && faceW > 0.12
+            if (positionOk) {
+              positionHistory.push({ cx: cx, cy: cy, t: Date.now() })
+              if (positionHistory.length > 6) positionHistory.shift()
+              if (positionHistory.length >= 4) {
+                var dxSum = 0
+                for (var k = 1; k < positionHistory.length; k++) {
+                  dxSum += Math.abs(positionHistory[k].cx - positionHistory[k - 1].cx)
+                       + Math.abs(positionHistory[k].cy - positionHistory[k - 1].cy)
+                }
+                motionConfirmed = dxSum > 0.015
+              }
+            } else {
+              positionHistory = []
+              motionConfirmed = false
+            }
+            setFaceFound(positionOk && motionConfirmed)
           } else {
             setFaceFound(false)
           }
@@ -188,12 +206,23 @@ export function capturePhoto() {
             lumVar > 100
           )
         } else {
-          setFaceFound(
-            skinRatio > 0.22 &&
-            brightRatio < 0.40 &&
-            midSkinRatio > 0.55 &&
-            lumVar > 400
-          )
+          var heuristicOk = skinRatio > 0.22 && brightRatio < 0.40 && midSkinRatio > 0.55 && lumVar > 400
+          if (heuristicOk) {
+            positionHistory.push({ skin: skinRatio, lum: lumMean, t: Date.now() })
+            if (positionHistory.length > 6) positionHistory.shift()
+            if (positionHistory.length >= 4) {
+              var variance = 0
+              for (var k = 1; k < positionHistory.length; k++) {
+                variance += Math.abs(positionHistory[k].skin - positionHistory[k - 1].skin)
+                         + Math.abs(positionHistory[k].lum - positionHistory[k - 1].lum) / 255
+              }
+              motionConfirmed = variance > 0.01
+            }
+          } else {
+            positionHistory = []
+            motionConfirmed = false
+          }
+          setFaceFound(heuristicOk && motionConfirmed)
         }
       }, 500)
     }
