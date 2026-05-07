@@ -205,7 +205,11 @@ export default function MyClaims() {
                   m = ist.getUTCMonth() + 1
                   return y + '-' + String(m).padStart(2, '0') + '-01'
                 }()}
-                max={new Date().toISOString().slice(0, 10)}
+                max={function () {
+                  var now = new Date()
+                  var ist = new Date(now.getTime() + (330 * 60000))
+                  return ist.getUTCFullYear() + '-' + String(ist.getUTCMonth() + 1).padStart(2, '0') + '-' + String(ist.getUTCDate()).padStart(2, '0')
+                }()}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
             </div>
 

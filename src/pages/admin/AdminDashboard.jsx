@@ -101,9 +101,11 @@ export default function AdminDashboard() {
             {data.open_punches_past > 0 && (
               <button
                 onClick={function () {
-                  var yesterday = new Date()
-                  yesterday.setDate(yesterday.getDate() - 1)
-                  navigate('/admin/attendance?date=' + yesterday.toISOString().slice(0, 10) + '&status=Incomplete')
+                  var now = new Date()
+                  var ist = new Date(now.getTime() + (330 * 60000))
+                  ist.setUTCDate(ist.getUTCDate() - 1)
+                  var yStr = ist.getUTCFullYear() + '-' + String(ist.getUTCMonth() + 1).padStart(2, '0') + '-' + String(ist.getUTCDate()).padStart(2, '0')
+                  navigate('/admin/attendance?date=' + yStr + '&status=Incomplete')
                 }}
                 className="w-full flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3 hover:bg-red-100 transition-colors text-left"
               >
