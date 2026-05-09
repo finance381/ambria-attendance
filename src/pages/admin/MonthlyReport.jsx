@@ -23,6 +23,9 @@ export default function MonthlyReport() {
   var [sortCol, setSortCol] = useState('name')
   var [sortDir, setSortDir] = useState('asc')
   var [selected, setSelected] = useState([])
+  var [drillEmp, setDrillEmp] = useState(null)
+  var [drillData, setDrillData] = useState([])
+  var [drillLoading, setDrillLoading] = useState(false)
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -121,6 +124,58 @@ export default function MonthlyReport() {
     } else {
       setSelected(allIds)
     }
+  }
+
+  async function openDrill(emp) {
+    setDrillEmp(emp)
+    setDrillLoading(true)
+    var daysInMonth = new Date(year, month, 0).getDate()
+    var startDate = year + '-' + String(month).padStart(2, '0') + '-01'
+    var endDate = year + '-' + String(month).padStart(2, '0') + '-' + String(daysInMonth).padStart(2, '0')
+
+    var { data } = await supabase
+      .from('punches')
+      .select('attendance_date, punch_type, punched_at')
+      .eq('employee_id', emp.employee_id)
+      .gte('attendance_date', startDate)
+      .lte('attendance_date', endDate)
+      .order('attendance_date')
+      .order('punched_at')
+
+    // Group by date
+    var byDate = {}
+    ;(data || []).forEach(function (p) {
+      if (!byDate[p.attendance_date]) byDate[p.attendance_date] = { ins: [], outs: [] }
+      if (p.punch_type === 'in') byDate[p.attendance_date].ins.push(p.punched_at)
+      else byDate[p.attendance_date].outs.push(p.punched_at)
+    })
+
+    // Build all days
+    var rows = []
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+      var entry = byDate[dateStr]
+      var punchIn = entry && entry.ins.length > 0 ? entry.ins[0] : null
+      var punchOut = entry && entry.outs.length > 0 ? entry.outs[entry.outs.length - 1] : null
+      var hours = null
+      if (punchIn && punchOut) {
+        hours = Math.round((new Date(punchOut) - new Date(punchIn)) / 36e5 * 10) / 10
+      }
+      var dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(dateStr).getDay()]
+      rows.push({ date: dateStr, day: dayName, punchIn: punchIn, punchOut: punchOut, hours: hours, hasData: !!entry })
+    }
+
+    setDrillData(rows)
+    setDrillLoading(false)
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '—'
+    var d = new Date(iso)
+    var h = d.getHours(), m = d.getMinutes()
+    var ampm = h >= 12 ? 'PM' : 'AM'
+    h = h % 12 || 12
+    return h + ':' + String(m).padStart(2, '0') + ' ' + ampm
   }
 
   // Export DOCX — supports multi-month range + search/dept filters
@@ -455,7 +510,9 @@ export default function MonthlyReport() {
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-400 font-mono">{r.emp_code}</td>
                         <td className="px-3 py-2 font-medium text-gray-900">
-                          {r.name}
+                          <button onClick={function () { openDrill(r) }} className="hover:text-slate-600 hover:underline underline-offset-2 text-left">
+                            {r.name}
+                          </button>
                           {r.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">casual</span>}
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-500">{r.department_name || '—'}</td>
@@ -553,6 +610,52 @@ export default function MonthlyReport() {
                   {exporting ? 'Exporting…' : '⬇ Export'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {drillEmp && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setDrillEmp(null) }}>
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-xl max-h-[85vh] flex flex-col" onClick={function (e) { e.stopPropagation() }}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">{drillEmp.name}</h3>
+                <p className="text-xs text-gray-500">{drillEmp.emp_code} · {MONTHS[month - 1]} {year}</p>
+              </div>
+              <button onClick={function () { setDrillEmp(null) }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {drillLoading ? (
+                <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-gray-50">
+                    <tr className="border-b border-gray-200">
+                      <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Day</th>
+                      <th className="px-4 py-2 text-center text-[10px] font-bold text-emerald-600 uppercase">In</th>
+                      <th className="px-4 py-2 text-center text-[10px] font-bold text-red-500 uppercase">Out</th>
+                      <th className="px-4 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drillData.map(function (row) {
+                      var isFuture = new Date(row.date + 'T23:59:59') > new Date()
+                      var bgClass = isFuture ? ' text-gray-300' : !row.hasData ? ' bg-red-50/50' : ''
+                      return (
+                        <tr key={row.date} className={'border-b border-gray-100' + bgClass}>
+                          <td className="px-4 py-1.5 text-xs font-mono text-gray-600">{row.date.slice(8)}</td>
+                          <td className="px-4 py-1.5 text-xs text-gray-500">{row.day}</td>
+                          <td className="px-4 py-1.5 text-xs text-center text-emerald-700 font-medium">{isFuture ? '' : fmtTime(row.punchIn)}</td>
+                          <td className="px-4 py-1.5 text-xs text-center text-red-600 font-medium">{isFuture ? '' : fmtTime(row.punchOut)}</td>
+                          <td className="px-4 py-1.5 text-xs text-right font-mono text-gray-700">{isFuture ? '' : (row.hours != null ? row.hours : '—')}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
