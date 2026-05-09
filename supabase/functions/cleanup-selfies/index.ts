@@ -1,6 +1,7 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   try {
     // Verify this is called by cron or admin (not random users)
     const authHeader = req.headers.get('Authorization')
@@ -9,8 +10,15 @@ Deno.serve(async (req) => {
     // Allow either: valid cron secret OR authenticated admin
     let isAuthorized = false
 
+    const srkAuth = Deno.env.get('SRK_AUTH')!
     if (cronSecret && req.headers.get('x-cron-secret') === cronSecret) {
       isAuthorized = true
+    }
+    if (!isAuthorized && authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      if (token === srkAuth) {
+        isAuthorized = true
+      }
     }
 
     if (!isAuthorized && authHeader) {

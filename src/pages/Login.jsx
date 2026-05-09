@@ -7,8 +7,6 @@ export default function Login() {
   var [password, setPassword] = useState('')
   var [error, setError] = useState('')
   var [loading, setLoading] = useState(false)
-  var [attempts, setAttempts] = useState(0)
-  var [lockedUntil, setLockedUntil] = useState(0)
   var { login } = useAuth()
   var { t } = useLanguage()
 
@@ -26,28 +24,13 @@ export default function Login() {
       return
     }
 
-    if (Date.now() < lockedUntil) {
-      var secsLeft = Math.ceil((lockedUntil - Date.now()) / 1000)
-      setError(t('login_err_locked') || 'Too many attempts. Try again in ' + secsLeft + 's')
-      return
-    }
 
     setLoading(true)
     var result = await login(phone, password)
     setLoading(false)
 
     if (result.error) {
-      var newAttempts = attempts + 1
-      setAttempts(newAttempts)
-      if (newAttempts >= 5) {
-        setLockedUntil(Date.now() + 30000)
-        setAttempts(0)
-        setError(t('login_err_locked') || 'Too many attempts. Try again in 30 seconds')
-      } else {
-        setError(t('login_err_invalid'))
-      }
-    } else {
-      setAttempts(0)
+      setError(result.error.message || t('login_err_invalid'))
     }
   }
 

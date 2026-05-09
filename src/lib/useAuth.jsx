@@ -63,13 +63,27 @@ export function AuthProvider({ children }) {
   }, [fetchEmployee])
 
   async function login(phone, password) {
-    var email = phoneToEmail(phone)
-    var { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password
-    })
-    if (error) return { error: error }
-    return { data: data }
+    try {
+      var res = await fetch(
+        import.meta.env.VITE_SUPABASE_URL + '/functions/v1/login',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phone, password: password }),
+        }
+      )
+      var body = await res.json()
+      if (res.status === 429) return { error: { message: body.error, status: 429 } }
+      if (!res.ok) return { error: { message: body.error || 'Login failed' } }
+      var { error } = await supabase.auth.setSession({
+        access_token: body.access_token,
+        refresh_token: body.refresh_token,
+      })
+      if (error) return { error: error }
+      return { data: body }
+    } catch (e) {
+      return { error: { message: 'Network error' } }
+    }
   }
 
   async function logout() {
