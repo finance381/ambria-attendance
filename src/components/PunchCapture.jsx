@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { capturePhoto } from '../lib/camera'
 import { getLocation } from '../lib/gps'
@@ -10,6 +10,12 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
   var [preview, setPreview] = useState(null)
   var [error, setError] = useState('')
   var { t } = useLanguage()
+
+  useEffect(function () {
+    setStep('ready')
+    setPreview(null)
+    setError('')
+  }, [punchType])
 
   async function handlePunch() {
     setError('')
