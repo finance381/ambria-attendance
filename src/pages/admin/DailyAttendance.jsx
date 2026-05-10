@@ -33,6 +33,8 @@ export default function DailyAttendance() {
 
   // Detail panel
   var [detailTarget, setDetailTarget] = useState(null)
+  var [sortCol, setSortCol] = useState('name')
+  var [sortDir, setSortDir] = useState('asc')
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -62,6 +64,30 @@ export default function DailyAttendance() {
       if (!r.name.toLowerCase().includes(q) && !r.emp_code.toLowerCase().includes(q)) return false
     }
     return true
+  })
+
+  // Sort
+  function handleSort(col) {
+    if (sortCol === col) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') }
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  filtered.sort(function (a, b) {
+    var va, vb
+    switch (sortCol) {
+      case 'emp_code': va = a.emp_code; vb = b.emp_code; break
+      case 'name': va = a.name; vb = b.name; break
+      case 'department_name': va = a.department_name || ''; vb = b.department_name || ''; break
+      case 'first_in': va = a.first_in || ''; vb = b.first_in || ''; break
+      case 'last_out': va = a.last_out || ''; vb = b.last_out || ''; break
+      case 'in_count': va = a.in_count || 0; vb = b.in_count || 0; break
+      case 'status': va = a.status || ''; vb = b.status || ''; break
+      default: va = a.name; vb = b.name
+    }
+    if (typeof va === 'string') {
+      var cmp = va.localeCompare(vb)
+      return sortDir === 'asc' ? cmp : -cmp
+    }
+    return sortDir === 'asc' ? va - vb : vb - va
   })
 
   // Stats
@@ -159,16 +185,27 @@ export default function DailyAttendance() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Code</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Selfie</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">In</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Out</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sessions</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Venue In</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Venue Out</th>
+                {[
+                  { key: 'emp_code', label: 'Code' },
+                  { key: null, label: 'Selfie' },
+                  { key: 'name', label: 'Name' },
+                  { key: 'department_name', label: 'Department' },
+                  { key: 'first_in', label: 'In' },
+                  { key: 'last_out', label: 'Out' },
+                  { key: 'in_count', label: 'Sessions' },
+                  { key: 'status', label: 'Status' },
+                  { key: null, label: 'Venue In' },
+                  { key: null, label: 'Venue Out' }
+                ].map(function (col, i) {
+                  var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                  return (
+                    <th key={i}
+                      onClick={col.key ? function () { handleSort(col.key) } : undefined}
+                      className={'text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider' + (col.key ? ' cursor-pointer hover:bg-gray-100 select-none' : '')}>
+                      {col.label}{arrow}
+                    </th>
+                  )
+                })}
                 <th className="px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>

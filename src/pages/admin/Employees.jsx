@@ -24,6 +24,8 @@ export default function Employees() {
   var [bulkDept, setBulkDept] = useState('')
   var [bulkRole, setBulkRole] = useState('staff')
   var [bulkSaving, setBulkSaving] = useState(false)
+  var [sortCol, setSortCol] = useState('name')
+  var [sortDir, setSortDir] = useState('asc')
 
   var [form, setForm] = useState({
     name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: ''
@@ -132,6 +134,28 @@ export default function Employees() {
       (e.phone && e.phone.includes(search))
     var matchDept = !deptFilter || String(e.department_id) === deptFilter
     return matchSearch && matchDept
+  })
+
+  function handleSort(col) {
+    if (sortCol === col) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') }
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  filtered.sort(function (a, b) {
+    var va, vb
+    switch (sortCol) {
+      case 'emp_code': va = a.emp_code; vb = b.emp_code; break
+      case 'name': va = a.name; vb = b.name; break
+      case 'phone': va = a.phone || ''; vb = b.phone || ''; break
+      case 'department_id': va = deptName(a.department_id); vb = deptName(b.department_id); break
+      case 'role': va = a.role; vb = b.role; break
+      case 'active': va = a.active ? 1 : 0; vb = b.active ? 1 : 0; break
+      default: va = a.name; vb = b.name
+    }
+    if (typeof va === 'string') {
+      var cmp = va.localeCompare(vb)
+      return sortDir === 'asc' ? cmp : -cmp
+    }
+    return sortDir === 'asc' ? va - vb : vb - va
   })
 
   var activeCount = employees.filter(function (e) { return e.active }).length
@@ -413,12 +437,22 @@ export default function Employees() {
                   className="rounded border-gray-300 text-slate-800 focus:ring-slate-700 cursor-pointer"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Code</th>
-              <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Phone</th>
-              <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department</th>
-              <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Role</th>
-              <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+              {[
+                { key: 'emp_code', label: 'Code' },
+                { key: 'name', label: 'Name' },
+                { key: 'phone', label: 'Phone' },
+                { key: 'department_id', label: 'Department' },
+                { key: 'role', label: 'Role' },
+                { key: 'active', label: 'Status' }
+              ].map(function (col) {
+                var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                return (
+                  <th key={col.key} onClick={function () { handleSort(col.key) }}
+                    className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none">
+                    {col.label}{arrow}
+                  </th>
+                )
+              })}
               <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>

@@ -8,6 +8,8 @@ export default function LeaveBalances() {
   var [search, setSearch] = useState('')
   var [loading, setLoading] = useState(true)
   var [error, setError] = useState('')
+  var [sortCol, setSortCol] = useState('name')
+  var [sortDir, setSortDir] = useState('asc')
 
   var loadData = useCallback(async function () {
     setLoading(true)
@@ -36,6 +38,31 @@ export default function LeaveBalances() {
       if (!b.name.toLowerCase().includes(q) && !b.emp_code.toLowerCase().includes(q)) return false
     }
     return true
+  })
+
+  function handleSort(col) {
+    if (sortCol === col) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') }
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  filtered.sort(function (a, b) {
+    var va, vb
+    switch (sortCol) {
+      case 'emp_code': va = a.emp_code; vb = b.emp_code; break
+      case 'name': va = a.name; vb = b.name; break
+      case 'department_name': va = a.department_name || ''; vb = b.department_name || ''; break
+      case 'annual_used': va = a.annual_used; vb = b.annual_used; break
+      case 'annual_remaining': va = a.annual_remaining; vb = b.annual_remaining; break
+      case 'quarter_used': va = a.quarter_used; vb = b.quarter_used; break
+      case 'quarter_remaining': va = a.quarter_remaining; vb = b.quarter_remaining; break
+      case 'half_used': va = a.half_used; vb = b.half_used; break
+      case 'half_remaining': va = a.half_remaining; vb = b.half_remaining; break
+      default: va = a.name; vb = b.name
+    }
+    if (typeof va === 'string') {
+      var cmp = va.localeCompare(vb)
+      return sortDir === 'asc' ? cmp : -cmp
+    }
+    return sortDir === 'asc' ? va - vb : vb - va
   })
 
   var fyLabel = data ? data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(0, 4) : ''
@@ -79,21 +106,41 @@ export default function LeaveBalances() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Code</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department</th>
+                {[
+                  { key: 'emp_code', label: 'Code', align: 'text-left', color: 'text-gray-500' },
+                  { key: 'name', label: 'Name', align: 'text-left', color: 'text-gray-500' },
+                  { key: 'department_name', label: 'Department', align: 'text-left', color: 'text-gray-500' }
+                ].map(function (col) {
+                  var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                  return (
+                    <th key={col.key} onClick={function () { handleSort(col.key) }}
+                      className={col.align + ' px-3 py-2.5 text-[10px] font-bold ' + col.color + ' uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none'}>
+                      {col.label}{arrow}
+                    </th>
+                  )
+                })}
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider" colSpan={2}>Annual Leave</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-blue-600 uppercase tracking-wider" colSpan={2}>Quarterly</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-orange-600 uppercase tracking-wider" colSpan={2}>Half Days</th>
               </tr>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th colSpan={3}></th>
-                <th className="text-center px-2 py-1.5 text-[9px] font-semibold text-gray-400">Used</th>
-                <th className="text-center px-2 py-1.5 text-[9px] font-semibold text-gray-400">Left</th>
-                <th className="text-center px-2 py-1.5 text-[9px] font-semibold text-gray-400">Used</th>
-                <th className="text-center px-2 py-1.5 text-[9px] font-semibold text-gray-400">Left</th>
-                <th className="text-center px-2 py-1.5 text-[9px] font-semibold text-gray-400">Used</th>
-                <th className="text-center px-2 py-1.5 text-[9px] font-semibold text-gray-400">Left</th>
+                {[
+                  { key: 'annual_used', label: 'Used' },
+                  { key: 'annual_remaining', label: 'Left' },
+                  { key: 'quarter_used', label: 'Used' },
+                  { key: 'quarter_remaining', label: 'Left' },
+                  { key: 'half_used', label: 'Used' },
+                  { key: 'half_remaining', label: 'Left' }
+                ].map(function (col) {
+                  var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                  return (
+                    <th key={col.key} onClick={function () { handleSort(col.key) }}
+                      className="text-center px-2 py-1.5 text-[9px] font-semibold text-gray-400 cursor-pointer hover:bg-gray-100 select-none">
+                      {col.label}{arrow}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
