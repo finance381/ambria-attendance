@@ -178,6 +178,103 @@ export default function MonthlyReport() {
     return h + ':' + String(m).padStart(2, '0') + ' ' + ampm
   }
 
+  async function exportDrillDocx() {
+    if (!drillEmp || drillData.length === 0) return
+
+    var border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
+    var borders = { top: border, bottom: border, left: border, right: border }
+    var colWidths = [1200, 1000, 2100, 2100, 1400, 1560]
+    var tableWidth = colWidths.reduce(function (a, b) { return a + b }, 0)
+
+    function cell(text, opts) {
+      opts = opts || {}
+      return new TableCell({
+        borders: borders,
+        width: { size: opts.w || 1200, type: WidthType.DXA },
+        margins: { top: 60, bottom: 60, left: 100, right: 100 },
+        shading: opts.header ? { fill: 'E7E6E6', type: 'clear' } : undefined,
+        children: [new Paragraph({
+          alignment: opts.align || AlignmentType.CENTER,
+          children: [new TextRun({ text: String(text), bold: !!opts.bold, size: opts.size || 20, font: 'Arial' })]
+        })]
+      })
+    }
+
+    var headerRow = new TableRow({
+      children: [
+        cell('Date', { header: true, bold: true, w: colWidths[0] }),
+        cell('Day', { header: true, bold: true, w: colWidths[1] }),
+        cell('Punch In', { header: true, bold: true, w: colWidths[2] }),
+        cell('Punch Out', { header: true, bold: true, w: colWidths[3] }),
+        cell('Hours', { header: true, bold: true, w: colWidths[4] }),
+        cell('Status', { header: true, bold: true, w: colWidths[5] })
+      ],
+      tableHeader: true
+    })
+
+    var totalHours = 0
+    var dataRows = drillData.map(function (row) {
+      var isFuture = new Date(row.date + 'T23:59:59') > new Date()
+      var status = isFuture ? '—' : row.hasData ? (row.punchOut ? 'Present' : 'Incomplete') : 'Absent'
+      if (row.hours) totalHours += row.hours
+      return new TableRow({
+        children: [
+          cell(row.date.slice(8), { w: colWidths[0] }),
+          cell(row.day, { w: colWidths[1] }),
+          cell(isFuture ? '' : fmtTime(row.punchIn), { w: colWidths[2] }),
+          cell(isFuture ? '' : fmtTime(row.punchOut), { w: colWidths[3] }),
+          cell(isFuture ? '' : (row.hours != null ? String(row.hours) : '—'), { w: colWidths[4] }),
+          cell(isFuture ? '—' : status, { w: colWidths[5], bold: status === 'Absent' })
+        ]
+      })
+    })
+
+    var totalsRow = new TableRow({
+      children: [
+        cell('TOTAL', { w: colWidths[0] + colWidths[1], bold: true }),
+        cell('', { w: colWidths[1] }),
+        cell('', { w: colWidths[2] }),
+        cell('', { w: colWidths[3] }),
+        cell(String(Math.round(totalHours * 10) / 10), { w: colWidths[4], bold: true }),
+        cell('', { w: colWidths[5] })
+      ]
+    })
+
+    var doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'GET YOUR VENUE EVENTS PVT LTD', bold: true, size: 28, font: 'Arial' })]
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'Day-wise Attendance Report', bold: true, size: 24, font: 'Arial' })]
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+            children: [new TextRun({ text: drillEmp.name + ' (' + drillEmp.emp_code + ')  |  ' + MONTHS[month - 1] + ' ' + year, size: 20, font: 'Arial' })]
+          }),
+          new Paragraph({ children: [] }),
+          new Table({
+            width: { size: tableWidth, type: WidthType.DXA },
+            columnWidths: colWidths,
+            rows: [headerRow].concat(dataRows).concat([totalsRow])
+          })
+        ]
+      }]
+    })
+
+    var blob = await Packer.toBlob(doc)
+    var a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = drillEmp.emp_code + '_' + MONTHS[month - 1] + '_' + year + '_daywise.docx'
+    a.click()
+    showToast('DOCX exported')
+  }
+
   // Export DOCX — supports multi-month range + search/dept filters
   async function exportCSV() {
     setExporting(true)
@@ -623,7 +720,10 @@ export default function MonthlyReport() {
                 <h3 className="text-sm font-bold text-gray-900">{drillEmp.name}</h3>
                 <p className="text-xs text-gray-500">{drillEmp.emp_code} · {MONTHS[month - 1]} {year}</p>
               </div>
-              <button onClick={function () { setDrillEmp(null) }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+              <div className="flex items-center gap-2">
+                <button onClick={exportDrillDocx} className="px-3 py-1.5 text-xs font-medium text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors">⬇ DOCX</button>
+                <button onClick={function () { setDrillEmp(null) }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+              </div>
             </div>
             <div className="overflow-y-auto flex-1">
               {drillLoading ? (
