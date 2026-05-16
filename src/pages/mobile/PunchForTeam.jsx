@@ -321,16 +321,7 @@ export default function PunchForTeam() {
             </div>
           ) : (
             <>
-              {openPunches.some(function (op) { return op.is_casual }) && (
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1 pt-1">Casual Workers</p>
-              )}
-              {openPunches.filter(function (op) { return op.is_casual }).map(function (op) {
-                return renderOpenCard(op)
-              })}
-              {openPunches.some(function (op) { return !op.is_casual }) && (
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1 pt-3">Permanent Staff</p>
-              )}
-              {openPunches.filter(function (op) { return !op.is_casual }).map(function (op) {
+              {openPunches.map(function (op) {
                 return renderOpenCard(op)
               })}
             </>
