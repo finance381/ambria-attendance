@@ -267,6 +267,67 @@ export default function PunchForTeam() {
     loadAll()
   }
 
+  async function handleCancelTransfer(mov) {
+    var { data, error } = await supabase.rpc('cancel_transfer', { p_movement_id: mov.movement_id })
+    if (error || (data && data.error)) {
+      showToast((data && data.error) || error.message)
+      return
+    }
+    showToast(data.name + ' transfer cancelled')
+    loadAll()
+  }
+
+  async function handleBulkReceive() {
+    setReceivingId('bulk')
+
+    var photo
+    try {
+      photo = await captureProxyPhoto()
+    } catch (err) {
+      if (err.message === 'Cancelled') { setReceivingId(null); return }
+      showToast('Camera error: ' + err.message)
+      setReceivingId(null)
+      return
+    }
+
+    var gps = await getLocation()
+
+    var today = new Date().toISOString().slice(0, 10)
+    var filePath = 'bulk_receive/' + today + '_' + Date.now() + '.jpg'
+
+    var { error: uploadError } = await supabase.storage
+      .from('selfies')
+      .upload(filePath, photo.blob, { contentType: 'image/jpeg', upsert: false })
+
+    if (uploadError) {
+      showToast('Upload failed: ' + uploadError.message)
+      setReceivingId(null)
+      return
+    }
+
+    var movIds = incoming.map(function (m) { return m.movement_id })
+
+    var { data, error } = await supabase.rpc('bulk_receive_transfers', {
+      p_movement_ids: movIds,
+      p_selfie_path: filePath,
+      p_latitude: gps.latitude,
+      p_longitude: gps.longitude,
+      p_gps_accuracy: gps.accuracy,
+      p_device_info: navigator.userAgent,
+      p_location_name: gps.areaName
+    })
+
+    setReceivingId(null)
+
+    if (error || (data && data.error)) {
+      showToast((data && data.error) || error.message)
+      return
+    }
+
+    showToast(data.received_count + ' workers received ✓')
+    loadAll()
+  }
+
   async function handleProxyPunch(employee, punchType) {
     setPunchingId(employee.id)
     setPunchStep('camera')
@@ -507,7 +568,18 @@ export default function PunchForTeam() {
             <div className="text-center py-8">
               <p className="text-sm text-gray-400">No incoming transfers</p>
             </div>
-          ) : incoming.map(function (mov) {
+          ) : (
+            <>
+              {incoming.length > 1 && (
+                <button
+                  onClick={handleBulkReceive}
+                  disabled={receivingId === 'bulk'}
+                  className="w-full py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors mb-3"
+                >
+                  {receivingId === 'bulk' ? 'Receiving…' : '📷 Receive All ' + incoming.length + ' Workers'}
+                </button>
+              )}
+              {incoming.map(function (mov) {
             var isReceiving = receivingId === mov.movement_id
             var minsAgo = Math.round((Date.now() - new Date(mov.initiated_at).getTime()) / 60000)
             return (
@@ -522,16 +594,26 @@ export default function PunchForTeam() {
                   <span className="text-[10px] text-blue-600 font-semibold">{minsAgo}m ago</span>
                 </div>
                 <p className="text-[10px] text-gray-400 mb-2">Sent by {mov.initiated_by_name}</p>
-                <button
-                  onClick={function () { handleReceive(mov) }}
-                  disabled={isReceiving}
-                  className="w-full py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors"
-                >
-                  {isReceiving ? 'Receiving…' : '📷 Receive & Punch In'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={function () { handleReceive(mov) }}
+                    disabled={isReceiving}
+                    className="flex-1 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                  >
+                    {isReceiving ? 'Receiving…' : '📷 Receive & Punch In'}
+                  </button>
+                  <button
+                    onClick={function () { handleCancelTransfer(mov) }}
+                    className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )
           })}
+            </>
+          )}
         </div>
       )}
 
