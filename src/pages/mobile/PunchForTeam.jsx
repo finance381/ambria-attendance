@@ -194,6 +194,41 @@ export default function PunchForTeam() {
     loadAll()
   }
 
+  function renderOpenCard(op) {
+    var hoursAgo = Math.round((Date.now() - new Date(op.punched_in_at).getTime()) / 3600000)
+    return (
+      <div key={op.punch_id} className={'bg-white border rounded-xl px-4 py-3 ' +
+        (hoursAgo > 12 ? 'border-amber-300 bg-amber-50/50' : 'border-gray-200')}>
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <p className="text-sm font-medium text-gray-900">
+              {op.name}
+              {op.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">{t('team_casual_tag')}</span>}
+            </p>
+            <p className="text-[11px] text-gray-400">
+              {op.emp_code} · {op.department_name} · {formatTime(op.punched_in_at)}
+            </p>
+          </div>
+          <span className="text-[10px] text-amber-600 font-semibold">{t('team_hours_ago', { n: hoursAgo })}</span>
+        </div>
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={function () { handleProxyPunch({ id: op.employee_id, name: op.name }, 'out') }}
+            className="flex-1 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+          >
+            {t('team_punch_out_now')}
+          </button>
+          <button
+            onClick={function () { setRetroTarget(op); setRetroTime(''); setRetroError('') }}
+            className="flex-1 py-1.5 text-xs font-semibold text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            {t('team_enter_time')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
   }
@@ -284,41 +319,22 @@ export default function PunchForTeam() {
             <div className="text-center py-8">
               <p className="text-sm text-gray-400">{t('team_no_open')}</p>
             </div>
-          ) : openPunches.map(function (op) {
-            var hoursAgo = Math.round((Date.now() - new Date(op.punched_in_at).getTime()) / 3600000)
-
-            return (
-              <div key={op.punch_id} className={'bg-white border rounded-xl px-4 py-3 ' +
-                (hoursAgo > 12 ? 'border-amber-300 bg-amber-50/50' : 'border-gray-200')}>
-                <div className="flex items-center justify-between mb-1">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {op.name}
-                      {op.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">{t('team_casual_tag')}</span>}
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      {op.emp_code} · {op.department_name} · {formatTime(op.punched_in_at)}
-                    </p>
-                  </div>
-                  <span className="text-[10px] text-amber-600 font-semibold">{t('team_hours_ago', { n: hoursAgo })}</span>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={function () { handleProxyPunch({ id: op.employee_id, name: op.name }, 'out') }}
-                    className="flex-1 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-                  >
-                    {t('team_punch_out_now')}
-                  </button>
-                  <button
-                    onClick={function () { setRetroTarget(op); setRetroTime(''); setRetroError('') }}
-                    className="flex-1 py-1.5 text-xs font-semibold text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    {t('team_enter_time')}
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+          ) : (
+            <>
+              {openPunches.some(function (op) { return op.is_casual }) && (
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1 pt-1">Casual Workers</p>
+              )}
+              {openPunches.filter(function (op) { return op.is_casual }).map(function (op) {
+                return renderOpenCard(op)
+              })}
+              {openPunches.some(function (op) { return !op.is_casual }) && (
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1 pt-3">Permanent Staff</p>
+              )}
+              {openPunches.filter(function (op) { return !op.is_casual }).map(function (op) {
+                return renderOpenCard(op)
+              })}
+            </>
+          )}
         </div>
       )}
 
