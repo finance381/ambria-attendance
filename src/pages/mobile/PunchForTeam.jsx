@@ -215,6 +215,13 @@ export default function PunchForTeam() {
 
     var msg = data.transferred_count + ' transferred → ' + data.to_venue
     showToast(msg)
+
+    // Fire push notification to all guards (async, non-blocking)
+    supabase.rpc('notify_transfer', {
+      p_to_venue: data.to_venue,
+      p_count: data.transferred_count
+    }).catch(function () {})
+
     loadAll()
   }
 
