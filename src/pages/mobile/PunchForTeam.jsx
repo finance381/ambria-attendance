@@ -12,7 +12,6 @@ export default function PunchForTeam() {
   var [tab, setTab] = useState('punch')
   var [toast, setToast] = useState('')
 
-  var [newName, setNewName] = useState('')
   var [newDept, setNewDept] = useState('')
   var [addError, setAddError] = useState('')
   var [addSaving, setAddSaving] = useState(false)
@@ -27,6 +26,7 @@ export default function PunchForTeam() {
   var [newVendorPhone, setNewVendorPhone] = useState('')
   var [newVendorContact, setNewVendorContact] = useState('')
   var [removeTarget, setRemoveTarget] = useState(null)
+  var [batchNames, setBatchNames] = useState([''])
 
   var [retroTarget, setRetroTarget] = useState(null)
   var [retroTime, setRetroTime] = useState('')
@@ -62,11 +62,12 @@ export default function PunchForTeam() {
     return d ? d.name : '—'
   }
 
-  async function handleAddCasual(e) {
+  async function handleBatchAdd(e) {
     e.preventDefault()
     setAddError('')
 
-    if (!newName.trim()) return setAddError(t('team_err_name'))
+    var names = batchNames.map(function (n) { return n.trim() }).filter(function (n) { return n !== '' })
+    if (names.length === 0) return setAddError('Add at least one name')
     if (!newDept) return setAddError(t('team_err_dept'))
 
     setAddSaving(true)
@@ -77,7 +78,7 @@ export default function PunchForTeam() {
       if (!newVendorName.trim()) { setAddError('Vendor name is required'); setAddSaving(false); return }
       var { data: vData, error: vErr } = await supabase
         .from('vendors')
-        .insert({ name: newVendorName.trim(), phone: newVendorPhone.trim() || null, contact_person: newVendorContact.trim() || null })
+        .insert({ name: newVendorName.trim() })
         .select('id')
         .single()
       if (vErr) { setAddError('Vendor creation failed: ' + vErr.message); setAddSaving(false); return }
@@ -86,38 +87,48 @@ export default function PunchForTeam() {
       finalVendorId = Number(vendorId)
     }
 
-    var { data, error } = await supabase.rpc('add_casual', {
-      p_name: newName.trim(),
-      p_department_id: Number(newDept),
-      p_vendor_id: finalVendorId
-    })
+    if (names.length === 1) {
+      // Single add — use original RPC for duplicate detection
+      var { data, error } = await supabase.rpc('add_casual', {
+        p_name: names[0],
+        p_department_id: Number(newDept),
+        p_vendor_id: finalVendorId
+      })
 
-    setAddSaving(false)
+      setAddSaving(false)
+      if (error) { setAddError(error.message); return }
+      if (data && data.error) { setAddError(data.error); return }
+      if (data && data.existing) { setConfirmExisting(data); return }
 
-    if (error) { setAddError(error.message); return }
-    if (data && data.error) { setAddError(data.error); return }
+      showToast(data.name + ' (' + data.emp_code + ')')
+    } else {
+      // Batch add
+      var { data, error } = await supabase.rpc('batch_add_casuals', {
+        p_names: names,
+        p_department_id: Number(newDept),
+        p_vendor_id: finalVendorId
+      })
 
-    if (data && data.existing) {
-      setConfirmExisting(data)
-      return
+      setAddSaving(false)
+      if (error || (data && data.error)) { setAddError((data && data.error) || error.message); return }
+
+      var msg = data.created_count + ' added'
+      if (data.skipped_count > 0) msg += ', ' + data.skipped_count + ' skipped (duplicates)'
+      showToast(msg)
     }
 
-    showToast(data.name + ' (' + data.emp_code + ')')
-    setNewName('')
+    setBatchNames([''])
     setNewDept('')
     setVendorId('')
     setNewVendorName('')
-    setNewVendorPhone('')
-    setNewVendorContact('')
     loadAll()
   }
 
   async function handleForceCreate() {
     setAddSaving(true)
-
     var finalVendorId = vendorId && vendorId !== 'new' ? Number(vendorId) : null
     var { data, error } = await supabase.rpc('add_casual_force', {
-      p_name: newName.trim(),
+      p_name: batchNames[0].trim(),
       p_department_id: Number(newDept),
       p_vendor_id: finalVendorId
     })
@@ -131,15 +142,17 @@ export default function PunchForTeam() {
     }
 
     showToast(data.name + ' (' + data.emp_code + ')')
-    setNewName('')
+    setBatchNames([''])
     setNewDept('')
+    setVendorId('')
+    setNewVendorName('')
     loadAll()
   }
 
   function handleReuseExisting() {
     showToast(confirmExisting.name)
     setConfirmExisting(null)
-    setNewName('')
+    setBatchNames([''])
     setNewDept('')
     loadAll()
   }
@@ -399,14 +412,7 @@ export default function PunchForTeam() {
       {/* ADD CASUAL TAB */}
       {tab === 'add' && (
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <form onSubmit={handleAddCasual} className="space-y-3">
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('team_name')} *</label>
-              <input type="text" value={newName} onChange={function (e) { setNewName(e.target.value) }}
-                placeholder={t('team_name_placeholder')} maxLength={100}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
-                autoFocus />
-            </div>
+          <form onSubmit={handleBatchAdd} className="space-y-3">
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('team_department')} *</label>
               <select value={newDept} onChange={function (e) { setNewDept(e.target.value) }}
@@ -419,7 +425,7 @@ export default function PunchForTeam() {
               <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Vendor / Agency</label>
               <select value={vendorId} onChange={function (e) {
                 setVendorId(e.target.value)
-                if (e.target.value !== 'new') { setNewVendorName(''); setNewVendorPhone(''); setNewVendorContact('') }
+                if (e.target.value !== 'new') { setNewVendorName('') }
               }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
                 <option value="">— No Vendor —</option>
@@ -433,11 +439,57 @@ export default function PunchForTeam() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
             )}
 
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Worker Names *</label>
+              <div className="space-y-2">
+                {batchNames.map(function (name, i) {
+                  return (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={function (e) {
+                          var updated = batchNames.slice()
+                          updated[i] = e.target.value
+                          setBatchNames(updated)
+                        }}
+                        onKeyDown={function (e) {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (name.trim() && i === batchNames.length - 1) {
+                              setBatchNames(batchNames.concat(['']))
+                            }
+                          }
+                        }}
+                        placeholder={'Name ' + (i + 1)}
+                        maxLength={100}
+                        autoFocus={i === batchNames.length - 1}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                      />
+                      {batchNames.length > 1 && (
+                        <button type="button" onClick={function () {
+                          setBatchNames(batchNames.filter(function (_, j) { return j !== i }))
+                        }} className="px-2 text-gray-300 hover:text-red-500 text-lg">✕</button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <button type="button" onClick={function () { setBatchNames(batchNames.concat([''])) }}
+                className="mt-2 text-xs text-slate-600 hover:text-slate-800 font-medium">
+                + Add another worker
+              </button>
+            </div>
+
             {addError && <p className="text-xs text-red-600">{addError}</p>}
 
             <button type="submit" disabled={addSaving}
-              className="w-full py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
-              {addSaving ? t('team_adding') : t('team_add_casual_btn')}
+              className="w-full py-2.5 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
+              {addSaving ? t('team_adding') : (
+                batchNames.filter(function (n) { return n.trim() }).length > 1
+                  ? 'Add ' + batchNames.filter(function (n) { return n.trim() }).length + ' Workers'
+                  : t('team_add_casual_btn')
+              )}
             </button>
           </form>
 
