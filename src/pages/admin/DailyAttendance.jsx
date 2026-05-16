@@ -90,6 +90,22 @@ export default function DailyAttendance() {
     return sortDir === 'asc' ? va - vb : vb - va
   })
 
+  var [detailPunches, setDetailPunches] = useState([])
+  var [detailPunchLoading, setDetailPunchLoading] = useState(false)
+
+  async function openDetailPanel(r) {
+    setDetailTarget(r)
+    setDetailPunchLoading(true)
+    var { data } = await supabase
+      .from('punches')
+      .select('id, punch_type, punched_at, selfie_path, latitude, longitude, gps_accuracy_meters, nearest_venue_id, is_proxy, location_name, venues(name)')
+      .eq('employee_id', r.employee_id)
+      .eq('attendance_date', date)
+      .order('punched_at')
+    setDetailPunches(data || [])
+    setDetailPunchLoading(false)
+  }
+
   // Stats
   var stats = { total: filtered.length, Present: 0, Absent: 0, Incomplete: 0, 'Half Day': 0 }
   filtered.forEach(function (r) {
@@ -219,7 +235,7 @@ export default function DailyAttendance() {
                 return (
                   <tr key={r.employee_id}
                     className={'border-b border-gray-100 hover:bg-gray-50 cursor-pointer' + (isIncomplete ? ' bg-amber-50/50' : '')}
-                    onClick={function () { setDetailTarget(r) }}>
+                    onClick={function () { openDetailPanel(r) }}>
                     <td className="px-3 py-2 text-xs text-gray-400 font-mono">{r.emp_code}</td>
                     <td className="px-3 py-2">
                       <SelfieThumb punches={r.punches} onClick={function (e) { e.stopPropagation() }} />
@@ -292,13 +308,17 @@ export default function DailyAttendance() {
 
               {/* Punches */}
               <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Punches</h4>
-              {detailTarget.punches.length === 0 ? (
+              {detailPunchLoading ? (
+                <p className="text-xs text-gray-400 italic mb-4">Loading punches…</p>
+              ) : detailPunches.length === 0 ? (
                 <p className="text-xs text-gray-400 italic mb-4">No punches recorded</p>
               ) : (
                 <div className="space-y-2 mb-4">
-                  {detailTarget.punches.map(function (p) {
+                  {detailPunches.map(function (p) {
+                    var venueName = p.venues ? p.venues.name : null
+                    var locationLabel = venueName || p.location_name || null
                     return (
-                      <div key={p.punch_id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div key={p.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2">
                           {p.selfie_path && (
                             <SelfieImg path={p.selfie_path} size="w-9 h-9" rounded="rounded-lg" />
@@ -311,13 +331,17 @@ export default function DailyAttendance() {
                               </span>
                               <span className="text-xs font-mono text-gray-700">{formatTime(p.punched_at)}</span>
                             </div>
-                            {p.venue && <span className="text-[10px] text-gray-400">{p.venue}</span>}
+                            {locationLabel && (
+                              <span className={'text-[10px] ' + (venueName ? 'text-emerald-600 font-medium' : 'text-gray-400')}>
+                                📍 {locationLabel}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {p.is_proxy && <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 rounded">proxy</span>}
-                          {p.gps_accuracy && p.gps_accuracy > 100 && (
-                            <span className="text-[9px] text-amber-500">{Math.round(p.gps_accuracy)}m</span>
+                          {p.gps_accuracy_meters && p.gps_accuracy_meters > 100 && (
+                            <span className="text-[9px] text-amber-500">{Math.round(p.gps_accuracy_meters)}m</span>
                           )}
                         </div>
                       </div>

@@ -104,7 +104,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         if (onCancel) onCancel()
         return
       }
-      gps = { latitude: null, longitude: null, accuracy: null }
+      gps = { latitude: null, longitude: null, accuracy: null, areaName: null }
     }
 
     // Offline detection — queue locally if no network
@@ -186,7 +186,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         p_longitude: gps.longitude,
         p_gps_accuracy: gps.accuracy,
         p_device_info: navigator.userAgent,
-        p_client_punch_id: clientPunchId
+        p_client_punch_id: clientPunchId,
+        p_location_name: gps.areaName
       })
     } catch (netErr) {
       // Network threw before reaching server — queue it

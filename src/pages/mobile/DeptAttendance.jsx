@@ -47,7 +47,7 @@ export default function DeptAttendance() {
 
     var { data } = await supabase
       .from('punches')
-      .select('id, punch_type, punched_at, selfie_path, latitude, longitude, gps_accuracy_meters, nearest_venue_id, is_proxy, venues(name)')
+      .select('id, punch_type, punched_at, selfie_path, latitude, longitude, gps_accuracy_meters, nearest_venue_id, is_proxy, location_name, venues(name)')
       .eq('employee_id', r.employee_id)
       .eq('attendance_date', date)
       .order('punched_at')
@@ -199,11 +199,10 @@ export default function DeptAttendance() {
                           <span className="text-xs">📍</span>
                           {venueName ? (
                             <span className="text-xs text-emerald-700 font-medium">{venueName}</span>
+                          ) : p.location_name ? (
+                            <span className="text-xs text-gray-600">{p.location_name}</span>
                           ) : hasGps ? (
-                            <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
-                              className="text-xs text-blue-600 underline underline-offset-2">
-                              View location on map ↗
-                            </a>
+                            <span className="text-xs text-gray-400 italic">Unknown area</span>
                           ) : (
                             <span className="text-xs text-gray-400">No GPS data</span>
                           )}

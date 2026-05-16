@@ -199,7 +199,8 @@ export default function PunchForTeam() {
       p_to_venue_id: Number(transferVenue),
       p_latitude: gps.latitude,
       p_longitude: gps.longitude,
-      p_gps_accuracy: gps.accuracy
+      p_gps_accuracy: gps.accuracy,
+      p_location_name: gps.areaName
     })
 
     setTransferring(false)
@@ -251,7 +252,8 @@ export default function PunchForTeam() {
       p_latitude: gps.latitude,
       p_longitude: gps.longitude,
       p_gps_accuracy: gps.accuracy,
-      p_device_info: navigator.userAgent
+      p_device_info: navigator.userAgent,
+      p_location_name: gps.areaName
     })
 
     setReceivingId(null)
@@ -303,7 +305,8 @@ export default function PunchForTeam() {
       p_latitude: gps.latitude,
       p_longitude: gps.longitude,
       p_gps_accuracy: gps.accuracy,
-      p_device_info: navigator.userAgent
+      p_device_info: navigator.userAgent,
+      p_location_name: gps.areaName
     })
 
     setPunchingId(null)

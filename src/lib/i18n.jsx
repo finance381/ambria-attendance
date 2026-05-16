@@ -29,6 +29,7 @@ var translations = {
     app_name: 'Ambria Attendance',
     tab_home: 'Home',
     tab_team: 'Team',
+    tab_dept: 'My Dept',
     tab_claims: 'Claims',
     tab_dar: 'DAR',
     tab_attendance: 'Attendance',
@@ -245,9 +246,9 @@ var translations = {
     // ── Shell / Nav ──────────────────────────
     app_name: 'Ambria Attendance',
     tab_home: 'होम',
-    tab_team: 'टीम',
-    tab_claims: 'क्लेम',
     tab_dar: 'DAR',
+    tab_team: 'टीम',
+    tab_dept: 'मेरा विभाग',
     tab_attendance: 'हाज़िरी',
     tab_settings: 'सेटिंग्स',
 
