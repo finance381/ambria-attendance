@@ -18,6 +18,7 @@ import LeaveBalances from './pages/admin/LeaveBalances'
 import DARWriter from './pages/mobile/DARWriter'
 import AdminDARs from './pages/admin/AdminDARs'
 import Vendors from './pages/admin/Vendors'
+import CasualReports from './pages/admin/CasualReports'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -132,6 +133,11 @@ export default function App() {
         <Route path="vendors" element={
           <ProtectedRoute roles={['admin']}>
             <Vendors />
+          </ProtectedRoute>
+        } />
+        <Route path="casuals" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <CasualReports />
           </ProtectedRoute>
         } />
       </Route>
