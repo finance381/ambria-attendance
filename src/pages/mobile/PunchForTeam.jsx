@@ -428,18 +428,9 @@ export default function PunchForTeam() {
               </select>
             </div>
             {vendorId === 'new' && (
-              <div className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">New Vendor Details</p>
-                <input type="text" value={newVendorName} onChange={function (e) { setNewVendorName(e.target.value) }}
-                  placeholder="Vendor / Agency name *" maxLength={100}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
-                <input type="tel" value={newVendorPhone} onChange={function (e) { setNewVendorPhone(e.target.value) }}
-                  placeholder="Phone (optional)" maxLength={15}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
-                <input type="text" value={newVendorContact} onChange={function (e) { setNewVendorContact(e.target.value) }}
-                  placeholder="Contact person (optional)" maxLength={100}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
-              </div>
+              <input type="text" value={newVendorName} onChange={function (e) { setNewVendorName(e.target.value) }}
+                placeholder="Vendor / Agency name *" maxLength={100}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
             )}
 
             {addError && <p className="text-xs text-red-600">{addError}</p>}
