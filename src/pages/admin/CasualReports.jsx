@@ -5,12 +5,17 @@ export default function CasualReports() {
   var today = new Date().toISOString().slice(0, 10)
   var [date, setDate] = useState(today)
   var [data, setData] = useState(null)
+  var [movements, setMovements] = useState([])
   var [loading, setLoading] = useState(true)
 
   var loadData = useCallback(async function () {
     setLoading(true)
-    var { data: result } = await supabase.rpc('casual_daily_headcount', { p_date: date })
-    setData(result)
+    var [headcount, movLog] = await Promise.all([
+      supabase.rpc('casual_daily_headcount', { p_date: date }),
+      supabase.rpc('movement_log', { p_date: date })
+    ])
+    setData(headcount.data)
+    setMovements(Array.isArray(movLog.data) ? movLog.data : [])
     setLoading(false)
   }, [date])
 
@@ -95,6 +100,55 @@ export default function CasualReports() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* Movement Log */}
+          {movements.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-3">Movements</h3>
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Worker</th>
+                      <th className="text-left px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">From</th>
+                      <th className="text-left px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">To</th>
+                      <th className="text-center px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Departed</th>
+                      <th className="text-center px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Arrived</th>
+                      <th className="text-center px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Transit</th>
+                      <th className="text-center px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movements.map(function (m) {
+                      var statusColor = m.status === 'arrived' ? 'text-emerald-600 bg-emerald-50'
+                        : m.status === 'in_transit' ? 'text-blue-600 bg-blue-50'
+                        : 'text-gray-400 bg-gray-100'
+                      return (
+                        <tr key={m.movement_id} className="border-b border-gray-50 hover:bg-gray-50">
+                          <td className="px-4 py-2">
+                            <p className="text-xs font-medium text-gray-900">{m.name}</p>
+                            <p className="text-[10px] text-gray-400">{m.emp_code}</p>
+                          </td>
+                          <td className="px-4 py-2 text-xs text-amber-600 font-medium">{m.from_venue}</td>
+                          <td className="px-4 py-2 text-xs text-emerald-600 font-medium">{m.to_venue}</td>
+                          <td className="px-4 py-2 text-xs text-center text-gray-600">{fmtTime(m.departed_at)}</td>
+                          <td className="px-4 py-2 text-xs text-center text-gray-600">{fmtTime(m.arrived_at)}</td>
+                          <td className="px-4 py-2 text-xs text-center text-gray-700 font-mono">
+                            {m.transit_minutes != null ? m.transit_minutes + 'm' : '—'}
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' + statusColor}>
+                              {m.status === 'in_transit' ? 'In Transit' : m.status}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>

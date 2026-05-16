@@ -27,6 +27,13 @@ export default function PunchForTeam() {
   var [newVendorContact, setNewVendorContact] = useState('')
   var [removeTarget, setRemoveTarget] = useState(null)
   var [batchNames, setBatchNames] = useState([''])
+  var [selectedIds, setSelectedIds] = useState({})
+  var [showTransfer, setShowTransfer] = useState(false)
+  var [transferVenue, setTransferVenue] = useState('')
+  var [transferring, setTransferring] = useState(false)
+  var [venues, setVenues] = useState([])
+  var [incoming, setIncoming] = useState([])
+  var [receivingId, setReceivingId] = useState(null)
 
   var [retroTarget, setRetroTarget] = useState(null)
   var [retroTime, setRetroTime] = useState('')
@@ -41,17 +48,21 @@ export default function PunchForTeam() {
   }, [])
 
   var loadAll = useCallback(async function () {
-    var [deptRes, casualRes, openRes, vendorRes] = await Promise.all([
+    var [deptRes, casualRes, openRes, vendorRes, venueRes, incomingRes] = await Promise.all([
       supabase.from('departments').select('id, name').eq('active', true).order('name'),
       supabase.rpc('casual_list'),
       supabase.rpc('open_punches'),
-      supabase.from('vendors').select('id, name').eq('active', true).order('name')
+      supabase.from('vendors').select('id, name').eq('active', true).order('name'),
+      supabase.from('venues').select('id, name').eq('active', true).order('name'),
+      supabase.rpc('incoming_transfers')
     ])
 
     setDepartments(deptRes.data || [])
     setCasuals(Array.isArray(casualRes.data) ? casualRes.data : [])
     setOpenPunches(Array.isArray(openRes.data) ? openRes.data : [])
     setVendors(vendorRes.data || [])
+    setVenues(venueRes.data || [])
+    setIncoming(Array.isArray(incomingRes.data) ? incomingRes.data : [])
     setLoading(false)
   }, [])
 
@@ -166,6 +177,91 @@ export default function PunchForTeam() {
       return
     }
     showToast(data.name + ' removed')
+    loadAll()
+  }
+
+  function toggleSelect(id) {
+    var next = Object.assign({}, selectedIds)
+    if (next[id]) { delete next[id] } else { next[id] = true }
+    setSelectedIds(next)
+  }
+
+  var selectedCount = Object.keys(selectedIds).length
+
+  async function handleTransfer() {
+    if (!transferVenue) return
+    setTransferring(true)
+
+    var gps = await getLocation()
+
+    var { data, error } = await supabase.rpc('initiate_transfer', {
+      p_employee_ids: Object.keys(selectedIds),
+      p_to_venue_id: Number(transferVenue),
+      p_latitude: gps.latitude,
+      p_longitude: gps.longitude,
+      p_gps_accuracy: gps.accuracy
+    })
+
+    setTransferring(false)
+    setShowTransfer(false)
+    setSelectedIds({})
+    setTransferVenue('')
+
+    if (error || (data && data.error)) {
+      showToast((data && data.error) || error.message)
+      return
+    }
+
+    var msg = data.transferred_count + ' transferred → ' + data.to_venue
+    showToast(msg)
+    loadAll()
+  }
+
+  async function handleReceive(mov) {
+    setReceivingId(mov.movement_id)
+
+    var photo
+    try {
+      photo = await captureProxyPhoto()
+    } catch (err) {
+      if (err.message === 'Cancelled') { setReceivingId(null); return }
+      showToast('Camera error: ' + err.message)
+      setReceivingId(null)
+      return
+    }
+
+    var gps = await getLocation()
+
+    var today = new Date().toISOString().slice(0, 10)
+    var filePath = mov.employee_id + '/' + today + '_in_transfer_' + Date.now() + '.jpg'
+
+    var { error: uploadError } = await supabase.storage
+      .from('selfies')
+      .upload(filePath, photo.blob, { contentType: 'image/jpeg', upsert: false })
+
+    if (uploadError) {
+      showToast('Upload failed: ' + uploadError.message)
+      setReceivingId(null)
+      return
+    }
+
+    var { data, error } = await supabase.rpc('receive_transfer', {
+      p_movement_id: mov.movement_id,
+      p_selfie_path: filePath,
+      p_latitude: gps.latitude,
+      p_longitude: gps.longitude,
+      p_gps_accuracy: gps.accuracy,
+      p_device_info: navigator.userAgent
+    })
+
+    setReceivingId(null)
+
+    if (error || (data && data.error)) {
+      showToast((data && data.error) || error.message)
+      return
+    }
+
+    showToast(data.name + ' received ✓')
     loadAll()
   }
 
@@ -300,6 +396,7 @@ export default function PunchForTeam() {
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5">
         {[
           { id: 'punch', label: t('team_tab_punch'), count: casuals.length },
+          { id: 'incoming', label: 'Incoming', count: incoming.length },
           { id: 'open', label: t('team_tab_open'), count: openPunches.length },
           { id: 'add', label: t('team_tab_add') }
         ].map(function (tb) {
@@ -348,13 +445,21 @@ export default function PunchForTeam() {
                 var isPunching = punchingId === c.id
 
                 return (
-                  <div key={c.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                      <p className="text-[11px] text-gray-400 truncate">
-                        {c.emp_code} · {c.department_name || '—'}
-                        {c.vendor_name && <span className="text-blue-500"> · {c.vendor_name}</span>}
-                      </p>
+                  <div key={c.id} className={'bg-white border rounded-xl px-4 py-3 flex items-center justify-between ' +
+                    (selectedIds[c.id] ? 'border-blue-400 bg-blue-50/30' : 'border-gray-200')}>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {openIds[c.id] && (
+                        <input type="checkbox" checked={!!selectedIds[c.id]}
+                          onChange={function () { toggleSelect(c.id) }}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          {c.emp_code} · {c.department_name || '—'}
+                          {c.vendor_name && <span className="text-blue-500"> · {c.vendor_name}</span>}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 ml-2 shrink-0">
                       {isPunching ? (
@@ -389,6 +494,78 @@ export default function PunchForTeam() {
               })}
             </>
           )}
+        </div>
+      )}
+
+      {/* INCOMING TRANSFERS TAB */}
+      {tab === 'incoming' && (
+        <div className="space-y-2">
+          {incoming.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-400">No incoming transfers</p>
+            </div>
+          ) : incoming.map(function (mov) {
+            var isReceiving = receivingId === mov.movement_id
+            var minsAgo = Math.round((Date.now() - new Date(mov.initiated_at).getTime()) / 60000)
+            return (
+              <div key={mov.movement_id} className="bg-white border border-blue-200 rounded-xl px-4 py-3 bg-blue-50/30">
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{mov.name}</p>
+                    <p className="text-[11px] text-gray-400">
+                      {mov.emp_code} · from <span className="text-amber-600 font-medium">{mov.from_venue}</span> → <span className="text-emerald-600 font-medium">{mov.to_venue}</span>
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-blue-600 font-semibold">{minsAgo}m ago</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mb-2">Sent by {mov.initiated_by_name}</p>
+                <button
+                  onClick={function () { handleReceive(mov) }}
+                  disabled={isReceiving}
+                  className="w-full py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                >
+                  {isReceiving ? 'Receiving…' : '📷 Receive & Punch In'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* TRANSFER BAR (sticky bottom when casuals selected) */}
+      {tab === 'punch' && selectedCount > 0 && (
+        <div className="fixed bottom-20 left-4 right-4 z-40">
+          <button onClick={function () { setShowTransfer(true); setTransferVenue('') }}
+            className="w-full py-3 text-sm font-bold text-white bg-blue-600 rounded-xl shadow-lg hover:bg-blue-700 transition-colors">
+            Transfer {selectedCount} worker{selectedCount > 1 ? 's' : ''} →
+          </button>
+        </div>
+      )}
+
+      {/* TRANSFER MODAL */}
+      {showTransfer && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4" onClick={function () { setShowTransfer(false) }}>
+          <div className="bg-white rounded-t-2xl rounded-b-xl w-full max-w-md shadow-xl" onClick={function (e) { e.stopPropagation() }}>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900">Transfer {selectedCount} Worker{selectedCount > 1 ? 's' : ''}</h3>
+              <p className="text-xs text-gray-500">Select destination venue</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <select value={transferVenue} onChange={function (e) { setTransferVenue(e.target.value) }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">— Select Venue —</option>
+                {venues.map(function (v) { return <option key={v.id} value={v.id}>{v.name}</option> })}
+              </select>
+              <div className="flex gap-2">
+                <button onClick={function () { setShowTransfer(false) }}
+                  className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">{t('cancel')}</button>
+                <button onClick={handleTransfer} disabled={!transferVenue || transferring}
+                  className="flex-1 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors font-medium">
+                  {transferring ? 'Transferring…' : 'Confirm Transfer'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
