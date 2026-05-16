@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import { capturePhoto } from '../../lib/camera'
+import { captureProxyPhoto } from '../../lib/camera'
 import { getLocation } from '../../lib/gps'
 import { useLanguage } from '../../lib/i18n'
 
@@ -120,7 +120,7 @@ export default function PunchForTeam() {
 
     var photo
     try {
-      photo = await capturePhoto()
+      photo = await captureProxyPhoto()
     } catch (err) {
       if (err.message === 'Cancelled') { setPunchingId(null); setPunchStep(''); return }
       showToast('Camera error: ' + err.message)
