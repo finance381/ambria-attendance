@@ -20,6 +20,13 @@ export default function PunchForTeam() {
 
   var [punchingId, setPunchingId] = useState(null)
   var [punchStep, setPunchStep] = useState('')
+  var [punchSearch, setPunchSearch] = useState('')
+  var [vendors, setVendors] = useState([])
+  var [vendorId, setVendorId] = useState('')
+  var [newVendorName, setNewVendorName] = useState('')
+  var [newVendorPhone, setNewVendorPhone] = useState('')
+  var [newVendorContact, setNewVendorContact] = useState('')
+  var [removeTarget, setRemoveTarget] = useState(null)
 
   var [retroTarget, setRetroTarget] = useState(null)
   var [retroTime, setRetroTime] = useState('')
@@ -34,16 +41,17 @@ export default function PunchForTeam() {
   }, [])
 
   var loadAll = useCallback(async function () {
-    var [deptRes, casualRes, openRes] = await Promise.all([
+    var [deptRes, casualRes, openRes, vendorRes] = await Promise.all([
       supabase.from('departments').select('id, name').eq('active', true).order('name'),
-      supabase.from('employees').select('id, emp_code, name, department_id, is_casual')
-        .eq('is_casual', true).eq('active', true).order('name'),
-      supabase.rpc('open_punches')
+      supabase.rpc('casual_list'),
+      supabase.rpc('open_punches'),
+      supabase.from('vendors').select('id, name').eq('active', true).order('name')
     ])
 
     setDepartments(deptRes.data || [])
-    setCasuals(casualRes.data || [])
-    setOpenPunches(openRes.data || [])
+    setCasuals(Array.isArray(casualRes.data) ? casualRes.data : [])
+    setOpenPunches(Array.isArray(openRes.data) ? openRes.data : [])
+    setVendors(vendorRes.data || [])
     setLoading(false)
   }, [])
 
@@ -63,9 +71,25 @@ export default function PunchForTeam() {
 
     setAddSaving(true)
 
+    // Create vendor inline if needed
+    var finalVendorId = null
+    if (vendorId === 'new') {
+      if (!newVendorName.trim()) { setAddError('Vendor name is required'); setAddSaving(false); return }
+      var { data: vData, error: vErr } = await supabase
+        .from('vendors')
+        .insert({ name: newVendorName.trim(), phone: newVendorPhone.trim() || null, contact_person: newVendorContact.trim() || null })
+        .select('id')
+        .single()
+      if (vErr) { setAddError('Vendor creation failed: ' + vErr.message); setAddSaving(false); return }
+      finalVendorId = vData.id
+    } else if (vendorId) {
+      finalVendorId = Number(vendorId)
+    }
+
     var { data, error } = await supabase.rpc('add_casual', {
       p_name: newName.trim(),
-      p_department_id: Number(newDept)
+      p_department_id: Number(newDept),
+      p_vendor_id: finalVendorId
     })
 
     setAddSaving(false)
@@ -81,15 +105,21 @@ export default function PunchForTeam() {
     showToast(data.name + ' (' + data.emp_code + ')')
     setNewName('')
     setNewDept('')
+    setVendorId('')
+    setNewVendorName('')
+    setNewVendorPhone('')
+    setNewVendorContact('')
     loadAll()
   }
 
   async function handleForceCreate() {
     setAddSaving(true)
 
+    var finalVendorId = vendorId && vendorId !== 'new' ? Number(vendorId) : null
     var { data, error } = await supabase.rpc('add_casual_force', {
       p_name: newName.trim(),
-      p_department_id: Number(newDept)
+      p_department_id: Number(newDept),
+      p_vendor_id: finalVendorId
     })
 
     setAddSaving(false)
@@ -111,6 +141,18 @@ export default function PunchForTeam() {
     setConfirmExisting(null)
     setNewName('')
     setNewDept('')
+    loadAll()
+  }
+
+  async function handleDeactivateCasual() {
+    if (!removeTarget) return
+    var { data, error } = await supabase.rpc('deactivate_casual', { p_employee_id: removeTarget.id })
+    setRemoveTarget(null)
+    if (error || (data && data.error)) {
+      showToast((data && data.error) || error.message)
+      return
+    }
+    showToast(data.name + ' removed')
     loadAll()
   }
 
@@ -275,40 +317,65 @@ export default function PunchForTeam() {
               <button onClick={function () { setTab('add') }}
                 className="text-sm text-slate-700 underline">{t('team_add_casual_link')}</button>
             </div>
-          ) : casuals.map(function (c) {
-            var isOpen = openIds[c.id]
-            var isPunching = punchingId === c.id
+          ) : (
+            <>
+              <input
+                type="text"
+                value={punchSearch}
+                onChange={function (e) { setPunchSearch(e.target.value) }}
+                placeholder="Search casual worker…"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+              />
+              {casuals.filter(function (c) {
+                if (!punchSearch) return true
+                var q = punchSearch.toLowerCase()
+                return c.name.toLowerCase().includes(q) || c.emp_code.toLowerCase().includes(q) || (c.vendor_name && c.vendor_name.toLowerCase().includes(q))
+              }).map(function (c) {
+                var isOpen = openIds[c.id]
+                var isPunching = punchingId === c.id
 
-            return (
-              <div key={c.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                  <p className="text-[11px] text-gray-400">{c.emp_code} · {deptName(c.department_id)}</p>
-                </div>
-                <div>
-                  {isPunching ? (
-                    <span className="text-xs text-gray-400">
-                      {punchStep === 'camera' ? t('team_camera') : t('team_uploading')}
-                    </span>
-                  ) : isOpen ? (
-                    <button
-                      onClick={function () { handleProxyPunch(c, 'out') }}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-                    >
-                      {t('team_punch_out')}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={function () { handleProxyPunch(c, 'in') }}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      {t('team_punch_in')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+                return (
+                  <div key={c.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                      <p className="text-[11px] text-gray-400 truncate">
+                        {c.emp_code} · {c.department_name || '—'}
+                        {c.vendor_name && <span className="text-blue-500"> · {c.vendor_name}</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-2 shrink-0">
+                      {isPunching ? (
+                        <span className="text-xs text-gray-400">
+                          {punchStep === 'camera' ? t('team_camera') : t('team_uploading')}
+                        </span>
+                      ) : isOpen ? (
+                        <button
+                          onClick={function () { handleProxyPunch(c, 'out') }}
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+                        >
+                          {t('team_punch_out')}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={function () { handleProxyPunch(c, 'in') }}
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                          {t('team_punch_in')}
+                        </button>
+                      )}
+                      <button
+                        onClick={function () { setRemoveTarget(c) }}
+                        className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                        title="Remove casual"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
         </div>
       )}
 
@@ -348,6 +415,32 @@ export default function PunchForTeam() {
                 {departments.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
               </select>
             </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Vendor / Agency</label>
+              <select value={vendorId} onChange={function (e) {
+                setVendorId(e.target.value)
+                if (e.target.value !== 'new') { setNewVendorName(''); setNewVendorPhone(''); setNewVendorContact('') }
+              }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                <option value="">— No Vendor —</option>
+                {vendors.map(function (v) { return <option key={v.id} value={v.id}>{v.name}</option> })}
+                <option value="new">➕ Add New Vendor</option>
+              </select>
+            </div>
+            {vendorId === 'new' && (
+              <div className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">New Vendor Details</p>
+                <input type="text" value={newVendorName} onChange={function (e) { setNewVendorName(e.target.value) }}
+                  placeholder="Vendor / Agency name *" maxLength={100}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+                <input type="tel" value={newVendorPhone} onChange={function (e) { setNewVendorPhone(e.target.value) }}
+                  placeholder="Phone (optional)" maxLength={15}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+                <input type="text" value={newVendorContact} onChange={function (e) { setNewVendorContact(e.target.value) }}
+                  placeholder="Contact person (optional)" maxLength={100}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+              </div>
+            )}
 
             {addError && <p className="text-xs text-red-600">{addError}</p>}
 
@@ -374,6 +467,24 @@ export default function PunchForTeam() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* REMOVE CASUAL CONFIRM */}
+      {removeTarget && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4" onClick={function () { setRemoveTarget(null) }}>
+          <div className="bg-white rounded-t-2xl rounded-b-xl w-full max-w-md shadow-xl p-5" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="text-sm font-bold text-gray-900 mb-2">Remove Casual Worker</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Remove <strong>{removeTarget.name}</strong> ({removeTarget.emp_code}) from the active list? Their punch history is preserved.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={function () { setRemoveTarget(null) }}
+                className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">{t('cancel')}</button>
+              <button onClick={handleDeactivateCasual}
+                className="flex-1 py-2 text-sm text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors font-medium">Remove</button>
+            </div>
+          </div>
         </div>
       )}
 
