@@ -11,7 +11,6 @@ var TAB_KEYS = [
   { to: '/claims', key: 'tab_claims', icon: '📝', roles: null },
   { to: '/dar', key: 'tab_dar', icon: '📋', roles: null, empCodes: ['AMB001'] },
   { to: '/attendance', key: 'tab_attendance', icon: '📅', roles: null },
-  { to: '/settings', key: 'tab_settings', icon: '⚙️', roles: null },
 ]
 
 export default function MobileShell() {
@@ -37,6 +36,7 @@ export default function MobileShell() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <NavLink to="/settings" className="text-white/50 hover:text-white transition-colors text-lg">⚙️</NavLink>
             <a href="/"
               className="px-2 py-1 rounded-lg border border-white/10 text-white/50 text-xs font-semibold no-underline hover:text-white transition-colors"
             >⌂ Hub</a>
