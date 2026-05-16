@@ -11,6 +11,7 @@ import Employees from './pages/admin/Employees'
 import DailyAttendance from './pages/admin/DailyAttendance'
 import MonthlyReport from './pages/admin/MonthlyReport'
 import PunchForTeam from './pages/mobile/PunchForTeam'
+import DeptAttendance from './pages/mobile/DeptAttendance'
 import MyClaims from './pages/mobile/MyClaims'
 import ClaimsQueue from './pages/admin/ClaimsQueue'
 import ConfigHub from './pages/admin/ConfigHub'
@@ -76,6 +77,11 @@ export default function App() {
         <Route path="team" element={
           <ProtectedRoute roles={['supervisor', 'manager', 'admin']}>
             <PunchForTeam />
+          </ProtectedRoute>
+        } />
+        <Route path="dept" element={
+          <ProtectedRoute roles={['manager', 'admin']}>
+            <DeptAttendance />
           </ProtectedRoute>
         } />
         <Route path="attendance" element={<MyAttendance />} />

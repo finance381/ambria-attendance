@@ -7,6 +7,7 @@ import { useLanguage, LanguageToggle } from '../../lib/i18n'
 var TAB_KEYS = [
   { to: '/', key: 'tab_home', icon: '🏠', roles: null },
   { to: '/team', key: 'tab_team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
+  { to: '/dept', key: 'tab_dept', icon: '📋', roles: ['manager', 'admin'] },
   { to: '/claims', key: 'tab_claims', icon: '📝', roles: null },
   { to: '/dar', key: 'tab_dar', icon: '📋', roles: null, empCodes: ['AMB001'] },
   { to: '/attendance', key: 'tab_attendance', icon: '📅', roles: null },
