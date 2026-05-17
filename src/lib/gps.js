@@ -22,7 +22,7 @@ export function getLocation() {
           var controller = new AbortController()
           var timer = setTimeout(function () { controller.abort() }, 3000)
           var res = await fetch(
-            'https://nominatim.openstreetmap.org/reverse?lat=' + result.latitude + '&lon=' + result.longitude + '&format=json&zoom=16&addressdetails=1',
+            'https://nominatim.openstreetmap.org/reverse?lat=' + result.latitude + '&lon=' + result.longitude + '&format=json&zoom=16&addressdetails=1&email=admin@ambria.local',
             { signal: controller.signal, headers: { 'Accept': 'application/json' } }
           )
           clearTimeout(timer)

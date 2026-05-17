@@ -117,6 +117,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           latitude: gps.latitude,
           longitude: gps.longitude,
           gpsAccuracy: gps.accuracy,
+          areaName: gps.areaName || null,
           deviceInfo: navigator.userAgent,
           clientTimestamp: new Date().toISOString(),
           clientPunchId: clientPunchId
@@ -161,6 +162,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           latitude: gps.latitude,
           longitude: gps.longitude,
           gpsAccuracy: gps.accuracy,
+          areaName: gps.areaName || null,
           deviceInfo: navigator.userAgent,
           clientTimestamp: new Date().toISOString(),
           clientPunchId: clientPunchId
@@ -199,6 +201,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           latitude: gps.latitude,
           longitude: gps.longitude,
           gpsAccuracy: gps.accuracy,
+          areaName: gps.areaName || null,
           deviceInfo: navigator.userAgent,
           clientTimestamp: new Date().toISOString(),
           clientPunchId: clientPunchId

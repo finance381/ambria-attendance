@@ -22,8 +22,15 @@ serve(async (req) => {
     }
 
     // Normalize phone: strip +91/0, prepend 91
-    const raw = phone.replace(/[\s\-]/g, "");
-    const normalized = raw.replace(/^(\+91|91|0)/, "");
+    const digits = phone.replace(/[^0-9]/g, "");
+    var normalized;
+    if (digits.startsWith('91') && digits.length === 12) {
+      normalized = digits.slice(2);
+    } else if (digits.startsWith('0') && digits.length === 11) {
+      normalized = digits.slice(1);
+    } else {
+      normalized = digits;
+    }
     if (!/^\d{10}$/.test(normalized)) {
       return new Response(JSON.stringify({ error: "Invalid phone number" }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" },

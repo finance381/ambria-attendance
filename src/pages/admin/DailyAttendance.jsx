@@ -33,6 +33,8 @@ export default function DailyAttendance() {
 
   // Detail panel
   var [detailTarget, setDetailTarget] = useState(null)
+  var [detailPunches, setDetailPunches] = useState([])
+  var [detailPunchLoading, setDetailPunchLoading] = useState(false)
   var [sortCol, setSortCol] = useState('name')
   var [sortDir, setSortDir] = useState('asc')
 
@@ -89,9 +91,6 @@ export default function DailyAttendance() {
     }
     return sortDir === 'asc' ? va - vb : vb - va
   })
-
-  var [detailPunches, setDetailPunches] = useState([])
-  var [detailPunchLoading, setDetailPunchLoading] = useState(false)
 
   async function openDetailPanel(r) {
     setDetailTarget(r)
