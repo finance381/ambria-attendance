@@ -24,6 +24,12 @@ export default function DeptAttendance() {
   var [detail, setDetail] = useState(null)
   var [detailPunches, setDetailPunches] = useState([])
   var [detailLoading, setDetailLoading] = useState(false)
+  var [view, setView] = useState('daily')
+  var [mYear, setMYear] = useState(new Date().getFullYear())
+  var [mMonth, setMMonth] = useState(new Date().getMonth() + 1)
+  var [mRecords, setMRecords] = useState([])
+  var [mLoading, setMLoading] = useState(false)
+  var [mSearch, setMSearch] = useState('')
 
   var loadData = useCallback(async function () {
     setLoading(true)
@@ -40,6 +46,21 @@ export default function DeptAttendance() {
   }, [date, employee.department_id])
 
   useEffect(function () { loadData() }, [loadData])
+
+  var loadMonthly = useCallback(async function () {
+    setMLoading(true)
+    var { data } = await supabase.rpc('monthly_summary', {
+      p_year: mYear,
+      p_month: mMonth,
+      p_department_id: employee.department_id
+    })
+    setMRecords(data || [])
+    setMLoading(false)
+  }, [mYear, mMonth, employee.department_id])
+
+  useEffect(function () {
+    if (view === 'monthly') loadMonthly()
+  }, [view, loadMonthly])
 
   async function openDetail(r) {
     setDetail(r)
@@ -77,8 +98,28 @@ export default function DeptAttendance() {
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-0.5">My Department</h2>
-      <p className="text-xs text-gray-400 mb-4">{deptName} · {dateLabel}</p>
+      <p className="text-xs text-gray-400 mb-3">{deptName}</p>
 
+      {/* Daily / Monthly toggle */}
+      <div className="flex bg-gray-100 rounded-lg p-0.5 mb-3">
+        <button onClick={function () { setView('daily') }}
+          className={'flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ' +
+            (view === 'daily' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
+          Daily
+        </button>
+        <button onClick={function () { setView('monthly') }}
+          className={'flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ' +
+            (view === 'monthly' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
+          Monthly
+        </button>
+      </div>
+
+      {view === 'monthly' && <MonthlyView
+        mYear={mYear} setMYear={setMYear} mMonth={mMonth} setMMonth={setMMonth}
+        mRecords={mRecords} mLoading={mLoading} mSearch={mSearch} setMSearch={setMSearch} t={t}
+      />}
+
+      {view === 'daily' && <>
       {/* Date nav */}
       <div className="flex items-center gap-2 mb-3">
         <button onClick={function () {
@@ -150,6 +191,7 @@ export default function DeptAttendance() {
           })}
         </div>
       )}
+      </>}
 
       {/* DETAIL MODAL */}
       {detail && (
@@ -220,6 +262,118 @@ export default function DeptAttendance() {
         </div>
       )}
     </div>
+  )
+}
+
+var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, mSearch, setMSearch, t }) {
+  var now = new Date()
+  var isCurrentMonth = mYear === now.getFullYear() && mMonth === now.getMonth() + 1
+
+  function prevMonth() {
+    if (mMonth === 1) { setMMonth(12); setMYear(mYear - 1) }
+    else setMMonth(mMonth - 1)
+  }
+  function nextMonth() {
+    if (isCurrentMonth) return
+    if (mMonth === 12) { setMMonth(1); setMYear(mYear + 1) }
+    else setMMonth(mMonth + 1)
+  }
+
+  var filtered = mRecords.filter(function (r) {
+    if (!mSearch) return true
+    var q = mSearch.toLowerCase()
+    return r.name.toLowerCase().includes(q) || r.emp_code.toLowerCase().includes(q)
+  })
+
+  var totals = { present: 0, half: 0, absent: 0, incomplete: 0, hours: 0 }
+  filtered.forEach(function (r) {
+    totals.present += r.days_present || 0
+    totals.half += r.days_half || 0
+    totals.absent += r.days_absent || 0
+    totals.incomplete += r.days_incomplete || 0
+    totals.hours += r.total_hours || 0
+  })
+
+  return (
+    <>
+      {/* Month nav */}
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={prevMonth}
+          className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300">←</button>
+        <div className="flex-1 text-center text-sm font-semibold text-gray-700">
+          {MONTHS[mMonth - 1]} {mYear}
+        </div>
+        <button onClick={nextMonth} disabled={isCurrentMonth}
+          className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30">→</button>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-5 gap-1.5 mb-3">
+        {[
+          { label: 'Staff', value: filtered.length, color: 'text-slate-700' },
+          { label: 'Present', value: totals.present, color: 'text-emerald-600' },
+          { label: 'Half', value: totals.half, color: 'text-orange-600' },
+          { label: 'Absent', value: totals.absent, color: 'text-red-600' },
+          { label: 'Hours', value: Math.round(totals.hours * 10) / 10, color: 'text-blue-600' }
+        ].map(function (s) {
+          return (
+            <div key={s.label} className="bg-white border border-gray-200 rounded-lg px-1 py-2 text-center">
+              <p className="text-[8px] font-semibold text-gray-400 uppercase">{s.label}</p>
+              <p className={'text-lg font-bold ' + s.color}>{s.value}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Search */}
+      <input type="text" value={mSearch} onChange={function (e) { setMSearch(e.target.value) }}
+        placeholder="Search name or code…"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-slate-700" />
+
+      {/* Employee cards */}
+      {mLoading ? (
+        <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-8">No records</p>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(function (r) {
+            var pct = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
+            var pctColor = pct >= 90 ? 'text-emerald-600' : pct >= 75 ? 'text-amber-600' : 'text-red-600'
+            return (
+              <div key={r.employee_id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{r.name}
+                      {r.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">casual</span>}
+                    </p>
+                    <p className="text-[11px] text-gray-400">{r.emp_code} · {r.designation || ''}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={'text-lg font-bold ' + pctColor}>{pct}%</p>
+                    <p className="text-[9px] text-gray-400">attendance</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 text-[11px]">
+                  <span className="text-emerald-600 font-semibold">{r.days_present || 0}P</span>
+                  <span className="text-orange-600 font-semibold">{r.days_half || 0}H</span>
+                  <span className="text-red-600 font-semibold">{r.days_absent || 0}A</span>
+                  <span className="text-amber-600 font-semibold">{r.days_incomplete || 0}Inc</span>
+                  <span className="text-gray-500">{r.total_hours}hrs</span>
+                  {r.claims_used > 0 && (
+                    <span className={r.claims_over_limit ? 'text-red-600 font-bold' : 'text-purple-600'}>
+                      {r.claims_used}/{r.claims_limit}C
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
   )
 }
 
