@@ -39,7 +39,7 @@ export default function DeptAttendance() {
     ])
 
     var all = attRes.data || []
-    var deptOnly = all.filter(function (r) { return r.department_id === employee.department_id })
+    var deptOnly = employee.role === 'admin' ? all : all.filter(function (r) { return r.department_id === employee.department_id })
     setRecords(deptOnly)
     setDeptName(deptRes.data ? deptRes.data.name : '')
     setLoading(false)
@@ -52,7 +52,7 @@ export default function DeptAttendance() {
     var { data } = await supabase.rpc('monthly_summary', {
       p_year: mYear,
       p_month: mMonth,
-      p_department_id: employee.department_id
+      p_department_id: employee.role === 'admin' ? null : employee.department_id
     })
     setMRecords(data || [])
     setMLoading(false)
@@ -98,7 +98,7 @@ export default function DeptAttendance() {
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-0.5">My Department</h2>
-      <p className="text-xs text-gray-400 mb-3">{deptName}</p>
+      <p className="text-xs text-gray-400 mb-3">{employee.role === 'admin' ? 'All Departments' : deptName}</p>
 
       {/* Daily / Monthly toggle */}
       <div className="flex bg-gray-100 rounded-lg p-0.5 mb-3">
@@ -285,6 +285,12 @@ function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, m
     if (!mSearch) return true
     var q = mSearch.toLowerCase()
     return r.name.toLowerCase().includes(q) || r.emp_code.toLowerCase().includes(q)
+  })
+
+  filtered.sort(function (a, b) {
+    var pctA = a.effective_days > 0 ? a.days_present / a.effective_days : 0
+    var pctB = b.effective_days > 0 ? b.days_present / b.effective_days : 0
+    return pctB - pctA
   })
 
   var totals = { present: 0, half: 0, absent: 0, incomplete: 0, hours: 0 }
