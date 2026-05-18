@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, HeadingLevel, WidthType, BorderStyle } from 'docx'
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, HeadingLevel, WidthType, BorderStyle, ShadingType, PageOrientation } from 'docx'
 
 var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -379,51 +379,78 @@ export default function MonthlyReport() {
     }
 
     // Helpers to build table cells
+    var cellBorder = { style: BorderStyle.SINGLE, size: 1, color: 'D0D0D0' }
+    var cellBorders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder }
+    var cellMargins = { top: 60, bottom: 60, left: 80, right: 80 }
+
     function textRun(text, opts) {
       opts = opts || {}
-      return new TextRun({ text: String(text), bold: !!opts.bold, size: opts.size || 20 })
+      return new TextRun({ text: String(text), bold: !!opts.bold, size: opts.size || 18, font: 'Arial', color: opts.color || '333333' })
     }
-    function headerCell(text) {
+    function headerCell(text, w) {
       return new TableCell({
-        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [textRun(text, { bold: true })] })],
-        shading: { fill: 'E7E6E6' }
+        width: { size: w, type: WidthType.DXA },
+        borders: cellBorders,
+        margins: cellMargins,
+        shading: { fill: '2B3544', type: ShadingType.CLEAR },
+        verticalAlign: 'center',
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+          children: [new TextRun({ text: String(text), bold: true, size: 16, font: 'Arial', color: 'FFFFFF' })] })]
       })
     }
     function dataCell(text, opts) {
       opts = opts || {}
       return new TableCell({
-        children: [new Paragraph({ alignment: opts.align || AlignmentType.CENTER, children: [textRun(text, { bold: !!opts.bold })] })]
+        width: { size: opts.w || 900, type: WidthType.DXA },
+        borders: cellBorders,
+        margins: cellMargins,
+        shading: opts.shaded ? { fill: 'F7F8FA', type: ShadingType.CLEAR } : undefined,
+        children: [new Paragraph({ alignment: opts.align || AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+          children: [textRun(text, { bold: !!opts.bold, color: opts.color })] })]
       })
     }
 
+    // Column widths (DXA) — landscape letter with 0.75" margins = 13680 content width
+    var colW = { sno: 550, name: 1900, dept: 1500, wk: 750, p: 700, h: 600, a: 700, inc: 600, hrs: 850, exp: 850, hpct: 700, apct: 700, avg: 750, cl: 730 }
+    var colWMonth = 900
+    // Adjust name width for multi-month to fit month column
+    var colWidths = isSingleMonth
+      ? [colW.sno, colW.name, colW.dept, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl]
+      : [colW.sno, colWMonth, colW.name - 200, colW.dept - 200, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl]
+
     // Build header row
-    var colHeaders = ['S.No.', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims']
-    var headerCells = isSingleMonth ? colHeaders : ['S.No.', 'Month'].concat(colHeaders.slice(1))
+    var colHeaders = isSingleMonth
+      ? ['S.No', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims']
+      : ['S.No', 'Month', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims']
 
     var tableRows = [
-      new TableRow({ children: headerCells.map(headerCell), tableHeader: true })
+      new TableRow({ children: colHeaders.map(function (h, i) { return headerCell(h, colWidths[i]) }), tableHeader: true })
     ]
 
     // Data rows
+    var rowIdx = 0
     allRows.forEach(function (r) {
+      var shaded = rowIdx % 2 === 1
+      rowIdx++
+      var s = { shaded: shaded }
       var dataCells = [
-        dataCell(r.serial),
-        dataCell(r.name, { align: AlignmentType.LEFT, bold: true }),
-        dataCell(r.dept, { align: AlignmentType.LEFT }),
-        dataCell(r.wkdays),
-        dataCell(r.present),
-        dataCell(r.half),
-        dataCell(r.absent),
-        dataCell(r.incomplete),
-        dataCell(r.hrs),
-        dataCell(r.expected),
-        dataCell(r.hrsPct),
-        dataCell(r.attPct),
-        dataCell(r.avgD),
-        dataCell(r.claims)
+        dataCell(r.serial, { w: colWidths[0], shaded: shaded }),
+        dataCell(r.name, { align: AlignmentType.LEFT, bold: true, w: isSingleMonth ? colWidths[1] : colWidths[2], shaded: shaded }),
+        dataCell(r.dept, { align: AlignmentType.LEFT, w: isSingleMonth ? colWidths[2] : colWidths[3], shaded: shaded }),
+        dataCell(r.wkdays, { shaded: shaded }),
+        dataCell(r.present, { shaded: shaded, color: '1B7A43' }),
+        dataCell(r.half, { shaded: shaded, color: 'C2590A' }),
+        dataCell(r.absent, { shaded: shaded, color: 'DC2626' }),
+        dataCell(r.incomplete, { shaded: shaded, color: 'B45309' }),
+        dataCell(r.hrs, { shaded: shaded }),
+        dataCell(r.expected, { shaded: shaded }),
+        dataCell(r.hrsPct, { shaded: shaded }),
+        dataCell(r.attPct, { shaded: shaded }),
+        dataCell(r.avgD, { shaded: shaded }),
+        dataCell(r.claims, { shaded: shaded, color: '7C3AED' })
       ]
       if (!isSingleMonth) {
-        dataCells.splice(1, 0, dataCell(r.month))
+        dataCells.splice(1, 0, dataCell(r.month, { w: colWidths[1], shaded: shaded }))
       }
       tableRows.push(new TableRow({ children: dataCells }))
     })
@@ -434,50 +461,76 @@ export default function MonthlyReport() {
     var gAttPct = grandTotals.wkdays > 0 ? Math.round(grandTotals.present / grandTotals.wkdays * 100) + '%' : '—'
     var gAvgD = grandTotals.present > 0 ? Math.round(grandTotals.hrs / grandTotals.present * 10) / 10 : '—'
 
+    var totShading = { fill: 'E8ECF0', type: ShadingType.CLEAR }
+    function totCell(text, opts) {
+      opts = opts || {}
+      return new TableCell({
+        width: { size: opts.w || 900, type: WidthType.DXA },
+        borders: cellBorders,
+        margins: cellMargins,
+        shading: totShading,
+        children: [new Paragraph({ alignment: opts.align || AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+          children: [new TextRun({ text: String(text), bold: true, size: 18, font: 'Arial', color: '1a1a1a' })] })]
+      })
+    }
+
     var totCells = [
-      dataCell('', { bold: true }),
-      dataCell('TOTAL', { align: AlignmentType.LEFT, bold: true }),
-      dataCell('', { bold: true }),
-      dataCell(grandTotals.wkdays, { bold: true }),
-      dataCell(grandTotals.present, { bold: true }),
-      dataCell(grandTotals.half, { bold: true }),
-      dataCell(grandTotals.absent, { bold: true }),
-      dataCell(grandTotals.incomplete, { bold: true }),
-      dataCell(Math.round(grandTotals.hrs * 10) / 10, { bold: true }),
-      dataCell(gExpected, { bold: true }),
-      dataCell(gHrsPct, { bold: true }),
-      dataCell(gAttPct, { bold: true }),
-      dataCell(gAvgD, { bold: true }),
-      dataCell(grandTotals.claims, { bold: true })
+      totCell(''),
+      totCell('TOTAL', { align: AlignmentType.LEFT }),
+      totCell(''),
+      totCell(grandTotals.wkdays),
+      totCell(grandTotals.present),
+      totCell(grandTotals.half),
+      totCell(grandTotals.absent),
+      totCell(grandTotals.incomplete),
+      totCell(Math.round(grandTotals.hrs * 10) / 10),
+      totCell(gExpected),
+      totCell(gHrsPct),
+      totCell(gAttPct),
+      totCell(gAvgD),
+      totCell(grandTotals.claims)
     ]
     if (!isSingleMonth) {
-      totCells.splice(1, 0, dataCell('', { bold: true }))
+      totCells.splice(1, 0, totCell(''))
     }
     tableRows.push(new TableRow({ children: totCells }))
 
+    var tableWidth = colWidths.reduce(function (a, b) { return a + b }, 0)
+
     var table = new Table({
       rows: tableRows,
-      width: { size: 100, type: WidthType.PERCENTAGE }
+      width: { size: tableWidth, type: WidthType.DXA },
+      columnWidths: colWidths
     })
 
-    // Build document
+    // Build document — landscape
     var doc = new Document({
+      styles: {
+        default: { document: { run: { font: 'Arial', size: 20 } } }
+      },
       sections: [{
-        properties: {},
+        properties: {
+          page: {
+            size: { width: 12240, height: 15840, orientation: PageOrientation.LANDSCAPE },
+            margin: { top: 720, right: 720, bottom: 720, left: 720 }
+          }
+        },
         children: [
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: 'GET YOUR VENUE EVENTS PVT LTD', bold: true, size: 28 })]
+            spacing: { after: 80 },
+            children: [new TextRun({ text: 'GET YOUR VENUE EVENTS PVT LTD', bold: true, size: 28, font: 'Arial', color: '2B3544' })]
           }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: 'Attendance Report', bold: true, size: 24 })]
+            spacing: { after: 60 },
+            children: [new TextRun({ text: 'Attendance Report', bold: true, size: 22, font: 'Arial', color: '555555' })]
           }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: 'Period: ' + periodLabel + '  |  Total Employees: ' + allRows.length, size: 20 })]
+            spacing: { after: 200 },
+            children: [new TextRun({ text: 'Period: ' + periodLabel + '   |   Employees: ' + allRows.length, size: 18, font: 'Arial', color: '888888' })]
           }),
-          new Paragraph({ children: [new TextRun({ text: '', size: 20 })] }),
           table
         ]
       }]
