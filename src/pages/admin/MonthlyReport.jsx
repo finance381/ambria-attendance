@@ -307,7 +307,7 @@ export default function MonthlyReport() {
 
     // Collect all rows
     var allRows = []
-    var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, total: 0 }
+    var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, wkdays: 0, hrs: 0, claims: 0 }
     var serial = 1
 
     for (var i = 0; i < months.length; i++) {
@@ -325,23 +325,39 @@ export default function MonthlyReport() {
         var absent = r.days_absent || 0
         var half = r.days_half || 0
         var incomplete = r.days_incomplete || 0
-        var total = present + absent + half + incomplete
+        var wkdays = r.effective_days || 0
+        var hrs = r.total_hours || 0
+        var expected = wkdays * 9
+        var hrsPct = expected > 0 ? Math.round(hrs / expected * 100) : 0
+        var attPct = wkdays > 0 ? Math.round(present / wkdays * 100) : 0
+        var avgD = present > 0 ? Math.round(hrs / present * 10) / 10 : 0
+        var claimsUsed = r.claims_used || 0
+        var claimsLimit = r.claims_limit || 0
 
         grandTotals.present += present
         grandTotals.absent += absent
         grandTotals.half += half
         grandTotals.incomplete += incomplete
-        grandTotals.total += total
+        grandTotals.wkdays += wkdays
+        grandTotals.hrs += hrs
+        grandTotals.claims += claimsUsed
 
         allRows.push({
           serial: serial++,
           month: monthLabel,
           name: r.name,
+          dept: r.department_name || '—',
+          wkdays: wkdays,
           present: present,
-          absent: absent,
           half: half,
+          absent: absent,
           incomplete: incomplete,
-          total: total
+          hrs: hrs,
+          expected: expected,
+          hrsPct: hrsPct + '%',
+          attPct: attPct + '%',
+          avgD: avgD,
+          claims: claimsUsed + '/' + claimsLimit
         })
       })
     }
@@ -381,9 +397,8 @@ export default function MonthlyReport() {
     }
 
     // Build header row
-    var headerCells = isSingleMonth
-      ? ['S.No.', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days']
-      : ['S.No.', 'Month', 'Name', 'Present', 'Absent', 'Half Days', 'Incomplete', 'Total Working Days']
+    var colHeaders = ['S.No.', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims']
+    var headerCells = isSingleMonth ? colHeaders : ['S.No.', 'Month'].concat(colHeaders.slice(1))
 
     var tableRows = [
       new TableRow({ children: headerCells.map(headerCell), tableHeader: true })
@@ -391,50 +406,53 @@ export default function MonthlyReport() {
 
     // Data rows
     allRows.forEach(function (r) {
-      var cells = isSingleMonth
-        ? [
-            dataCell(r.serial),
-            dataCell(r.name, { align: AlignmentType.LEFT, bold: true }),
-            dataCell(r.present),
-            dataCell(r.absent),
-            dataCell(r.half),
-            dataCell(r.incomplete),
-            dataCell(r.total)
-          ]
-        : [
-            dataCell(r.serial),
-            dataCell(r.month),
-            dataCell(r.name, { align: AlignmentType.LEFT, bold: true }),
-            dataCell(r.present),
-            dataCell(r.absent),
-            dataCell(r.half),
-            dataCell(r.incomplete),
-            dataCell(r.total)
-          ]
-      tableRows.push(new TableRow({ children: cells }))
+      var dataCells = [
+        dataCell(r.serial),
+        dataCell(r.name, { align: AlignmentType.LEFT, bold: true }),
+        dataCell(r.dept, { align: AlignmentType.LEFT }),
+        dataCell(r.wkdays),
+        dataCell(r.present),
+        dataCell(r.half),
+        dataCell(r.absent),
+        dataCell(r.incomplete),
+        dataCell(r.hrs),
+        dataCell(r.expected),
+        dataCell(r.hrsPct),
+        dataCell(r.attPct),
+        dataCell(r.avgD),
+        dataCell(r.claims)
+      ]
+      if (!isSingleMonth) {
+        dataCells.splice(1, 0, dataCell(r.month))
+      }
+      tableRows.push(new TableRow({ children: dataCells }))
     })
 
     // Totals row
-    var totCells = isSingleMonth
-      ? [
-          dataCell('', { bold: true }),
-          dataCell('TOTAL', { align: AlignmentType.LEFT, bold: true }),
-          dataCell(grandTotals.present, { bold: true }),
-          dataCell(grandTotals.absent, { bold: true }),
-          dataCell(grandTotals.half, { bold: true }),
-          dataCell(grandTotals.incomplete, { bold: true }),
-          dataCell(grandTotals.total, { bold: true })
-        ]
-      : [
-          dataCell('', { bold: true }),
-          dataCell('', { bold: true }),
-          dataCell('TOTAL', { align: AlignmentType.LEFT, bold: true }),
-          dataCell(grandTotals.present, { bold: true }),
-          dataCell(grandTotals.absent, { bold: true }),
-          dataCell(grandTotals.half, { bold: true }),
-          dataCell(grandTotals.incomplete, { bold: true }),
-          dataCell(grandTotals.total, { bold: true })
-        ]
+    var gExpected = grandTotals.wkdays * 9
+    var gHrsPct = gExpected > 0 ? Math.round(grandTotals.hrs / gExpected * 100) + '%' : '—'
+    var gAttPct = grandTotals.wkdays > 0 ? Math.round(grandTotals.present / grandTotals.wkdays * 100) + '%' : '—'
+    var gAvgD = grandTotals.present > 0 ? Math.round(grandTotals.hrs / grandTotals.present * 10) / 10 : '—'
+
+    var totCells = [
+      dataCell('', { bold: true }),
+      dataCell('TOTAL', { align: AlignmentType.LEFT, bold: true }),
+      dataCell('', { bold: true }),
+      dataCell(grandTotals.wkdays, { bold: true }),
+      dataCell(grandTotals.present, { bold: true }),
+      dataCell(grandTotals.half, { bold: true }),
+      dataCell(grandTotals.absent, { bold: true }),
+      dataCell(grandTotals.incomplete, { bold: true }),
+      dataCell(Math.round(grandTotals.hrs * 10) / 10, { bold: true }),
+      dataCell(gExpected, { bold: true }),
+      dataCell(gHrsPct, { bold: true }),
+      dataCell(gAttPct, { bold: true }),
+      dataCell(gAvgD, { bold: true }),
+      dataCell(grandTotals.claims, { bold: true })
+    ]
+    if (!isSingleMonth) {
+      totCells.splice(1, 0, dataCell('', { bold: true }))
+    }
     tableRows.push(new TableRow({ children: totCells }))
 
     var table = new Table({
