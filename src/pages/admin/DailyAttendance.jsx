@@ -253,10 +253,12 @@ export default function DailyAttendance() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      <VenueCell venue={r.venue_in} status={r.status} type="in" />
+                      <VenueCell venue={r.venue_in} status={r.status} type="in"
+                        locationName={r.punches && r.punches.find(function (p) { return p.punch_type === 'in' && p.location_name }) ? r.punches.find(function (p) { return p.punch_type === 'in' }).location_name : null} />
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      <VenueCell venue={r.venue_out} status={r.status} type="out" />
+                      <VenueCell venue={r.venue_out} status={r.status} type="out"
+                        locationName={r.punches && r.punches.find(function (p) { return p.punch_type === 'out' && p.location_name }) ? r.punches.find(function (p) { return p.punch_type === 'out' }).location_name : null} />
                       {r.has_override && <span className="text-blue-500 ml-1" title="Has override">✏️</span>}
                     </td>
                     <td className="px-3 py-2 text-right" onClick={function (e) { e.stopPropagation() }}>
@@ -520,7 +522,7 @@ function SelfieImg({ path, size, rounded }) {
   )
 }
 
-function VenueCell({ venue, status, type }) {
+function VenueCell({ venue, status, type, locationName }) {
   if (status === 'Absent') return <span className="text-[10px] text-gray-300">—</span>
   if (status === 'Incomplete' && type === 'out') return <span className="text-[10px] text-gray-300">—</span>
 
@@ -528,6 +530,14 @@ function VenueCell({ venue, status, type }) {
     return (
       <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded" title={venue}>
         {venue.length > 15 ? venue.slice(0, 15) + '…' : venue}
+      </span>
+    )
+  }
+
+  if (locationName) {
+    return (
+      <span className="text-[10px] font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded" title={locationName}>
+        {locationName.length > 18 ? locationName.slice(0, 18) + '…' : locationName}
       </span>
     )
   }
