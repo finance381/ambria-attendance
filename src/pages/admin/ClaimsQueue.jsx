@@ -13,6 +13,8 @@ export default function ClaimsQueue() {
   var [deptFilter, setDeptFilter] = useState('')
   var [statusFilter, setStatusFilter] = useState('')
   var [search, setSearch] = useState('')
+  var [mYear, setMYear] = useState(new Date().getFullYear())
+  var [mMonth, setMMonth] = useState(new Date().getMonth() + 1)
   var [loading, setLoading] = useState(true)
   var [saving, setSaving] = useState(false)
   var [toast, setToast] = useState('')
@@ -85,15 +87,21 @@ export default function ClaimsQueue() {
     loadAll()
   }
 
-  var pendingCount = claims.filter(function (c) { return c.status === 'pending' }).length
-  var approvedCount = claims.filter(function (c) { return c.status === 'approved' }).length
-  var rejectedCount = claims.filter(function (c) { return c.status === 'rejected' }).length
+  var monthClaims = claims.filter(function (c) {
+    var d = c.attendance_date
+    if (!d) return false
+    var parts = d.split('-')
+    return Number(parts[0]) === mYear && Number(parts[1]) === mMonth
+  })
+  var pendingCount = monthClaims.filter(function (c) { return c.status === 'pending' }).length
+  var approvedCount = monthClaims.filter(function (c) { return c.status === 'approved' }).length
+  var rejectedCount = monthClaims.filter(function (c) { return c.status === 'rejected' }).length
 
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">Claims</h2>
       <p className="text-xs text-gray-500 mb-4">
-        {claims.length} claim{claims.length !== 1 ? 's' : ''}
+        {monthClaims.length} claim{monthClaims.length !== 1 ? 's' : ''}
         {pendingCount > 0 && <span className="ml-1 text-amber-600 font-semibold">· {pendingCount} pending</span>}
       </p>
 
@@ -122,6 +130,22 @@ export default function ClaimsQueue() {
             placeholder="Name or code…"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
         </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Month</label>
+          <div className="flex items-center gap-1">
+            <button onClick={function () { if (mMonth === 1) { setMMonth(12); setMYear(mYear - 1) } else setMMonth(mMonth - 1) }}
+              className="px-2 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">←</button>
+            <span className="px-3 py-2 text-sm font-medium text-gray-700 min-w-[100px] text-center">
+              {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][mMonth - 1]} {mYear}
+            </span>
+            <button onClick={function () {
+                var now = new Date(); if (mYear === now.getFullYear() && mMonth === now.getMonth() + 1) return;
+                if (mMonth === 12) { setMMonth(1); setMYear(mYear + 1) } else setMMonth(mMonth + 1)
+              }}
+              disabled={mYear === new Date().getFullYear() && mMonth === new Date().getMonth() + 1}
+              className="px-2 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm disabled:opacity-30">→</button>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -138,9 +162,16 @@ export default function ClaimsQueue() {
       ) : (
         <div className="space-y-3">
           {claims.filter(function (c) {
-            if (!search) return true
-            var q = search.toLowerCase()
-            return c.employee_name.toLowerCase().includes(q) || c.emp_code.toLowerCase().includes(q)
+            var d = c.attendance_date
+            if (d) {
+              var parts = d.split('-')
+              if (Number(parts[0]) !== mYear || Number(parts[1]) !== mMonth) return false
+            }
+            if (search) {
+              var q = search.toLowerCase()
+              if (!c.employee_name.toLowerCase().includes(q) && !c.emp_code.toLowerCase().includes(q)) return false
+            }
+            return true
           }).map(function (c) {
             var isPending = c.status === 'pending'
             return (
