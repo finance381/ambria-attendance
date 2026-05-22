@@ -12,6 +12,7 @@ export default function ClaimsQueue() {
   var [departments, setDepartments] = useState([])
   var [deptFilter, setDeptFilter] = useState('')
   var [statusFilter, setStatusFilter] = useState('')
+  var [search, setSearch] = useState('')
   var [loading, setLoading] = useState(true)
   var [saving, setSaving] = useState(false)
   var [toast, setToast] = useState('')
@@ -115,6 +116,12 @@ export default function ClaimsQueue() {
             {departments.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
           </select>
         </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Search</label>
+          <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
+            placeholder="Name or code…"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+        </div>
       </div>
 
       {loading ? (
@@ -130,7 +137,11 @@ export default function ClaimsQueue() {
         </div>
       ) : (
         <div className="space-y-3">
-          {claims.map(function (c) {
+          {claims.filter(function (c) {
+            if (!search) return true
+            var q = search.toLowerCase()
+            return c.employee_name.toLowerCase().includes(q) || c.emp_code.toLowerCase().includes(q)
+          }).map(function (c) {
             var isPending = c.status === 'pending'
             return (
               <div key={c.claim_id} className={'border rounded-xl p-4 ' +
