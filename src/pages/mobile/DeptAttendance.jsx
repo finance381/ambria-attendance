@@ -180,10 +180,26 @@ export default function DeptAttendance() {
                   <span className="text-[10px] font-bold uppercase">{r.status}</span>
                 </div>
                 {r.status !== 'Absent' && (
-                  <div className="flex gap-4 mt-1 text-[11px] opacity-80">
-                    <span>In: <strong>{fmtTime(r.first_in)}</strong></span>
-                    <span>Out: <strong>{fmtTime(r.last_out)}</strong></span>
-                    {r.in_count > 1 && <span>{r.in_count} sessions</span>}
+                  <div className="mt-1 text-[11px] opacity-80">
+                    <div className="flex gap-4">
+                      <span>In: <strong>{fmtTime(r.first_in)}</strong></span>
+                      <span>Out: <strong>{fmtTime(r.last_out)}</strong></span>
+                      {r.in_count > 1 && <span>{r.in_count} sessions</span>}
+                    </div>
+                    {r.punches && r.punches.length > 0 && (
+                      <div className="flex gap-4 mt-0.5 text-[10px]">
+                        {(function () {
+                          var inP = r.punches.find(function (p) { return p.punch_type === 'in' })
+                          var outP = r.punches.slice().reverse().find(function (p) { return p.punch_type === 'out' })
+                          var inLoc = inP && (inP.venue || inP.location_name)
+                          var outLoc = outP && (outP.venue || outP.location_name)
+                          return <>
+                            {inLoc && <span className={inP.venue ? 'text-emerald-600' : 'text-gray-500'}>📍 {inLoc.length > 20 ? inLoc.slice(0, 20) + '…' : inLoc}</span>}
+                            {outLoc && <span className={outP.venue ? 'text-emerald-600' : 'text-gray-500'}>📍 {outLoc.length > 20 ? outLoc.slice(0, 20) + '…' : outLoc}</span>}
+                          </>
+                        })()}
+                      </div>
+                    )}
                   </div>
                 )}
               </button>
