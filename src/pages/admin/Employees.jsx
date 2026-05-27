@@ -94,6 +94,22 @@ export default function Employees() {
     loadAll()
   }
 
+  async function handleBulkReactivate() {
+    setBulkSaving(true)
+    var failed = 0
+    for (var i = 0; i < selectedIds.length; i++) {
+      var { error } = await supabase
+        .from('employees')
+        .update({ active: true })
+        .eq('id', selectedIds[i])
+      if (error) failed++
+    }
+    setBulkSaving(false)
+    showToast((selectedIds.length - failed) + ' employees reactivated' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    clearSelection()
+    loadAll()
+  }
+
   async function handleBulkDepartment() {
     if (!bulkDept) return
     setBulkSaving(true)
@@ -418,6 +434,10 @@ export default function Employees() {
               className="px-3 py-1.5 text-xs font-semibold bg-red-500/80 hover:bg-red-500 rounded-lg transition-colors">
               Deactivate All
             </button>
+            <button onClick={function () { setBulkAction('reactivate') }}
+              className="px-3 py-1.5 text-xs font-semibold bg-emerald-500/80 hover:bg-emerald-500 rounded-lg transition-colors">
+              Reactivate All
+            </button>
             <button onClick={clearSelection}
               className="px-3 py-1.5 text-xs text-white/50 hover:text-white/80 transition-colors">
               Cancel
@@ -676,6 +696,23 @@ export default function Employees() {
               <button onClick={function () { setBulkAction(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
               <button onClick={handleBulkDeactivate} disabled={bulkSaving} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors font-medium">
                 {bulkSaving ? 'Processing…' : 'Deactivate ' + selectedCount}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkAction === 'reactivate' && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setBulkAction(null) }}>
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl p-5" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="text-sm font-bold text-emerald-600 mb-2">Bulk Reactivate</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Reactivate <strong>{selectedCount}</strong> selected employee{selectedCount > 1 ? 's' : ''}? They will be able to log in and punch again.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={function () { setBulkAction(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={handleBulkReactivate} disabled={bulkSaving} className="px-4 py-2 text-sm text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors font-medium">
+                {bulkSaving ? 'Processing…' : 'Reactivate ' + selectedCount}
               </button>
             </div>
           </div>
