@@ -24,7 +24,11 @@ export default function DeptAttendance() {
   var [detail, setDetail] = useState(null)
   var [detailPunches, setDetailPunches] = useState([])
   var [detailLoading, setDetailLoading] = useState(false)
-  var [view, setView] = useState('daily')
+  var [view, setView] = useState('daily') // 'daily' | 'dars'
+  var [darRecords, setDarRecords] = useState([])
+  var [darLoading, setDarLoading] = useState(false)
+  var [darSearch, setDarSearch] = useState('')
+  var [expandedDar, setExpandedDar] = useState(null)
   var [mYear, setMYear] = useState(new Date().getFullYear())
   var [mMonth, setMMonth] = useState(new Date().getMonth() + 1)
   var [mRecords, setMRecords] = useState([])
@@ -46,6 +50,51 @@ export default function DeptAttendance() {
   }, [date, employee.department_id])
 
   useEffect(function () { loadData() }, [loadData])
+
+  var loadDARs = useCallback(async function () {
+    setDarLoading(true)
+    var { data } = await supabase
+      .from('daily_reports')
+      .select('id, emp_code, report_date, punch_in, punch_out, tasks, submitted_at')
+      .eq('report_date', date)
+      .order('emp_code')
+
+    // Filter to dept employees only
+    var { data: deptEmps } = await supabase
+      .from('employees')
+      .select('emp_code, name')
+      .eq('department_id', employee.department_id)
+      .eq('active', true)
+      .eq('is_casual', false)
+
+    var empMap = {}
+    ;(deptEmps || []).forEach(function (e) { empMap[e.emp_code] = e.name })
+    var deptCodes = new Set(Object.keys(empMap))
+
+    var deptDars = (data || []).filter(function (d) { return deptCodes.has(d.emp_code) })
+    deptDars.forEach(function (d) { d._name = empMap[d.emp_code] || d.emp_code })
+
+    // Add missing entries
+    var submittedCodes = new Set(deptDars.map(function (d) { return d.emp_code }))
+    Object.keys(empMap).forEach(function (code) {
+      if (!submittedCodes.has(code)) {
+        deptDars.push({ id: 'miss-' + code, emp_code: code, _name: empMap[code], _missing: true })
+      }
+    })
+
+    deptDars.sort(function (a, b) {
+      if (a._missing && !b._missing) return 1
+      if (!a._missing && b._missing) return -1
+      return a._name.localeCompare(b._name)
+    })
+
+    setDarRecords(deptDars)
+    setDarLoading(false)
+  }, [date, employee.department_id])
+
+  useEffect(function () {
+    if (view === 'dars') loadDARs()
+  }, [view, loadDARs])
 
   var loadMonthly = useCallback(async function () {
     setMLoading(true)
@@ -112,13 +161,108 @@ export default function DeptAttendance() {
             (view === 'monthly' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
           Monthly
         </button>
+        <button onClick={function () { setView('dars') }}
+          className={'flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ' +
+            (view === 'dars' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
+          DARs
+        </button>
       </div>
 
       {view === 'monthly' && <MonthlyView
         mYear={mYear} setMYear={setMYear} mMonth={mMonth} setMMonth={setMMonth}
         mRecords={mRecords} mLoading={mLoading} mSearch={mSearch} setMSearch={setMSearch} t={t}
       />}
+      {view === 'dars' && <>
+        {/* Date nav */}
+        <div className="flex items-center gap-2 mb-3">
+          <button onClick={function () {
+            var d = new Date(date); d.setDate(d.getDate() - 1); setDate(d.toISOString().slice(0, 10))
+          }} className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300">←</button>
+          <input type="date" value={date} onChange={function (e) { setDate(e.target.value) }}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-slate-700" />
+          <button onClick={function () {
+            var d = new Date(date); d.setDate(d.getDate() + 1)
+            if (d <= new Date()) setDate(d.toISOString().slice(0, 10))
+          }} disabled={isToday}
+            className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30">→</button>
+        </div>
 
+        {/* DAR stats */}
+        <div className="flex gap-3 mb-3">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex-1 text-center">
+            <p className="text-[9px] font-semibold text-emerald-600 uppercase">Submitted</p>
+            <p className="text-lg font-bold text-emerald-700">{darRecords.filter(function (d) { return !d._missing }).length}</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex-1 text-center">
+            <p className="text-[9px] font-semibold text-red-500 uppercase">Missing</p>
+            <p className="text-lg font-bold text-red-600">{darRecords.filter(function (d) { return d._missing }).length}</p>
+          </div>
+        </div>
+
+        {/* Search */}
+        <input type="text" value={darSearch} onChange={function (e) { setDarSearch(e.target.value) }}
+          placeholder="Search name or code…"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-slate-700" />
+
+        {darLoading ? (
+          <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+        ) : (
+          <div className="space-y-2">
+            {darRecords.filter(function (d) {
+              if (!darSearch) return true
+              var q = darSearch.toLowerCase()
+              return d._name.toLowerCase().includes(q) || d.emp_code.toLowerCase().includes(q)
+            }).map(function (d) {
+              if (d._missing) {
+                return (
+                  <div key={d.id} className="border border-red-200 bg-red-50 rounded-xl px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-red-700">{d._name}</p>
+                        <p className="text-[11px] text-red-400">{d.emp_code}</p>
+                      </div>
+                      <span className="text-[10px] font-bold text-red-500 uppercase">Not Submitted</span>
+                    </div>
+                  </div>
+                )
+              }
+
+              var isExpanded = expandedDar === d.id
+              var bullets = d.tasks ? d.tasks.split('\n').filter(function (l) { return l.trim() }).map(function (l) {
+                var line = l.trim()
+                if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) return '• ' + line.slice(1).trim()
+                return '• ' + line
+              }) : []
+
+              return (
+                <button key={d.id} onClick={function () { setExpandedDar(isExpanded ? null : d.id) }}
+                  className="w-full text-left border border-emerald-200 bg-emerald-50 rounded-xl px-4 py-3 transition-colors active:scale-[0.99]">
+                  <div className="flex items-center justify-between mb-1">
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-800">{d._name}</p>
+                      <p className="text-[11px] text-emerald-500">{d.emp_code}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-emerald-600 uppercase">Submitted</span>
+                      <p className="text-[10px] text-emerald-400">{fmtTime(d.submitted_at)}</p>
+                    </div>
+                  </div>
+                  {!isExpanded && bullets.length > 0 && (
+                    <p className="text-xs text-emerald-600 truncate mt-1">{bullets[0]} {bullets.length > 1 ? '(+' + (bullets.length - 1) + ')' : ''}</p>
+                  )}
+                  {isExpanded && (
+                    <div className="mt-2 pt-2 border-t border-emerald-200 space-y-1">
+                      {bullets.map(function (b, i) {
+                        return <p key={i} className="text-xs text-emerald-700">{b}</p>
+                      })}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </>}
       {view === 'daily' && <>
       {/* Date nav */}
       <div className="flex items-center gap-2 mb-3">
