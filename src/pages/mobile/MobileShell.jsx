@@ -10,7 +10,7 @@ var TAB_KEYS = [
   { to: '/claims', key: 'tab_claims', icon: '📝', roles: null },
   { to: '/team', key: 'tab_team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
   { to: '/dept', key: 'tab_dept', icon: '📋', roles: ['manager', 'admin'] },
-  
+  { to: '/dar', key: 'tab_dar', icon: '📋', roles: null, empCodes: ['AMB001'] },
 ]
 
 export default function MobileShell() {

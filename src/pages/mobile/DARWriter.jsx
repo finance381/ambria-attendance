@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
+// Add Navigate to the import at top
+import { Navigate } from 'react-router-dom'
 
 
 function formatDate(d) {
