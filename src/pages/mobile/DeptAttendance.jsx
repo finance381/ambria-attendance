@@ -34,6 +34,9 @@ export default function DeptAttendance() {
   var [mRecords, setMRecords] = useState([])
   var [mLoading, setMLoading] = useState(false)
   var [mSearch, setMSearch] = useState('')
+  var [mDetail, setMDetail] = useState(null)
+  var [mDetailDays, setMDetailDays] = useState([])
+  var [mDetailLoading, setMDetailLoading] = useState(false)
 
   var loadData = useCallback(async function () {
     setLoading(true)
@@ -111,6 +114,68 @@ export default function DeptAttendance() {
     if (view === 'monthly') loadMonthly()
   }, [view, loadMonthly])
 
+  async function openMonthlyDetail(r) {
+    setMDetail(r)
+    setMDetailLoading(true)
+
+    var startDate = mYear + '-' + String(mMonth).padStart(2, '0') + '-01'
+    var endDay = new Date(mYear, mMonth, 0).getDate()
+    var endDate = mYear + '-' + String(mMonth).padStart(2, '0') + '-' + String(endDay).padStart(2, '0')
+
+    var { data: punches } = await supabase
+      .from('punches')
+      .select('attendance_date, punch_type, punched_at, location_name, nearest_venue_id, venues(name)')
+      .eq('employee_id', r.employee_id)
+      .gte('attendance_date', startDate)
+      .lte('attendance_date', endDate)
+      .order('punched_at')
+
+    var dayMap = {}
+    ;(punches || []).forEach(function (p) {
+      if (!dayMap[p.attendance_date]) dayMap[p.attendance_date] = []
+      dayMap[p.attendance_date].push(p)
+    })
+
+    var todayStr = new Date().toISOString().slice(0, 10)
+    var days = []
+    for (var d = 1; d <= endDay; d++) {
+      var dateStr = mYear + '-' + String(mMonth).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+      if (dateStr > todayStr) break
+      var dayPunches = dayMap[dateStr] || []
+      var firstIn = null, lastOut = null, hours = 0
+
+      dayPunches.forEach(function (p) {
+        if (p.punch_type === 'in' && !firstIn) firstIn = p
+        if (p.punch_type === 'out') lastOut = p
+      })
+
+      if (firstIn && lastOut) {
+        hours = Math.round(((new Date(lastOut.punched_at) - new Date(firstIn.punched_at)) / 3600000) * 10) / 10
+      }
+
+      var status = 'Absent'
+      if (dayPunches.length > 0) {
+        if (!firstIn || !lastOut) status = 'Incomplete'
+        else if (hours < 4) status = 'Absent'
+        else if (hours < 7) status = 'Half Day'
+        else status = 'Present'
+      }
+
+      days.push({
+        date: dateStr,
+        day: d,
+        weekday: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(dateStr + 'T00:00:00').getDay()],
+        status: status,
+        firstIn: firstIn,
+        lastOut: lastOut,
+        hours: hours
+      })
+    }
+
+    setMDetailDays(days.reverse())
+    setMDetailLoading(false)
+  }
+
   async function openDetail(r) {
     setDetail(r)
     setDetailLoading(true)
@@ -171,6 +236,7 @@ export default function DeptAttendance() {
       {view === 'monthly' && <MonthlyView
         mYear={mYear} setMYear={setMYear} mMonth={mMonth} setMMonth={setMMonth}
         mRecords={mRecords} mLoading={mLoading} mSearch={mSearch} setMSearch={setMSearch} t={t}
+        onTapEmployee={openMonthlyDetail}
       />}
       {view === 'dars' && <>
         {/* Date nav */}
@@ -421,13 +487,93 @@ export default function DeptAttendance() {
           </div>
         </div>
       )}
+      {/* Monthly drill-down modal */}
+      {mDetail && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" onClick={function () { setMDetail(null) }}>
+          <div className="bg-white rounded-t-2xl w-full max-w-md shadow-xl max-h-[85vh] flex flex-col"
+            onClick={function (e) { e.stopPropagation() }}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">{mDetail.name}</h3>
+                <p className="text-xs text-gray-500">{mDetail.emp_code} · {MONTHS[mMonth - 1]} {mYear}</p>
+              </div>
+              <button onClick={function () { setMDetail(null) }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+            </div>
+
+            <div className="flex gap-2 px-5 py-2.5 border-b border-gray-100 bg-gray-50">
+              <span className="text-[11px] text-emerald-600 font-bold">{mDetail.days_present || 0}P</span>
+              <span className="text-[11px] text-orange-600 font-bold">{mDetail.days_half || 0}H</span>
+              <span className="text-[11px] text-red-600 font-bold">{mDetail.days_absent || 0}A</span>
+              <span className="text-[11px] text-amber-600 font-bold">{mDetail.days_incomplete || 0}Inc</span>
+              <span className="text-[11px] text-gray-500">{mDetail.total_hours}hrs</span>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-5 py-3">
+              {mDetailLoading ? (
+                <p className="text-sm text-gray-400 text-center py-8">{t('loading')}</p>
+              ) : mDetailDays.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">No data</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {mDetailDays.map(function (day) {
+                    var statusColor = day.status === 'Present' ? 'bg-emerald-50 border-emerald-200' :
+                      day.status === 'Absent' ? 'bg-red-50 border-red-200' :
+                      day.status === 'Half Day' ? 'bg-orange-50 border-orange-200' :
+                      day.status === 'Incomplete' ? 'bg-amber-50 border-amber-200' :
+                      'bg-gray-50 border-gray-200'
+
+                    var statusText = day.status === 'Present' ? 'text-emerald-700' :
+                      day.status === 'Absent' ? 'text-red-600' :
+                      day.status === 'Half Day' ? 'text-orange-600' :
+                      'text-amber-600'
+
+                    var locationIn = day.firstIn && day.firstIn.venues ? day.firstIn.venues.name : (day.firstIn ? day.firstIn.location_name : null)
+
+                    return (
+                      <div key={day.date} className={'border rounded-lg px-3 py-2 ' + statusColor}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-700 w-5">{day.day}</span>
+                            <span className="text-[10px] text-gray-400 w-7">{day.weekday}</span>
+                            {day.status !== 'Absent' && (
+                              <>
+                                <span className="text-[11px] text-gray-600">
+                                  {day.firstIn ? fmtTime(day.firstIn.punched_at) : '—'}
+                                </span>
+                                <span className="text-[10px] text-gray-400">→</span>
+                                <span className="text-[11px] text-gray-600">
+                                  {day.lastOut ? fmtTime(day.lastOut.punched_at) : '—'}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {day.hours > 0 && <span className="text-[10px] text-gray-500">{day.hours}h</span>}
+                            <span className={'text-[10px] font-bold uppercase ' + statusText}>{day.status}</span>
+                          </div>
+                        </div>
+                        {day.status !== 'Absent' && locationIn && (
+                          <div className="flex items-center gap-1 mt-1 ml-14">
+                            <span className="text-[10px]">📍</span>
+                            <span className="text-[10px] text-gray-500 truncate">{locationIn}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, mSearch, setMSearch, t }) {
+function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, mSearch, setMSearch, t, onTapEmployee }) {
   var now = new Date()
   var isCurrentMonth = mYear === now.getFullYear() && mMonth === now.getMonth() + 1
 
@@ -509,7 +655,8 @@ function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, m
             var pct = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
             var pctColor = pct >= 90 ? 'text-emerald-600' : pct >= 75 ? 'text-amber-600' : 'text-red-600'
             return (
-              <div key={r.employee_id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+              <div key={r.employee_id} onClick={function () { if (onTapEmployee) onTapEmployee(r) }}
+                className="bg-white border border-gray-200 rounded-xl px-4 py-3 cursor-pointer active:scale-[0.99] transition-transform">
                 <div className="flex items-center justify-between mb-1.5">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{r.name}
