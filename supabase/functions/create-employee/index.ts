@@ -23,7 +23,7 @@ serve(async (req) => {
 
     const anonClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SRK_AUTH')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } } }
     )
 
@@ -76,7 +76,7 @@ serve(async (req) => {
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SRK_AUTH')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 

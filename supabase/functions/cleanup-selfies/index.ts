@@ -10,7 +10,7 @@ serve(async (req) => {
     // Allow either: valid cron secret OR authenticated admin
     let isAuthorized = false
 
-    const srkAuth = Deno.env.get('SRK_AUTH')!
+    const srkAuth = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     if (cronSecret && req.headers.get('x-cron-secret') === cronSecret) {
       isAuthorized = true
     }
@@ -50,7 +50,7 @@ serve(async (req) => {
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SRK_AUTH')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 

@@ -62,12 +62,12 @@ function isDARMessage(text: string): boolean {
 
 serve(async (req) => {
   const authHeader = req.headers.get('Authorization')
-  const srk = Deno.env.get('SRK_AUTH') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  if (authHeader !== `Bearer ${srk}`) {
+  const authKey = Deno.env.get('SRK_AUTH') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  if (authHeader !== `Bearer ${authKey}`) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, srk)
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const WHAPI_TOKEN = Deno.env.get('WHAPI_API_TOKEN')!
 
   // IST today + yesterday
@@ -130,7 +130,7 @@ serve(async (req) => {
 
         // Extract sender phone (strip @s.whatsapp.net)
         const from = (msg.from || '').replace('@s.whatsapp.net', '')
-        if (!from) continue
+        if (!from || from.includes('@')) continue
 
         const employee = phoneLookup[from]
         if (!employee) {
@@ -187,10 +187,6 @@ serve(async (req) => {
     }
   }
 
-  if (unknownPhones.length > 0) {
-    report += `\n⚠️ Unmapped phones: ${unknownPhones.join(', ')}\n`
-  }
-
   // Send via Whapi
   let sentTo: string[] = []
   const recipientsRow = await supabase
@@ -202,7 +198,11 @@ serve(async (req) => {
   let recipients: string[] = []
   try {
     const raw = recipientsRow.data?.value
-    recipients = JSON.parse(typeof raw === 'string' ? raw.replace(/^"|"$/g, '') : raw || '[]')
+    if (Array.isArray(raw)) {
+      recipients = raw
+    } else if (typeof raw === 'string') {
+      recipients = JSON.parse(raw.replace(/^"|"$/g, ''))
+    }
   } catch { recipients = [] }
 
   for (const phone of recipients) {
