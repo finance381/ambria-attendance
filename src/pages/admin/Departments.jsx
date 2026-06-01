@@ -240,10 +240,12 @@ export default function Departments() {
               <button onClick={function () { setPermDelete(null) }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
               <button onClick={async function () {
                 setSaving(true)
-                var { error: delErr } = await supabase.from('departments').delete().eq('id', permDelete.id)
+                var { data: delData, error: delErr } = await supabase.from('departments').delete().eq('id', permDelete.id).select()
                 setSaving(false)
                 if (delErr) {
                   showToast('Delete failed: ' + delErr.message)
+                } else if (!delData || delData.length === 0) {
+                  showToast('Delete blocked — check RLS policy or reassign all employees (including inactive)')
                 } else {
                   showToast(permDelete.name + ' deleted permanently')
                 }
