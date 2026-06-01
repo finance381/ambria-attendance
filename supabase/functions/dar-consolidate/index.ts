@@ -70,12 +70,11 @@ serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const WHAPI_TOKEN = Deno.env.get('WHAPI_API_TOKEN')!
 
-  // IST today + yesterday
+  // Report on yesterday + day-before (late submissions)
   const now = new Date()
   const istOffset = 5.5 * 60 * 60 * 1000
   const istNow = new Date(now.getTime() + istOffset)
-  const todayIST = istNow.toISOString().slice(0, 10)
-  const yestIST = new Date(istNow.getTime() - 86400000).toISOString().slice(0, 10)
+  const reportDate = new Date(istNow.getTime() - 86400000).toISOString().slice(0, 10)
 
   // Load groups
   const { data: groups } = await supabase
@@ -107,8 +106,7 @@ serve(async (req) => {
 
   // darDate -> Set of emp_codes who submitted
   const submittedByDate: Record<string, Set<string>> = {}
-  submittedByDate[todayIST] = new Set()
-  submittedByDate[yestIST] = new Set()
+  submittedByDate[reportDate] = new Set()
 
   let unknownPhones: string[] = []
 
@@ -152,17 +150,15 @@ serve(async (req) => {
   }
 
   // Build report for today (primary) + yesterday (if late submissions found)
-  const todaySubmitted = submittedByDate[todayIST] || new Set()
-  const yestSubmitted = submittedByDate[yestIST] || new Set()
+  const todaySubmitted = submittedByDate[reportDate] || new Set()
   const todayMissing = [...allEmpCodes].filter(c => !todaySubmitted.has(c))
-  const yestMissing = [...allEmpCodes].filter(c => !yestSubmitted.has(c))
 
   function empName(code: string): string {
     const e = (allEmps || []).find(x => x.emp_code === code)
     return e ? e.name : code
   }
 
-  let report = `📋 *DAR Report — ${todayIST}*\n`
+  let report = `📋 *DAR Report — ${reportDate}*\n`
   report += `✅ Submitted: ${todaySubmitted.size}/${allEmpCodes.size}\n`
   report += `❌ Missing: ${todayMissing.length}\n`
   report += `─────────────────\n`
@@ -177,15 +173,6 @@ serve(async (req) => {
     report += todayMissing.map(c => empName(c)).sort().join(', ') + '\n'
   }
 
-  // Yesterday section (only if there were late submissions)
-  if (yestSubmitted.size > 0) {
-    report += `\n─────────────────\n`
-    report += `📋 *Yesterday (${yestIST})*\n`
-    report += `✅ ${yestSubmitted.size}/${allEmpCodes.size}\n`
-    if (yestMissing.length > 0 && yestMissing.length <= 10) {
-      report += `❌ Missing: ${yestMissing.map(c => empName(c)).sort().join(', ')}\n`
-    }
-  }
 
   // Send via Whapi
   let sentTo: string[] = []
@@ -230,10 +217,9 @@ serve(async (req) => {
 
   return new Response(
     JSON.stringify({
-      date: todayIST,
+      date: reportDate,
       expected: allEmpCodes.size,
-      today_submitted: todaySubmitted.size,
-      yesterday_submitted: yestSubmitted.size,
+      submitted: todaySubmitted.size,
       sent_to: sentTo,
       unknown_phones: unknownPhones
     }),

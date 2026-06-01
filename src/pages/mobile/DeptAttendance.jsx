@@ -118,6 +118,15 @@ export default function DeptAttendance() {
     setMDetail(r)
     setMDetailLoading(true)
 
+    var [halfRes, absentRes] = await Promise.all([
+      supabase.rpc('get_config', { p_key: 'half_day_threshold_hours' }),
+      supabase.rpc('get_config', { p_key: 'absent_threshold_hours' })
+    ])
+    var halfThreshold = 4
+    var absentThreshold = 0.5
+    try { halfThreshold = parseFloat(String(halfRes.data).replace(/"/g, '')) || 4 } catch (e) {}
+    try { absentThreshold = parseFloat(String(absentRes.data).replace(/"/g, '')) || 0.5 } catch (e) {}
+
     var startDate = mYear + '-' + String(mMonth).padStart(2, '0') + '-01'
     var endDay = new Date(mYear, mMonth, 0).getDate()
     var endDate = mYear + '-' + String(mMonth).padStart(2, '0') + '-' + String(endDay).padStart(2, '0')
@@ -156,9 +165,9 @@ export default function DeptAttendance() {
       var status = 'Absent'
       if (dayPunches.length > 0) {
         if (!firstIn || !lastOut) status = 'Incomplete'
-        else if (hours < 4) status = 'Absent'
-        else if (hours < 7) status = 'Half Day'
-        else status = 'Present'
+        else if (hours >= halfThreshold) status = 'Present'
+        else if (hours >= absentThreshold) status = 'Half Day'
+        else status = 'Absent'
       }
 
       days.push({

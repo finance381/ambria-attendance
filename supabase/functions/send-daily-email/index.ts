@@ -57,9 +57,22 @@ serve(async (req) => {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
 
-    // Open punches (no out after in)
-    const { data: openPunches } = await supabase.rpc('open_punches')
-    const openCount = openPunches ? openPunches.length : 0
+    // Open punches — direct query since open_punches RPC needs auth.uid()
+    const { data: todayIns } = await supabase
+      .from('punches')
+      .select('employee_id')
+      .eq('attendance_date', today)
+      .eq('punch_type', 'in')
+
+    const { data: todayOuts } = await supabase
+      .from('punches')
+      .select('employee_id')
+      .eq('attendance_date', today)
+      .eq('punch_type', 'out')
+
+    const outSet = new Set((todayOuts || []).map(p => p.employee_id))
+    const openCount = [...new Set((todayIns || []).map(p => p.employee_id))]
+      .filter(id => !outSet.has(id)).length
 
     // Top 5 absentees this month
     const { data: allEmps } = await supabase
