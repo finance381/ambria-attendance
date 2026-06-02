@@ -29,6 +29,8 @@ export default function DeptAttendance() {
   var [darLoading, setDarLoading] = useState(false)
   var [darSearch, setDarSearch] = useState('')
   var [expandedDar, setExpandedDar] = useState(null)
+  var [depts, setDepts] = useState([])
+  var [deptFilter, setDeptFilter] = useState('')
   var [mYear, setMYear] = useState(new Date().getFullYear())
   var [mMonth, setMMonth] = useState(new Date().getMonth() + 1)
   var [mRecords, setMRecords] = useState([])
@@ -54,30 +56,36 @@ export default function DeptAttendance() {
 
   useEffect(function () { loadData() }, [loadData])
 
+  useEffect(function () {
+    if (employee.role === 'admin') {
+      supabase.from('departments').select('id, name').order('name')
+        .then(function (res) { setDepts(res.data || []) })
+    }
+  }, [employee.role])
+
   var loadDARs = useCallback(async function () {
     setDarLoading(true)
-    var { data } = await supabase
-      .from('daily_reports')
-      .select('id, emp_code, report_date, punch_in, punch_out, tasks, submitted_at')
-      .eq('report_date', date)
-      .order('emp_code')
-
-    // Filter to dept employees only
-    var { data: deptEmps } = await supabase
-      .from('employees')
-      .select('emp_code, name')
-      .eq('department_id', employee.department_id)
-      .eq('active', true)
-      .eq('is_casual', false)
+    var [darsRes, empsRes] = await Promise.all([
+      supabase
+        .from('daily_reports')
+        .select('id, emp_code, report_date, punch_in, punch_out, tasks, submitted_at')
+        .eq('report_date', date),
+      (function () {
+        var q = supabase.from('employees').select('emp_code, name')
+          .eq('active', true).eq('is_casual', false)
+        if (employee.role !== 'admin') return q.eq('department_id', employee.department_id)
+        if (deptFilter) return q.eq('department_id', Number(deptFilter))
+        return q
+      })()
+    ])
 
     var empMap = {}
-    ;(deptEmps || []).forEach(function (e) { empMap[e.emp_code] = e.name })
+    ;(empsRes.data || []).forEach(function (e) { empMap[e.emp_code] = e.name })
     var deptCodes = new Set(Object.keys(empMap))
 
-    var deptDars = (data || []).filter(function (d) { return deptCodes.has(d.emp_code) })
+    var deptDars = (darsRes.data || []).filter(function (d) { return deptCodes.has(d.emp_code) })
     deptDars.forEach(function (d) { d._name = empMap[d.emp_code] || d.emp_code })
 
-    // Add missing entries
     var submittedCodes = new Set(deptDars.map(function (d) { return d.emp_code }))
     Object.keys(empMap).forEach(function (code) {
       if (!submittedCodes.has(code)) {
@@ -93,7 +101,7 @@ export default function DeptAttendance() {
 
     setDarRecords(deptDars)
     setDarLoading(false)
-  }, [date, employee.department_id])
+  }, [date, employee.department_id, employee.role, deptFilter])
 
   useEffect(function () {
     if (view === 'dars') loadDARs()
@@ -104,11 +112,11 @@ export default function DeptAttendance() {
     var { data } = await supabase.rpc('monthly_summary', {
       p_year: mYear,
       p_month: mMonth,
-      p_department_id: employee.role === 'admin' ? null : employee.department_id
+      p_department_id: employee.role === 'admin' ? (deptFilter ? Number(deptFilter) : null) : employee.department_id
     })
     setMRecords(data || [])
     setMLoading(false)
-  }, [mYear, mMonth, employee.department_id])
+  }, [mYear, mMonth, employee.department_id, deptFilter])
 
   useEffect(function () {
     if (view === 'monthly') loadMonthly()
@@ -201,6 +209,7 @@ export default function DeptAttendance() {
   }
 
   var filtered = records.filter(function (r) {
+    if (employee.role === 'admin' && deptFilter && r.department_id !== Number(deptFilter)) return false
     if (statusFilter && r.status !== statusFilter) return false
     if (search) {
       var q = search.toLowerCase()
@@ -241,6 +250,16 @@ export default function DeptAttendance() {
           DARs
         </button>
       </div>
+
+      {employee.role === 'admin' && depts.length > 0 && (
+        <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
+          <option value="">All Departments</option>
+          {depts.map(function (d) {
+            return <option key={d.id} value={d.id}>{d.name}</option>
+          })}
+        </select>
+      )}
 
       {view === 'monthly' && <MonthlyView
         mYear={mYear} setMYear={setMYear} mMonth={mMonth} setMMonth={setMMonth}

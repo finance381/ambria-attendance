@@ -22,25 +22,14 @@ export default function Vendors() {
     setLoading(true)
     var { data } = await supabase
       .from('vendors')
-      .select('*')
+      .select('id, name, phone, contact_person, active, created_at, employees(count)')
+      .eq('employees.is_casual', true)
+      .eq('employees.active', true)
       .order('active', { ascending: false })
       .order('name')
 
-    // Get casual counts per vendor
-    var { data: counts } = await supabase
-      .from('employees')
-      .select('vendor_id')
-      .eq('is_casual', true)
-      .eq('active', true)
-      .not('vendor_id', 'is', null)
-
-    var countMap = {}
-    ;(counts || []).forEach(function (e) {
-      countMap[e.vendor_id] = (countMap[e.vendor_id] || 0) + 1
-    })
-
     setVendors((data || []).map(function (v) {
-      return Object.assign({}, v, { casual_count: countMap[v.id] || 0 })
+      return Object.assign({}, v, { casual_count: v.employees?.[0]?.count || 0 })
     }))
     setLoading(false)
   }, [])
