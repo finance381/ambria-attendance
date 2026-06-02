@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { capturePhoto } from '../lib/camera'
 import { getLocation } from '../lib/gps'
@@ -10,6 +11,9 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
   var [preview, setPreview] = useState(null)
   var [error, setError] = useState('')
   var { t } = useLanguage()
+  var [showDarReminder, setShowDarReminder] = useState(false)
+  var [showGpsPrompt, setShowGpsPrompt] = useState(false)
+  var modalResolve = useRef(null)
 
   useEffect(function () {
     setStep('ready')
@@ -22,27 +26,11 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     var clientPunchId = (crypto && crypto.randomUUID) ? crypto.randomUUID() :
       (Date.now() + '_' + Math.random().toString(36).slice(2))
 
-    // Quick DAR reminder on punch-in
     // DAR reminder popup on punch-in — blocks until user dismisses
     if (punchType === 'in') {
       await new Promise(function (resolve) {
-        var overlay = document.createElement('div')
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:16px'
-        var card = document.createElement('div')
-        card.style.cssText = 'background:#fff;border-radius:16px;padding:24px;max-width:300px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.25);text-align:center'
-        card.innerHTML = '<div style="width:48px;height:48px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><span style="font-size:24px">📝</span></div>'
-          + '<p style="font-size:15px;font-weight:700;color:#92400e;margin:0 0 6px">' + (t('dar_reminder_title') || 'DAR Reminder') + '</p>'
-          + '<p style="font-size:13px;color:#78716c;margin:0 0 20px">' + (t('dar_reminder') || 'Remember to write your DAR in the group!') + '</p>'
-        var btn = document.createElement('button')
-        btn.textContent = t('dar_ok') || 'OK, Got it'
-        btn.style.cssText = 'width:100%;padding:12px;font-size:14px;font-weight:700;color:#fff;background:#f59e0b;border:none;border-radius:10px;cursor:pointer'
-        card.appendChild(btn)
-        overlay.appendChild(card)
-        document.body.appendChild(overlay)
-        btn.addEventListener('click', function () {
-          document.body.removeChild(overlay)
-          resolve()
-        })
+        modalResolve.current = resolve
+        setShowDarReminder(true)
       })
     }
 
@@ -75,29 +63,9 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     try {
       gps = await gpsPromise
     } catch (gpsErr) {
-      var proceed = await new Promise(function (res) {
-        var overlay = document.createElement('div')
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:16px'
-        var card = document.createElement('div')
-        card.style.cssText = 'background:#fff;border-radius:16px;padding:24px;max-width:300px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.25);text-align:center'
-        card.innerHTML = '<div style="width:48px;height:48px;background:#fef2f2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><span style="font-size:24px">📍</span></div>'
-          + '<p style="font-size:15px;font-weight:700;color:#dc2626;margin:0 0 6px">GPS Unavailable</p>'
-          + '<p style="font-size:13px;color:#78716c;margin:0 0 20px">Your location could not be detected. Punch will be recorded without venue info and flagged for review.</p>'
-        var btnRow = document.createElement('div')
-        btnRow.style.cssText = 'display:flex;gap:10px'
-        var cancelB = document.createElement('button')
-        cancelB.textContent = 'Cancel'
-        cancelB.style.cssText = 'flex:1;padding:12px;font-size:14px;font-weight:600;color:#64748b;background:#f1f5f9;border:none;border-radius:10px;cursor:pointer'
-        var proceedB = document.createElement('button')
-        proceedB.textContent = 'Punch Anyway'
-        proceedB.style.cssText = 'flex:1;padding:12px;font-size:14px;font-weight:700;color:#fff;background:#dc2626;border:none;border-radius:10px;cursor:pointer'
-        btnRow.appendChild(cancelB)
-        btnRow.appendChild(proceedB)
-        card.appendChild(btnRow)
-        overlay.appendChild(card)
-        document.body.appendChild(overlay)
-        cancelB.addEventListener('click', function () { document.body.removeChild(overlay); res(false) })
-        proceedB.addEventListener('click', function () { document.body.removeChild(overlay); res(true) })
+      var proceed = await new Promise(function (resolve) {
+        modalResolve.current = resolve
+        setShowGpsPrompt(true)
       })
       if (!proceed) {
         setStep('ready')
@@ -236,8 +204,10 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     if (onComplete) onComplete(data)
   }
 
+  var stepContent = null
+
   if (step === 'ready') {
-    return (
+    stepContent = (
       <button
         onClick={handlePunch}
         className={'w-full py-4 rounded-2xl text-lg font-bold text-white transition-all active:scale-95 ' +
@@ -249,46 +219,25 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         {'📸 ' + (punchType === 'in' ? t('punch_btn_in') : t('punch_btn_out'))}
       </button>
     )
-  }
-
-  if (step === 'dar') {
-    return (
-      <div className="text-center py-6">
-        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <span className="text-2xl">📝</span>
-        </div>
-        <p className="text-sm font-semibold text-amber-700">{t('dar_reminder') || 'Remember to write your DAR in the group!'}</p>
-      </div>
-    )
-  }
-
-  if (step === 'capturing') {
-    return (
+  } else if (step === 'capturing') {
+    stepContent = (
       <div className="text-center py-6">
         <div className="w-8 h-8 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-sm text-gray-500">{t('punch_opening_camera')}</p>
       </div>
     )
-  }
-
-  if (step === 'uploading') {
-    return (
+  } else if (step === 'uploading') {
+    stepContent = (
       <div className="text-center py-6">
-        {preview && (
-          <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-slate-200" />
-        )}
+        {preview && <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-slate-200" />}
         <div className="w-8 h-8 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-sm text-gray-500">{t('punch_recording')}</p>
       </div>
     )
-  }
-
-  if (step === 'done') {
-    return (
+  } else if (step === 'done') {
+    stepContent = (
       <div className="text-center py-6">
-        {preview && (
-          <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-emerald-300" />
-        )}
+        {preview && <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-emerald-300" />}
         <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
           <span className="text-2xl">✓</span>
         </div>
@@ -297,43 +246,76 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         </p>
       </div>
     )
-  }
-
-  if (step === 'queued') {
-    return (
+  } else if (step === 'queued') {
+    stepContent = (
       <div className="text-center py-6">
-        {preview && (
-          <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-amber-300" />
-        )}
+        {preview && <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-amber-300" />}
         <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
           <span className="text-2xl">📶</span>
         </div>
-        <p className="text-sm font-semibold text-amber-700">
-          {t('punch_queued') || 'Punch saved offline'}
-        </p>
-        <p className="text-[11px] text-amber-500 mt-1">
-          {t('punch_queued_desc') || 'Will sync automatically when back online'}
-        </p>
+        <p className="text-sm font-semibold text-amber-700">{t('punch_queued') || 'Punch saved offline'}</p>
+        <p className="text-[11px] text-amber-500 mt-1">{t('punch_queued_desc') || 'Will sync automatically when back online'}</p>
       </div>
     )
-  }
-
-  if (step === 'error') {
-    return (
+  } else if (step === 'error') {
+    stepContent = (
       <div className="text-center py-6">
         <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
           <span className="text-2xl">✕</span>
         </div>
         <p className="text-sm text-red-600 mb-3">{error}</p>
-        <button
-          onClick={function () { setStep('ready'); setError(''); setPreview(null) }}
-          className="px-4 py-2 text-sm text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-        >
+        <button onClick={function () { setStep('ready'); setError(''); setPreview(null) }}
+          className="px-4 py-2 text-sm text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
           {t('punch_try_again')}
         </button>
       </div>
     )
   }
 
-  return null
+  return (
+    <>
+      {stepContent}
+
+      {showDarReminder && createPortal(
+        <div className="fixed inset-0 z-[9997] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-[300px] w-full shadow-xl text-center">
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl">📝</span>
+            </div>
+            <p className="text-[15px] font-bold text-amber-800 mb-1.5">{t('dar_reminder_title') || 'DAR Reminder'}</p>
+            <p className="text-[13px] text-stone-500 mb-5">{t('dar_reminder') || 'Remember to write your DAR in the group!'}</p>
+            <button onClick={function () { setShowDarReminder(false); if (modalResolve.current) modalResolve.current() }}
+              className="w-full py-3 text-sm font-bold text-white bg-amber-500 rounded-xl active:scale-95 transition-transform">
+              {t('dar_ok') || 'OK, Got it'}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showGpsPrompt && createPortal(
+        <div className="fixed inset-0 z-[9997] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-[300px] w-full shadow-xl text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl">📍</span>
+            </div>
+            <p className="text-[15px] font-bold text-red-600 mb-1.5">GPS Unavailable</p>
+            <p className="text-[13px] text-stone-500 mb-5">Your location could not be detected. Punch will be recorded without venue info and flagged for review.</p>
+            <div className="flex gap-2.5">
+              <button onClick={function () { setShowGpsPrompt(false); if (modalResolve.current) modalResolve.current(false) }}
+                className="flex-1 py-3 text-sm font-semibold text-slate-500 bg-slate-100 rounded-xl active:scale-95 transition-transform">
+                Cancel
+              </button>
+              <button onClick={function () { setShowGpsPrompt(false); if (modalResolve.current) modalResolve.current(true) }}
+                className="flex-1 py-3 text-sm font-bold text-white bg-red-600 rounded-xl active:scale-95 transition-transform">
+                Punch Anyway
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  )
+
 }
