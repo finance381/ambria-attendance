@@ -20,6 +20,9 @@ export default function ClaimsQueue() {
   var [toast, setToast] = useState('')
   var [rejectTarget, setRejectTarget] = useState(null)
   var [rejectReason, setRejectReason] = useState('')
+  var [expandedClaim, setExpandedClaim] = useState(null)
+  var [claimPunches, setClaimPunches] = useState([])
+  var [punchLoading, setPunchLoading] = useState(false)
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -85,6 +88,23 @@ export default function ClaimsQueue() {
     setRejectTarget(null)
     setRejectReason('')
     loadAll()
+  }
+
+  async function loadPunchContext(claim) {
+    if (expandedClaim === claim.claim_id) {
+      setExpandedClaim(null)
+      return
+    }
+    setExpandedClaim(claim.claim_id)
+    setPunchLoading(true)
+    var { data } = await supabase
+      .from('punches')
+      .select('punch_type, punched_at, is_late_entry, location_name')
+      .eq('employee_id', claim.employee_id)
+      .eq('attendance_date', claim.attendance_date)
+      .order('punched_at')
+    setClaimPunches(data || [])
+    setPunchLoading(false)
   }
 
   var monthClaims = claims.filter(function (c) {
@@ -215,6 +235,45 @@ export default function ClaimsQueue() {
                     Submitted {formatDateTime(c.created_at)}
                   </p>
                 </div>
+
+                {/* Existing punch data toggle */}
+                {isPending && (
+                  <div className="mb-3">
+                    <button
+                      onClick={function () { loadPunchContext(c) }}
+                      className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      {expandedClaim === c.claim_id ? '▼ Hide existing punches' : '▶ Show existing punches'}
+                    </button>
+                    {expandedClaim === c.claim_id && (
+                      <div className="mt-2 bg-blue-50 rounded-lg px-3 py-2">
+                        {punchLoading ? (
+                          <p className="text-[10px] text-blue-400">Loading…</p>
+                        ) : claimPunches.length === 0 ? (
+                          <p className="text-[10px] text-blue-500">No punches recorded for this date</p>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider mb-1">Punches on {c.attendance_date}</p>
+                            {claimPunches.map(function (p, i) {
+                              var t = new Date(p.punched_at)
+                              var timeStr = t.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+                              return (
+                                <div key={i} className="flex items-center gap-2 text-[11px]">
+                                  <span className={'font-bold uppercase ' + (p.punch_type === 'in' ? 'text-emerald-600' : 'text-red-500')}>
+                                    {p.punch_type}
+                                  </span>
+                                  <span className="font-mono text-blue-800">{timeStr}</span>
+                                  {p.location_name && <span className="text-blue-400 truncate">· {p.location_name}</span>}
+                                  {p.is_late_entry && <span className="text-amber-500 text-[9px]">(claim)</span>}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Reviewed info for completed claims */}
                 {!isPending && c.reviewed_by_name && (
