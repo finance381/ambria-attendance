@@ -3,9 +3,9 @@
  * Returns { latitude, longitude, accuracy, areaName }
  */
 export function getLocation() {
-  return new Promise(function (resolve) {
+  return new Promise(function (resolve, reject) {
     if (!navigator.geolocation) {
-      resolve({ latitude: null, longitude: null, accuracy: null, areaName: null })
+      reject(new Error('Geolocation not supported'))
       return
     }
 
@@ -33,8 +33,8 @@ export function getLocation() {
 
         resolve(result)
       },
-      function () {
-        resolve({ latitude: null, longitude: null, accuracy: null, areaName: null })
+      function (err) {
+        reject(new Error(err.message || 'Location unavailable'))
       },
       {
         enableHighAccuracy: true,
