@@ -1,36 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { formatDate, formatTime12, formatDisplayDate, formatBullets } from '../../lib/formatters'
 import { useAuth } from '../../lib/useAuth'
-
-function formatDate(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-}
-
-function formatDisplayDate(dateStr) {
-  var d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function formatTime12(t) {
-  if (!t) return '—'
-  var parts = t.split(':')
-  var h = parseInt(parts[0], 10)
-  var m = parts[1]
-  var ampm = h >= 12 ? 'PM' : 'AM'
-  h = h % 12 || 12
-  return h + ':' + m + ' ' + ampm
-}
-
-function formatBullets(text) {
-  return text.split('\n').filter(function (l) { return l.trim() }).map(function (l) {
-    var line = l.trim()
-    if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
-      return '• ' + line.slice(1).trim()
-    }
-    return '• ' + line
-  })
-}
 
 export default function AdminDARs() {
   var { employee } = useAuth()

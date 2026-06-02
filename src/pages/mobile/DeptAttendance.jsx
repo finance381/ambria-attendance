@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { fmtTime } from '../../lib/formatters'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
 
@@ -716,13 +717,4 @@ function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, m
       )}
     </>
   )
-}
-
-function fmtTime(iso) {
-  if (!iso) return '—'
-  var d = new Date(iso)
-  var h = d.getHours(), m = d.getMinutes()
-  var ampm = h >= 12 ? 'PM' : 'AM'
-  h = h % 12 || 12
-  return h + ':' + String(m).padStart(2, '0') + ' ' + ampm
 }

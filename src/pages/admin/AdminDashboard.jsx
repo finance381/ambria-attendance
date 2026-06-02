@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { fmtTime } from '../../lib/formatters'
 
 export default function AdminDashboard() {
   var [data, setData] = useState(null)
@@ -190,7 +191,7 @@ export default function AdminDashboard() {
                       <p className="text-[10px] text-gray-400">{p.venue || ''}</p>
                     </div>
                   </div>
-                  <p className="text-xs font-mono text-gray-500">{formatTime(p.punched_at)}</p>
+                  <p className="text-xs font-mono text-gray-500">{fmtTime(p.punched_at)}</p>
                 </div>
               )
             })}
@@ -229,10 +230,4 @@ function QuickLink({ label, icon, onClick }) {
       <span className="text-sm font-medium text-gray-700">{label}</span>
     </button>
   )
-}
-
-function formatTime(isoString) {
-  if (!isoString) return '—'
-  var d = new Date(isoString)
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
 }

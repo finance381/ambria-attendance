@@ -1,27 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { formatDate, formatTime12, formatDisplayDate } from '../../lib/formatters'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
-
-
-function formatDate(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-}
-
-function formatTime12(t) {
-  if (!t) return '—'
-  var parts = t.split(':')
-  var h = parseInt(parts[0], 10)
-  var m = parts[1]
-  var ampm = h >= 12 ? 'PM' : 'AM'
-  h = h % 12 || 12
-  return h + ':' + m + ' ' + ampm
-}
-
-function formatDisplayDate(dateStr) {
-  var d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-}
 
 export default function DARWriter() {
   var { employee, session } = useAuth()

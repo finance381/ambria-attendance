@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { fmtTime } from '../../lib/formatters'
 
 var STATUS_COLORS = {
   Present: 'bg-emerald-50 text-emerald-700',
@@ -244,8 +245,8 @@ export default function DailyAttendance() {
                       {r.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">casual</span>}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500">{r.department_name || '—'}</td>
-                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{formatTime(r.first_in)}</td>
-                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{formatTime(r.last_out)}</td>
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{fmtTime(r.first_in)}</td>
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{fmtTime(r.last_out)}</td>
                     <td className="px-3 py-2 text-xs text-gray-500">{r.in_count || 0}</td>
                     <td className="px-3 py-2">
                       <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' + (STATUS_COLORS[r.status] || 'bg-gray-100 text-gray-500')}>
@@ -330,7 +331,7 @@ export default function DailyAttendance() {
                                 (p.punch_type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
                                 {p.punch_type}
                               </span>
-                              <span className="text-xs font-mono text-gray-700">{formatTime(p.punched_at)}</span>
+                              <span className="text-xs font-mono text-gray-700">{fmtTime(p.punched_at)}</span>
                             </div>
                             {locationLabel && (
                               <span className={'text-[10px] ' + (venueName ? 'text-emerald-600 font-medium' : 'text-gray-400')}>
@@ -477,12 +478,6 @@ function MiniStat({ label, value, color }) {
       <p className={'text-xl font-bold ' + (color || 'text-gray-900')}>{value}</p>
     </div>
   )
-}
-
-function formatTime(isoString) {
-  if (!isoString) return '—'
-  var d = new Date(isoString)
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
 }
 
 var SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
