@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../lib/useAuth'
 import { refreshPushSubscription } from '../../lib/pushRefresh'
 import { useLanguage, LanguageToggle } from '../../lib/i18n'
@@ -20,6 +20,26 @@ export default function MobileShell() {
   useEffect(function () {
     if (employee) refreshPushSubscription(employee.id)
   }, [employee])
+
+  var navigate = useNavigate()
+  var location = useLocation()
+
+  useEffect(function () {
+    window.history.pushState({ ambria: true }, '')
+
+    function onPopState() {
+      if (location.pathname === '/') {
+        window.history.pushState({ ambria: true }, '')
+      } else {
+        navigate('/', { replace: true })
+      }
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return function () {
+      window.removeEventListener('popstate', onPopState)
+    }
+  }, [location.pathname, navigate])
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
