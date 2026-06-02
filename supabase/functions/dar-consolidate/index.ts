@@ -92,12 +92,12 @@ serve(async (req) => {
     phoneLookup[p.phone] = { emp_code: p.emp_code, name: p.name }
   }
 
-  // Load all active non-casual employees for "missing" tracking
+  // Load all active employees who must submit DARs
   const { data: allEmps } = await supabase
     .from('employees')
     .select('emp_code, name')
     .eq('active', true)
-    .eq('is_casual', false)
+    .eq('dar_required', true)
 
   const allEmpCodes = new Set((allEmps || []).map(e => e.emp_code))
 

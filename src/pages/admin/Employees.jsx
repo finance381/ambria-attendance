@@ -28,7 +28,7 @@ export default function Employees() {
   var [sortDir, setSortDir] = useState('asc')
 
   var [form, setForm] = useState({
-    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: ''
+    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false
   })
   var [formError, setFormError] = useState('')
 
@@ -165,6 +165,7 @@ export default function Employees() {
       case 'department_id': va = deptName(a.department_id); vb = deptName(b.department_id); break
       case 'role': va = a.role; vb = b.role; break
       case 'active': va = a.active ? 1 : 0; vb = b.active ? 1 : 0; break
+      case 'dar_required': va = a.dar_required ? 1 : 0; vb = b.dar_required ? 1 : 0; break
       default: va = a.name; vb = b.name
     }
     if (typeof va === 'string') {
@@ -183,7 +184,7 @@ export default function Employees() {
   }
 
   function resetForm() {
-    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '' })
+    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false })
     setFormError('')
   }
 
@@ -200,7 +201,8 @@ export default function Employees() {
       department_id: emp.department_id ? String(emp.department_id) : '',
       role: emp.role,
       designation: emp.designation || '',
-      date_of_joining: emp.date_of_joining || ''
+      date_of_joining: emp.date_of_joining || '',
+      dar_required: !!emp.dar_required
     })
     setFormError('')
     setEditId(emp.id)
@@ -267,7 +269,8 @@ export default function Employees() {
       department_id: Number(form.department_id),
       role: form.role,
       designation: form.designation.trim() || null,
-      date_of_joining: form.date_of_joining || null
+      date_of_joining: form.date_of_joining || null,
+      dar_required: form.dar_required
     }
 
     var { error } = await supabase
@@ -338,7 +341,7 @@ export default function Employees() {
   }
 
   function exportCSV() {
-    var headers = ['Employee Code', 'Name', 'Phone', 'Department', 'Role', 'Designation', 'Date of Joining', 'Status']
+    var headers = ['Employee Code', 'Name', 'Phone', 'Department', 'Role', 'Designation', 'Date of Joining', 'Status', 'DAR Required']
     var csvRows = [headers.join(',')]
 
     employees.forEach(function (emp) {
@@ -350,7 +353,8 @@ export default function Employees() {
         emp.role,
         '"' + (emp.designation || '').replace(/"/g, '""') + '"',
         emp.date_of_joining || '',
-        emp.active ? 'Active' : 'Inactive'
+        emp.active ? 'Active' : 'Inactive',
+        emp.dar_required ? 'Yes' : 'No'
       ].join(','))
     })
 
@@ -463,7 +467,8 @@ export default function Employees() {
                 { key: 'phone', label: 'Phone' },
                 { key: 'department_id', label: 'Department' },
                 { key: 'role', label: 'Role' },
-                { key: 'active', label: 'Status' }
+                { key: 'active', label: 'Status' },
+                { key: 'dar_required', label: 'DAR' }
               ].map(function (col) {
                 var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
                 return (
@@ -479,7 +484,7 @@ export default function Employees() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-8 text-sm text-gray-400 italic">
+                <td colSpan={9} className="text-center py-8 text-sm text-gray-400 italic">
                   {employees.length ? 'No matching employees' : 'No employees yet — add one above'}
                 </td>
               </tr>
@@ -513,6 +518,9 @@ export default function Employees() {
                     ) : (
                       <span className="text-[10px] font-bold uppercase text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Inactive</span>
                     )}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    {emp.dar_required && <span className="text-[10px] font-bold uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">DAR</span>}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -577,6 +585,14 @@ export default function Employees() {
               <Field label="Date of Joining">
                 <input type="date" value={form.date_of_joining} onChange={function (e) { setForm({ ...form, date_of_joining: e.target.value }) }} className="form-input" />
               </Field>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.dar_required}
+                  onChange={function (e) { setForm({ ...form, dar_required: e.target.checked }) }}
+                  className="rounded border-gray-300 text-slate-800 focus:ring-slate-700" />
+                <span className="text-xs font-medium text-gray-700">DAR Required</span>
+                <span className="text-[10px] text-gray-400">— included in daily DAR report</span>
+              </label>
 
               {formError && (
                 <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
