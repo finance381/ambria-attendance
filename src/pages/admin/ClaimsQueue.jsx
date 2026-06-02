@@ -99,7 +99,7 @@ export default function ClaimsQueue() {
     setPunchLoading(true)
     var { data } = await supabase
       .from('punches')
-      .select('punch_type, punched_at, is_late_entry, location_name')
+      .select('punch_type, punched_at, is_late_entry, location_name, selfie_path, venues(name)')
       .eq('employee_id', claim.employee_id)
       .eq('attendance_date', claim.attendance_date)
       .order('punched_at')
@@ -259,11 +259,18 @@ export default function ClaimsQueue() {
                               var timeStr = t.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
                               return (
                                 <div key={i} className="flex items-center gap-2 text-[11px]">
+                                  {p.selfie_path && (
+                                    <img
+                                      src={supabase.storage.from('selfies').getPublicUrl(p.selfie_path).data.publicUrl}
+                                      className="w-8 h-8 rounded-full object-cover border border-blue-200 flex-shrink-0"
+                                      alt=""
+                                    />
+                                  )}
                                   <span className={'font-bold uppercase ' + (p.punch_type === 'in' ? 'text-emerald-600' : 'text-red-500')}>
                                     {p.punch_type}
                                   </span>
                                   <span className="font-mono text-blue-800">{timeStr}</span>
-                                  {p.location_name && <span className="text-blue-400 truncate">· {p.location_name}</span>}
+                                  {(p.venues || p.location_name) && <span className="text-blue-400 truncate">· {p.venues ? p.venues.name : p.location_name}</span>}
                                   {p.is_late_entry && <span className="text-amber-500 text-[9px]">(claim)</span>}
                                 </div>
                               )
