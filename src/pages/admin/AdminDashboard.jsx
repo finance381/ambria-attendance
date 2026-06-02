@@ -15,9 +15,21 @@ export default function AdminDashboard() {
 
   useEffect(function () {
     loadData()
-    // Auto-refresh every 30 seconds
     var interval = setInterval(loadData, 30000)
-    return function () { clearInterval(interval) }
+    function onVis() {
+      if (document.visibilityState === 'visible') {
+        loadData()
+        clearInterval(interval)
+        interval = setInterval(loadData, 30000)
+      } else {
+        clearInterval(interval)
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return function () {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [loadData])
 
   if (loading) {
@@ -36,7 +48,7 @@ export default function AdminDashboard() {
         <h2 className="text-lg font-bold text-gray-900">Dashboard</h2>
         <p className="text-[10px] text-gray-400">
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          <span className="ml-2">Auto-refreshes every 30s</span>
+          <span className="ml-2">Auto-refreshes when active</span>
         </p>
       </div>
       <p className="text-xs text-gray-500 mb-5">Live overview of today's attendance</p>

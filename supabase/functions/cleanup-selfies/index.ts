@@ -61,7 +61,8 @@ serve(async (req) => {
       .eq('key', 'photo_retention_days')
       .maybeSingle()
 
-    const retentionDays = configRow ? parseInt(configRow.value, 10) : 90
+    const raw = configRow?.value
+    const retentionDays = raw ? parseInt(String(raw).replace(/^"|"$/g, ''), 10) || 90 : 90
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
     const cutoffStr = cutoffDate.toISOString().slice(0, 10)
@@ -130,7 +131,7 @@ serve(async (req) => {
 
     // Log the cleanup
     await adminClient.from('activity_log').insert({
-      actor_id: '00000000-0000-0000-0000-000000000000',  // system action
+      actor_id: null,  // system action
       action: 'SELFIE_CLEANUP',
       details: {
         cutoff_date: cutoffStr,

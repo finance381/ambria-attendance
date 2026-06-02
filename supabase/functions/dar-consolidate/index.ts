@@ -74,7 +74,7 @@ serve(async (req) => {
   const now = new Date()
   const istOffset = 5.5 * 60 * 60 * 1000
   const istNow = new Date(now.getTime() + istOffset)
-  const reportDate = new Date(istNow.getTime() - 86400000).toISOString().slice(0, 10)
+  const reportDate = new Date(istNow.getTime() - 2 * 86400000).toISOString().slice(0, 10)
 
   // Load groups
   const { data: groups } = await supabase
@@ -102,7 +102,7 @@ serve(async (req) => {
   const allEmpCodes = new Set((allEmps || []).map(e => e.emp_code))
 
   // Fetch messages from each group (last 48h)
-  const cutoffEpoch = Math.floor((now.getTime() - 48 * 60 * 60 * 1000) / 1000)
+  const cutoffEpoch = Math.floor((now.getTime() - 72 * 60 * 60 * 1000) / 1000)
 
   // darDate -> Set of emp_codes who submitted
   const submittedByDate: Record<string, Set<string>> = {}
