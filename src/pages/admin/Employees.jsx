@@ -196,7 +196,7 @@ export default function Employees() {
     setShowAdd(true)
   }
 
-  function openEdit(emp) {
+  async function openEdit(emp) {
     setForm({
       name: emp.name,
       phone: emp.phone || '',
