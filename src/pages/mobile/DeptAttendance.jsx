@@ -40,6 +40,23 @@ export default function DeptAttendance() {
   var [mDetail, setMDetail] = useState(null)
   var [mDetailDays, setMDetailDays] = useState([])
   var [mDetailLoading, setMDetailLoading] = useState(false)
+  var [managerDeptIds, setManagerDeptIds] = useState([employee.department_id])
+  var [deptNames, setDeptNames] = useState({})
+
+  useEffect(function () {
+    if (employee.role === 'manager') {
+      supabase.from('manager_departments').select('department_id, departments(name)')
+        .eq('employee_id', employee.id)
+        .then(function (res) {
+          var ids = (res.data || []).map(function (d) { return d.department_id })
+          if (ids.length === 0) ids = [employee.department_id]
+          setManagerDeptIds(ids)
+          var names = {}
+          ;(res.data || []).forEach(function (d) { if (d.departments) names[d.department_id] = d.departments.name })
+          setDeptNames(names)
+        })
+    }
+  }, [employee.id, employee.role, employee.department_id])
 
   var loadData = useCallback(async function () {
     setLoading(true)
@@ -49,11 +66,13 @@ export default function DeptAttendance() {
     ])
 
     var all = attRes.data || []
-    var deptOnly = employee.role === 'admin' ? all : all.filter(function (r) { return r.department_id === employee.department_id })
+    var deptOnly = employee.role === 'admin' ? all : all.filter(function (r) { return managerDeptIds.includes(r.department_id) })
     setRecords(deptOnly)
-    setDeptName(deptRes.data ? deptRes.data.name : '')
+    setDeptName(managerDeptIds.length > 1
+      ? managerDeptIds.map(function (id) { return deptNames[id] || '' }).filter(Boolean).join(', ')
+      : (deptRes.data ? deptRes.data.name : ''))
     setLoading(false)
-  }, [date, employee.department_id])
+  }, [date, employee.department_id, managerDeptIds])
 
   useEffect(function () { loadData() }, [loadData])
 
@@ -74,7 +93,7 @@ export default function DeptAttendance() {
       (function () {
         var q = supabase.from('employees').select('emp_code, name')
           .eq('active', true).eq('is_casual', false)
-        if (employee.role !== 'admin') return q.eq('department_id', employee.department_id)
+        if (employee.role !== 'admin') return q.in('department_id', managerDeptIds)
         if (deptFilter) return q.eq('department_id', Number(deptFilter))
         return q
       })()
@@ -102,7 +121,7 @@ export default function DeptAttendance() {
 
     setDarRecords(deptDars)
     setDarLoading(false)
-  }, [date, employee.department_id, employee.role, deptFilter])
+  }, [date, managerDeptIds, employee.role, deptFilter])
 
   useEffect(function () {
     if (view === 'dars') loadDARs()
@@ -113,11 +132,13 @@ export default function DeptAttendance() {
     var { data } = await supabase.rpc('monthly_summary', {
       p_year: mYear,
       p_month: mMonth,
-      p_department_id: employee.role === 'admin' ? (deptFilter ? Number(deptFilter) : null) : employee.department_id
+      p_department_id: employee.role === 'admin' ? (deptFilter ? Number(deptFilter) : null) : (managerDeptIds.length === 1 ? managerDeptIds[0] : null)
     })
-    setMRecords(data || [])
+    var filtered = employee.role === 'admin' ? (data || []) :
+      (data || []).filter(function (r) { return managerDeptIds.includes(r.department_id) })
+    setMRecords(filtered)
     setMLoading(false)
-  }, [mYear, mMonth, employee.department_id, deptFilter])
+  }, [mYear, mMonth, managerDeptIds, deptFilter])
 
   useEffect(function () {
     if (view === 'monthly') loadMonthly()

@@ -31,6 +31,8 @@ export default function Employees() {
     name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false
   })
   var [formError, setFormError] = useState('')
+  var [mgrDepts, setMgrDepts] = useState([])
+  var [mgrDeptSaving, setMgrDeptSaving] = useState(false)
 
   var [newPassword, setNewPassword] = useState('')
   var [resetError, setResetError] = useState('')
@@ -206,6 +208,16 @@ export default function Employees() {
     })
     setFormError('')
     setEditId(emp.id)
+
+    if (emp.role === 'manager') {
+      var { data } = await supabase
+        .from('manager_departments')
+        .select('department_id')
+        .eq('employee_id', emp.id)
+      setMgrDepts((data || []).map(function (d) { return d.department_id }))
+    } else {
+      setMgrDepts([])
+    }
     setShowAdd(true)
   }
 
@@ -593,6 +605,45 @@ export default function Employees() {
                 <span className="text-xs font-medium text-gray-700">DAR Required</span>
                 <span className="text-[10px] text-gray-400">— included in daily DAR report</span>
               </label>
+
+              {editId && form.role === 'manager' && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Managed Departments</p>
+                  <div className="flex flex-wrap gap-2">
+                    {departments.map(function (d) {
+                      var checked = mgrDepts.includes(d.id)
+                      return (
+                        <label key={d.id} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="checkbox" checked={checked}
+                            onChange={function () {
+                              setMgrDepts(checked ? mgrDepts.filter(function (x) { return x !== d.id }) : mgrDepts.concat(d.id))
+                            }}
+                            className="rounded border-gray-300 text-slate-800 focus:ring-slate-700" />
+                          <span className="text-xs text-gray-700">{d.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={mgrDeptSaving}
+                    onClick={async function () {
+                      setMgrDeptSaving(true)
+                      await supabase.from('manager_departments').delete().eq('employee_id', editId)
+                      if (mgrDepts.length > 0) {
+                        await supabase.from('manager_departments').insert(
+                          mgrDepts.map(function (did) { return { employee_id: editId, department_id: did } })
+                        )
+                      }
+                      setMgrDeptSaving(false)
+                      showToast('Managed departments saved')
+                    }}
+                    className="mt-2 px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 disabled:opacity-40"
+                  >
+                    {mgrDeptSaving ? 'Saving…' : 'Save Departments'}
+                  </button>
+                </div>
+              )}
 
               {formError && (
                 <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
