@@ -49,14 +49,14 @@ function parseDate(text: string, msgTimestamp: string): string {
 }
 
 function isDARMessage(text: string): boolean {
-  if (!text || text.length < 80) return false
+  if (!text || text.length < 20) return false
   const lower = text.toLowerCase()
   // Must contain DAR indicators
   const hasDar = lower.includes('dar') || lower.includes('punch in') || lower.includes('punch out') ||
     lower.includes("today's output") || lower.includes('activities performed')
   // Exclude known non-DAR patterns
   const isNonDar = lower.startsWith('poa') || lower.includes('this message was deleted') ||
-    lower.includes('<media omitted>') || lower.includes('dar format')
+    lower.includes('<media omitted>')
   return hasDar && !isNonDar
 }
 
@@ -89,13 +89,17 @@ serve(async (req) => {
 
   const phoneLookup: Record<string, { emp_code: string, name: string }> = {}
   for (const p of (phoneMap || [])) {
-    phoneLookup[p.phone] = { emp_code: p.emp_code, name: p.name }
+    const normalized = p.phone.replace(/^\+/, '')
+    phoneLookup[normalized] = { emp_code: p.emp_code, name: p.name }
+    if (normalized.length > 10) {
+      phoneLookup[normalized.slice(-10)] = { emp_code: p.emp_code, name: p.name }
+    }
   }
 
-  // Load all active employees who must submit DARs
+  // Load all active employees who must submit DARs, with department
   const { data: allEmps } = await supabase
     .from('employees')
-    .select('emp_code, name')
+    .select('emp_code, name, departments(name)')
     .eq('active', true)
     .eq('dar_required', true)
 
@@ -126,11 +130,14 @@ serve(async (req) => {
         const text = msg.text?.body || msg.text || ''
         if (!isDARMessage(text)) continue
 
-        // Extract sender phone (strip @s.whatsapp.net)
-        const from = (msg.from || '').replace('@s.whatsapp.net', '')
+        // Extract sender phone (strip @s.whatsapp.net, normalize)
+        let from = (msg.from || '').replace('@s.whatsapp.net', '').replace(/^\+/, '')
         if (!from || from.includes('@')) continue
 
-        const employee = phoneLookup[from]
+        // Normalize: ensure 91 prefix
+        if (from.length === 10) from = '91' + from
+
+        const employee = phoneLookup[from] || phoneLookup[from.slice(-10)]
         if (!employee) {
           if (!unknownPhones.includes(from)) unknownPhones.push(from)
           continue
@@ -149,13 +156,13 @@ serve(async (req) => {
     }
   }
 
-  // Build report for today (primary) + yesterday (if late submissions found)
+  // Build report for today (primary)
   const todaySubmitted = submittedByDate[reportDate] || new Set()
   const todayMissing = [...allEmpCodes].filter(c => !todaySubmitted.has(c))
 
-  function empName(code: string): string {
+  function empInfo(code: string): { name: string, dept: string } {
     const e = (allEmps || []).find(x => x.emp_code === code)
-    return e ? e.name : code
+    return { name: e ? e.name : code, dept: e?.departments?.name || 'Other' }
   }
 
   let report = `📋 *DAR Report — ${reportDate}*\n`
@@ -163,14 +170,22 @@ serve(async (req) => {
   report += `❌ Missing: ${todayMissing.length}\n`
   report += `─────────────────\n`
 
-  if (todaySubmitted.size > 0) {
-    report += `\n*✅ Submitted Today:*\n`
-    report += [...todaySubmitted].map(c => empName(c)).sort().join(', ') + '\n'
-  }
-
   if (todayMissing.length > 0) {
+    // Group missing by department
+    const missingByDept: Record<string, string[]> = {}
+    for (const code of todayMissing) {
+      const info = empInfo(code)
+      if (!missingByDept[info.dept]) missingByDept[info.dept] = []
+      missingByDept[info.dept].push(info.name)
+    }
+
     report += `\n*❌ Missing Today:*\n`
-    report += todayMissing.map(c => empName(c)).sort().join(', ') + '\n'
+    for (const dept of Object.keys(missingByDept).sort()) {
+      report += `\n*${dept}*\n`
+      for (const name of missingByDept[dept].sort()) {
+        report += `• ${name}\n`
+      }
+    }
   }
 
 
@@ -213,6 +228,9 @@ serve(async (req) => {
   }
 
   console.log(report)
+  if (unknownPhones.length > 0) {
+    console.log(`Unknown phones (${unknownPhones.length}):`, unknownPhones.join(', '))
+  }
   console.log(`Sent to ${sentTo.length} recipients`)
 
   return new Response(
