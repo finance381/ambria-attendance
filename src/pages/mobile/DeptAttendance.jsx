@@ -45,11 +45,9 @@ export default function DeptAttendance() {
 
   useEffect(function () {
     if (employee.role === 'manager') {
-      console.log('Loading manager_departments for', employee.id, employee.role)
       supabase.from('manager_departments').select('department_id, departments(name)')
         .eq('employee_id', employee.id)
         .then(function (res) {
-          console.log('manager_departments result:', JSON.stringify(res.data), 'error:', res.error)
           var ids = (res.data || []).map(function (d) { return d.department_id })
           if (ids.length === 0) ids = [employee.department_id]
           setManagerDeptIds(ids)
@@ -95,7 +93,7 @@ export default function DeptAttendance() {
       (function () {
         var q = supabase.from('employees').select('emp_code, name')
           .eq('active', true).eq('is_casual', false)
-        if (employee.role !== 'admin') return q.in('department_id', managerDeptIds)
+        if (employee.role !== 'admin') return deptFilter ? q.eq('department_id', Number(deptFilter)) : q.in('department_id', managerDeptIds)
         if (deptFilter) return q.eq('department_id', Number(deptFilter))
         return q
       })()
@@ -134,7 +132,7 @@ export default function DeptAttendance() {
     var { data } = await supabase.rpc('monthly_summary', {
       p_year: mYear,
       p_month: mMonth,
-      p_department_id: employee.role === 'admin' ? (deptFilter ? Number(deptFilter) : null) : (managerDeptIds.length === 1 ? managerDeptIds[0] : null)
+      p_department_id: deptFilter ? Number(deptFilter) : (employee.role === 'admin' ? null : (managerDeptIds.length === 1 ? managerDeptIds[0] : null))
     })
     var filtered = employee.role === 'admin' ? (data || []) :
       (data || []).filter(function (r) { return managerDeptIds.includes(r.department_id) })
@@ -233,7 +231,7 @@ export default function DeptAttendance() {
   }
 
   var filtered = records.filter(function (r) {
-    if (employee.role === 'admin' && deptFilter && r.department_id !== Number(deptFilter)) return false
+    if (deptFilter && r.department_id !== Number(deptFilter)) return false
     if (statusFilter && r.status !== statusFilter) return false
     if (search) {
       var q = search.toLowerCase()
@@ -281,6 +279,26 @@ export default function DeptAttendance() {
           <option value="">All Departments</option>
           {depts.map(function (d) {
             return <option key={d.id} value={d.id}>{d.name}</option>
+          })}
+        </select>
+      )}
+
+      {employee.role === 'manager' && managerDeptIds.length > 1 && (
+        <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
+          <option value="">All My Departments</option>
+          {managerDeptIds.map(function (id) {
+            return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option>
+          })}
+        </select>
+      )}
+
+      {employee.role === 'manager' && managerDeptIds.length > 1 && (
+        <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
+          <option value="">All My Departments</option>
+          {managerDeptIds.map(function (id) {
+            return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option>
           })}
         </select>
       )}
