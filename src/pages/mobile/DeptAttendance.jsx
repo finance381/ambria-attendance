@@ -45,9 +45,11 @@ export default function DeptAttendance() {
 
   useEffect(function () {
     if (employee.role === 'manager') {
+      console.log('Loading manager_departments for', employee.id, employee.role)
       supabase.from('manager_departments').select('department_id, departments(name)')
         .eq('employee_id', employee.id)
         .then(function (res) {
+          console.log('manager_departments result:', JSON.stringify(res.data), 'error:', res.error)
           var ids = (res.data || []).map(function (d) { return d.department_id })
           if (ids.length === 0) ids = [employee.department_id]
           setManagerDeptIds(ids)
