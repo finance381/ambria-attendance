@@ -34,7 +34,7 @@ function parseDate(text: string, msgTimestamp: string): string {
   }
 
   // Pattern 2: DDth Month YYYY / DD Month YYYY / DD Month YY / DD Month
-  const textMatch = clean.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(\d{2,4})?/i)
+  const textMatch = clean.match(/(\d{1,2})(?:st|nd|rd|th)?\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(\d{2,4})?/i)
   if (textMatch) {
     const d = parseInt(textMatch[1])
     const m = MONTH_MAP[textMatch[2].toLowerCase()]
@@ -99,11 +99,20 @@ serve(async (req) => {
   // Load all active employees who must submit DARs, with department
   const { data: allEmps } = await supabase
     .from('employees')
-    .select('emp_code, name, departments(name)')
+    .select('id, emp_code, name, departments(name)')
     .eq('active', true)
     .eq('dar_required', true)
 
-  const allEmpCodes = new Set((allEmps || []).map(e => e.emp_code))
+  // Exclude employees with zero punches on reportDate (absent/leave)
+  const { data: presentPunches } = await supabase
+    .from('punches')
+    .select('employee_id')
+    .eq('attendance_date', reportDate)
+
+  const presentIds = new Set((presentPunches || []).map((p: any) => p.employee_id))
+  const absentEmps = (allEmps || []).filter(e => !presentIds.has(e.id))
+  const activeEmps = (allEmps || []).filter(e => presentIds.has(e.id))
+  const allEmpCodes = new Set(activeEmps.map(e => e.emp_code))
 
   // Fetch messages from each group (last 48h)
   const cutoffEpoch = Math.floor((now.getTime() - 72 * 60 * 60 * 1000) / 1000)
@@ -168,6 +177,7 @@ serve(async (req) => {
   let report = `📋 *DAR Report — ${reportDate}*\n`
   report += `✅ Submitted: ${todaySubmitted.size}/${allEmpCodes.size}\n`
   report += `❌ Missing: ${todayMissing.length}\n`
+  report += `🏠 Absent/Leave: ${absentEmps.length}\n`
   report += `─────────────────\n`
 
   if (todayMissing.length > 0) {
@@ -188,6 +198,22 @@ serve(async (req) => {
     }
   }
 
+
+  if (absentEmps.length > 0) {
+    report += `\n*🏠 Absent / On Leave (no punch):*\n`
+    const absentByDept: Record<string, string[]> = {}
+    for (const e of absentEmps) {
+      const dept = (e as any).departments?.name || 'Other'
+      if (!absentByDept[dept]) absentByDept[dept] = []
+      absentByDept[dept].push(e.name)
+    }
+    for (const dept of Object.keys(absentByDept).sort()) {
+      report += `\n*${dept}*\n`
+      for (const name of absentByDept[dept].sort()) {
+        report += `• ${name}\n`
+      }
+    }
+  }
 
   // Send via Whapi
   let sentTo: string[] = []
