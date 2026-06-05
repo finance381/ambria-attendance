@@ -8,9 +8,10 @@ var TAB_KEYS = [
   { to: '/', key: 'tab_home', icon: '🏠', roles: null },
   { to: '/attendance', key: 'tab_attendance', icon: '📅', roles: null },
   { to: '/claims', key: 'tab_claims', icon: '📝', roles: null },
-  { to: '/team', key: 'tab_team', icon: '👥', roles: ['supervisor', 'manager', 'admin'] },
+  { to: '/team', key: 'tab_team', icon: '👥', roles: null, empCodes: ['AMB001'] },
   { to: '/dept', key: 'tab_dept', icon: '📋', roles: ['manager', 'admin'] },
   { to: '/dar', key: 'tab_dar', icon: '📋', roles: null, empCodes: ['AMB001'] },
+  { to: '/analysis', key: 'tab_analysis', icon: '📊', roles: ['manager', 'admin'] },
 ]
 
 export default function MobileShell() {

@@ -32,6 +32,7 @@ var translations = {
     tab_dept: 'My Dept',
     tab_claims: 'Claims',
     tab_dar: 'DAR',
+    tab_analysis: 'Analysis',
     tab_attendance: 'Attendance',
     tab_settings: 'Settings',
 
@@ -247,6 +248,7 @@ var translations = {
     app_name: 'Ambria Attendance',
     tab_home: 'होम',
     tab_dar: 'DAR',
+    tab_analysis: 'विश्लेषण',
     tab_team: 'टीम',
     tab_dept: 'मेरा विभाग',
     tab_attendance: 'हाज़िरी',
