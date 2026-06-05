@@ -62,8 +62,10 @@ function downloadCSV(filename, headers, rows) {
 export default function AdminAnalysis() {
   var { employee } = useAuth()
   var now = new Date()
-  var [year, setYear] = useState(now.getFullYear())
-  var [month, setMonth] = useState(now.getMonth() + 1)
+  var firstOfMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01'
+  var todayStr = now.toISOString().slice(0, 10)
+  var [fromDate, setFromDate] = useState(firstOfMonth)
+  var [toDate, setToDate] = useState(todayStr)
   var [view, setView] = useState('timing')
   var [depts, setDepts] = useState([])
   var [deptFilter, setDeptFilter] = useState('')
@@ -78,7 +80,10 @@ export default function AdminAnalysis() {
   var [darLoading, setDarLoading] = useState(false)
   var [search, setSearch] = useState('')
 
-  var isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
+  // Derive year/month from fromDate for RPCs (bridge until RPCs accept date range)
+  var fromParts = fromDate.split('-')
+  var year = Number(fromParts[0])
+  var month = Number(fromParts[1])
 
   useEffect(function () {
     if (employee.role === 'manager') {
@@ -102,12 +107,12 @@ export default function AdminAnalysis() {
   var loadTiming = useCallback(async function () {
     setTimingLoading(true)
     var { data } = await supabase.rpc('avg_punch_times', {
-      p_year: year, p_month: month,
+      p_from_date: fromDate, p_to_date: toDate,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
     setTimingData(data || [])
     setTimingLoading(false)
-  }, [year, month, deptFilter])
+  }, [fromDate, toDate, deptFilter])
 
   var loadMonthly = useCallback(async function () {
     setMonthlyLoading(true)
@@ -126,12 +131,12 @@ export default function AdminAnalysis() {
   var loadDAR = useCallback(async function () {
     setDarLoading(true)
     var { data } = await supabase.rpc('dar_compliance', {
-      p_year: year, p_month: month,
+      p_from_date: fromDate, p_to_date: toDate,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
     setDarData(data || [])
     setDarLoading(false)
-  }, [year, month, deptFilter])
+  }, [fromDate, toDate, deptFilter])
 
   useEffect(function () {
     if (view === 'timing') loadTiming()
@@ -139,14 +144,16 @@ export default function AdminAnalysis() {
     if (view === 'dar') loadDAR()
   }, [view, loadTiming, loadMonthly, loadDAR])
 
-  function prevMonth() {
-    if (month === 1) { setMonth(12); setYear(year - 1) }
-    else setMonth(month - 1)
-  }
-  function nextMonth() {
-    if (isCurrentMonth) return
-    if (month === 12) { setMonth(1); setYear(year + 1) }
-    else setMonth(month + 1)
+  function setMonthPreset(offset) {
+    var d = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+    var y = d.getFullYear()
+    var m = d.getMonth() + 1
+    var ms = y + '-' + String(m).padStart(2, '0') + '-01'
+    var lastDay = new Date(y, m, 0).getDate()
+    var me = y + '-' + String(m).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0')
+    if (me > todayStr) me = todayStr
+    setFromDate(ms)
+    setToDate(me)
   }
 
   function filterBySearch(list) {
@@ -169,25 +176,44 @@ export default function AdminAnalysis() {
       {/* HEADER */}
       <div className="mb-5">
         <h2 className="text-lg font-bold text-gray-900 mb-3">Analysis</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {employee.role === 'admin' && depts.length > 0 && (
             <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
               <option value="">All Departments</option>
               {depts.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
             </select>
           )}
           {employee.role === 'manager' && managerDeptIds.length > 1 && (
             <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
               <option value="">All My Departments</option>
               {managerDeptIds.map(function (id) { return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option> })}
             </select>
           )}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-            <button onClick={prevMonth} className="px-2.5 py-1.5 text-sm rounded-md hover:bg-white transition-colors">←</button>
-            <span className="text-sm font-semibold text-gray-700 min-w-[90px] text-center">{MONTHS[month - 1]} {year}</span>
-            <button onClick={nextMonth} disabled={isCurrentMonth} className="px-2.5 py-1.5 text-sm rounded-md hover:bg-white transition-colors disabled:opacity-30">→</button>
+          <div className="flex items-center gap-2">
+            <input type="date" value={fromDate} max={toDate}
+              onChange={function (e) { setFromDate(e.target.value) }}
+              className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700" />
+            <span className="text-xs text-gray-400">to</span>
+            <input type="date" value={toDate} min={fromDate} max={todayStr}
+              onChange={function (e) { setToDate(e.target.value) }}
+              className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700" />
+          </div>
+          <div className="flex items-center gap-1">
+            {[0, -1, -2].map(function (offset) {
+              var d = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+              var label = MONTHS[d.getMonth()] + ' ' + d.getFullYear()
+              var ms = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01'
+              var active = fromDate === ms
+              return (
+                <button key={offset} onClick={function () { setMonthPreset(offset) }}
+                  className={'px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ' +
+                    (active ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}>
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -211,22 +237,22 @@ export default function AdminAnalysis() {
       </div>
 
       {/* TIMING VIEW */}
-      {view === 'timing' && <TimingView data={filterBySearch(timingData)} loading={timingLoading} month={month} year={year} />}
+      {view === 'timing' && <TimingView data={filterBySearch(timingData)} loading={timingLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
 
       {/* ATTENDANCE VIEW */}
-      {view === 'attendance' && <AttendanceView data={filterBySearch(monthlyData)} loading={monthlyLoading} month={month} year={year} />}
+      {view === 'attendance' && <AttendanceView data={filterBySearch(monthlyData)} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
 
       {/* HOURS VIEW */}
-      {view === 'hours' && <HoursView data={filterBySearch(monthlyData)} loading={monthlyLoading} month={month} year={year} />}
+      {view === 'hours' && <HoursView data={filterBySearch(monthlyData)} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
 
       {/* DAR VIEW */}
-      {view === 'dar' && <DARView data={filterBySearch(darData)} loading={darLoading} month={month} year={year} />}
+      {view === 'dar' && <DARView data={filterBySearch(darData)} loading={darLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
     </div>
   )
 }
 
 /* ========================== TIMING VIEW ========================== */
-function TimingView({ data, loading, month, year }) {
+function TimingView({ data, loading, month, year, fromDate, toDate }) {
   var [showAll, setShowAll] = useState(false)
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
@@ -261,10 +287,10 @@ function TimingView({ data, loading, month, year }) {
     return sortDir === 'desc' ? -cmp : cmp
   }) : filtered
 
-  // Compute expected working days in the month (up to today if current month)
-  var daysInMonth = new Date(year, month, 0).getDate()
-  var today = new Date()
-  var maxDay = (year === today.getFullYear() && month === today.getMonth() + 1) ? today.getDate() : daysInMonth
+  // Compute expected working days in range
+  var from = new Date(fromDate + 'T00:00:00')
+  var to = new Date(toDate + 'T00:00:00')
+  var maxDay = Math.round((to - from) / 86400000) + 1
 
   var tableRows = sortedFiltered.map(function (r) {
     var hrsClass = r.avg_hours >= 8 ? 'text-emerald-600 font-semibold' : r.avg_hours >= 6 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
@@ -290,6 +316,9 @@ function TimingView({ data, loading, month, year }) {
 
   return (
     <>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{fromDate} → {toDate} ({maxDay} days)</p>
+      </div>
       <div className="grid grid-cols-4 gap-4 mb-5">
         <StatCard label="Employees" value={filtered.length} />
         <StatCard label="Avg Punch In" value={fmtSecs(avgIn)} color="text-emerald-600" />
@@ -344,7 +373,7 @@ function TimingView({ data, loading, month, year }) {
 }
 
 /* ========================== ATTENDANCE VIEW ========================== */
-function AttendanceView({ data, loading, month, year }) {
+function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
   var [showAll, setShowAll] = useState(false)
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
@@ -509,7 +538,7 @@ function AttendanceView({ data, loading, month, year }) {
 }
 
 /* ========================== HOURS VIEW ========================== */
-function HoursView({ data, loading, month, year }) {
+function HoursView({ data, loading, month, year, fromDate, toDate }) {
   var [showAll, setShowAll] = useState(false)
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
@@ -599,7 +628,7 @@ function HoursView({ data, loading, month, year }) {
 }
 
 /* ========================== DAR VIEW ========================== */
-function DARView({ data, loading, month, year }) {
+function DARView({ data, loading, month, year, fromDate, toDate }) {
   var [showAll, setShowAll] = useState(false)
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
