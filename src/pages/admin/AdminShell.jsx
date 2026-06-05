@@ -10,6 +10,7 @@ var NAV_ITEMS = [
   { to: '/admin/employees', label: 'Employees', icon: '👥' },
   { to: '/admin/vendors', label: 'Vendors', icon: '🏢' },
   { to: '/admin/casuals', label: 'Casuals', icon: '👷' },
+  { to: '/admin/analysis', label: 'Analysis', icon: '📈' },
 ]
 
 export default function AdminShell() {
