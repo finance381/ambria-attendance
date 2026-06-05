@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-var TABLE_PREVIEW = 10
+var TABLE_PREVIEW = 999
 
 function fmtSecs(secs) {
   if (!secs && secs !== 0) return '\u2014'
@@ -252,7 +252,7 @@ function TimingView({ data, loading, month, year }) {
   var avgOut = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_out_secs || 0) }, 0) / filtered.length) : 0
   var avgHrs = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_hours || 0) }, 0) / filtered.length * 10) / 10 : 0
 
-  var TIMING_SORT_KEYS = ['name', 'department_name', 'days_worked', 'avg_in_secs', 'avg_out_secs', 'avg_hours', 'min_hours', 'max_hours']
+  var TIMING_SORT_KEYS = ['name', 'department_name', 'days_worked', 'avg_in_secs', 'avg_out_secs', 'avg_hours', 'min_hours', 'max_hours', '_flag']
   var sortedFiltered = sortCol !== null ? filtered.slice().sort(function (a, b) {
     var key = TIMING_SORT_KEYS[sortCol]
     var va = a[key], vb = b[key]
@@ -261,8 +261,20 @@ function TimingView({ data, loading, month, year }) {
     return sortDir === 'desc' ? -cmp : cmp
   }) : filtered
 
+  // Compute expected working days in the month (up to today if current month)
+  var daysInMonth = new Date(year, month, 0).getDate()
+  var today = new Date()
+  var maxDay = (year === today.getFullYear() && month === today.getMonth() + 1) ? today.getDate() : daysInMonth
+
   var tableRows = sortedFiltered.map(function (r) {
     var hrsClass = r.avg_hours >= 8 ? 'text-emerald-600 font-semibold' : r.avg_hours >= 6 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
+    // Flag logic matching DOCX report
+    var flag = ''
+    var flagColor = ''
+    if (r.avg_hours > 0 && r.avg_hours < 8) { flag = 'Low hours'; flagColor = 'text-red-600 bg-red-50' }
+    else if (r.days_worked <= Math.round(maxDay * 0.4) && maxDay >= 7) { flag = 'Low attendance'; flagColor = 'text-amber-600 bg-amber-50' }
+    else if (r.avg_hours >= 10) { flag = 'Extended shifts'; flagColor = 'text-blue-600 bg-blue-50' }
+    r._flag = flag
     return [
       { text: r.name, sub: r.emp_code },
       r.department_name || '\u2014',
@@ -271,7 +283,8 @@ function TimingView({ data, loading, month, year }) {
       fmtSecs(r.avg_out_secs),
       { text: r.avg_hours + 'h', className: hrsClass },
       r.min_hours + 'h',
-      r.max_hours + 'h'
+      r.max_hours + 'h',
+      flag ? { text: flag, className: 'text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ' + flagColor } : '\u2014'
     ]
   })
 
@@ -321,14 +334,11 @@ function TimingView({ data, loading, month, year }) {
       </div>
 
       <DataTable
-        headers={['Employee', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min', 'Max']}
-        rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        headers={['Employee', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min', 'Max', 'Flag']}
+        rows={tableRows}
         sortCol={sortCol} sortDir={sortDir}
         onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
-      {tableRows.length > TABLE_PREVIEW && (
-        <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
-      )}
     </>
   )
 }
@@ -490,13 +500,10 @@ function AttendanceView({ data, loading, month, year }) {
 
       <DataTable
         headers={['Employee', 'Dept', 'Att %', 'Present', 'Half', 'Absent', 'Incomplete', 'Hours']}
-        rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        rows={tableRows}
         sortCol={sortCol} sortDir={sortDir}
         onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
-      {tableRows.length > TABLE_PREVIEW && (
-        <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
-      )}
     </>
   )
 }
@@ -583,13 +590,10 @@ function HoursView({ data, loading, month, year }) {
 
       <DataTable
         headers={['Employee', 'Dept', 'Avg Daily', 'Total Hours', 'Days Present', 'Status']}
-        rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        rows={tableRows}
         sortCol={sortCol} sortDir={sortDir}
         onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
-      {tableRows.length > TABLE_PREVIEW && (
-        <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
-      )}
     </>
   )
 }
@@ -676,13 +680,10 @@ function DARView({ data, loading, month, year }) {
 
       <DataTable
         headers={['Employee', 'Dept', 'Compliance', 'Submitted', 'Days Present', 'Missing']}
-        rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        rows={tableRows}
         sortCol={sortCol} sortDir={sortDir}
         onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
-      {tableRows.length > TABLE_PREVIEW && (
-        <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
-      )}
     </>
   )
 }
@@ -730,14 +731,14 @@ function ShowAllToggle({ count, expanded, onToggle }) {
 function DataTable({ headers, rows, sortCol, sortDir, onSort }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-      <table className="w-full text-sm">
+      <table className="w-full text-xs">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             {headers.map(function (h, i) {
               var active = sortCol === i
               return (
                 <th key={i} onClick={onSort ? function () { onSort(i) } : undefined}
-                  className={'text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider select-none ' +
+                  className={'text-left px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider select-none ' +
                     (onSort ? 'cursor-pointer hover:text-gray-800 ' : '') +
                     (active ? 'text-slate-800' : 'text-gray-500')}>
                   {h}
@@ -749,20 +750,20 @@ function DataTable({ headers, rows, sortCol, sortDir, onSort }) {
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={headers.length} className="text-center py-8 text-sm text-gray-400">No data</td></tr>
+            <tr><td colSpan={headers.length} className="text-center py-6 text-xs text-gray-400">No data</td></tr>
           ) : rows.map(function (row, ri) {
             return (
               <tr key={ri} className="border-b border-gray-100 hover:bg-gray-50">
                 {row.map(function (cell, ci) {
                   if (typeof cell === 'object' && cell !== null && cell.text !== undefined) {
                     return (
-                      <td key={ci} className="px-4 py-2.5">
+                      <td key={ci} className="px-3 py-1.5">
                         <span className={cell.className || ''}>{cell.text}</span>
                         {cell.sub && <span className="block text-[10px] text-gray-400">{cell.sub}</span>}
                       </td>
                     )
                   }
-                  return <td key={ci} className="px-4 py-2.5 text-gray-700">{cell}</td>
+                  return <td key={ci} className="px-3 py-1.5 text-gray-700">{cell}</td>
                 })}
               </tr>
             )
