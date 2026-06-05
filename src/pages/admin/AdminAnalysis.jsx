@@ -116,8 +116,8 @@ export default function AdminAnalysis() {
 
   var loadMonthly = useCallback(async function () {
     setMonthlyLoading(true)
-    var { data } = await supabase.rpc('monthly_summary', {
-      p_year: year, p_month: month,
+    var { data } = await supabase.rpc('monthly_summary_range', {
+      p_from_date: fromDate, p_to_date: toDate,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
     var filtered = data || []
@@ -126,7 +126,7 @@ export default function AdminAnalysis() {
     }
     setMonthlyData(filtered)
     setMonthlyLoading(false)
-  }, [year, month, deptFilter, managerDeptIds, employee.role])
+  }, [fromDate, toDate, deptFilter, managerDeptIds, employee.role])
 
   var loadDAR = useCallback(async function () {
     setDarLoading(true)
