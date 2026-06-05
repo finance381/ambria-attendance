@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Legend, PieChart, Pie
+} from 'recharts'
 
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function fmtSecs(secs) {
-  if (!secs && secs !== 0) return '—'
+  if (!secs && secs !== 0) return '\u2014'
   var h = Math.floor(secs / 3600)
   var m = Math.floor((secs % 3600) / 60)
   var ampm = h >= 12 ? 'PM' : 'AM'
@@ -24,6 +27,18 @@ function fmtHour(decimalHour) {
 var COLORS = {
   emerald: '#10b981', red: '#ef4444', amber: '#f59e0b', blue: '#3b82f6',
   purple: '#8b5cf6', orange: '#f97316', slate: '#475569', teal: '#14b8a6'
+}
+
+function pctToColor(pct) {
+  if (pct >= 90) return COLORS.emerald
+  if (pct >= 75) return COLORS.amber
+  return COLORS.red
+}
+
+function hrsToColor(hrs) {
+  if (hrs >= 8) return COLORS.emerald
+  if (hrs >= 6) return COLORS.amber
+  return COLORS.red
 }
 
 export default function AdminAnalysis() {
@@ -139,7 +154,6 @@ export default function AdminAnalysis() {
           <p className="text-xs text-gray-500">{MONTHS[month - 1]} {year}</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Dept filter */}
           {employee.role === 'admin' && depts.length > 0 && (
             <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
@@ -154,14 +168,12 @@ export default function AdminAnalysis() {
               {managerDeptIds.map(function (id) { return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option> })}
             </select>
           )}
-          {/* Month nav */}
-          <button onClick={prevMonth} className="px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">←</button>
+          <button onClick={prevMonth} className="px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">\u2190</button>
           <span className="text-sm font-semibold text-gray-700 min-w-[90px] text-center">{MONTHS[month - 1]} {year}</span>
-          <button onClick={nextMonth} disabled={isCurrentMonth} className="px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-30">→</button>
+          <button onClick={nextMonth} disabled={isCurrentMonth} className="px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-30">\u2192</button>
         </div>
       </div>
 
-      {/* Tab bar */}
       <div className="flex gap-1 mb-5 bg-white border border-gray-200 rounded-xl p-1 w-fit">
         {TABS.map(function (t) {
           return (
@@ -174,7 +186,6 @@ export default function AdminAnalysis() {
         })}
       </div>
 
-      {/* Search */}
       <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
         placeholder="Search name or code\u2026"
         className="px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4 w-64 focus:outline-none focus:ring-2 focus:ring-slate-700" />
@@ -208,7 +219,6 @@ export default function AdminAnalysis() {
               <StatCard label="Avg Hours/Day" value={avgHrs + 'h'} color="text-blue-600" />
             </div>
 
-            {/* Chart */}
             <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
               <h3 className="text-sm font-bold text-gray-700 mb-4">Average punch-in and punch-out times</h3>
               <ResponsiveContainer width="100%" height={Math.max(filtered.length * 36, 200)}>
@@ -227,14 +237,13 @@ export default function AdminAnalysis() {
               </ResponsiveContainer>
             </div>
 
-            {/* Table */}
             <DataTable
               headers={['Employee', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min', 'Max']}
               rows={filtered.map(function (r) {
                 var hrsClass = r.avg_hours >= 8 ? 'text-emerald-600 font-semibold' : r.avg_hours >= 6 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
                 return [
                   { text: r.name, sub: r.emp_code },
-                  r.department_name || '—',
+                  r.department_name || '\u2014',
                   r.days_worked,
                   fmtSecs(r.avg_in_secs),
                   fmtSecs(r.avg_out_secs),
@@ -267,15 +276,19 @@ export default function AdminAnalysis() {
         var overallPct = totalEffective > 0 ? Math.round((totalPresent / totalEffective) * 100) : 0
 
         var pieData = [
-          { name: 'Present', value: totalPresent, color: COLORS.emerald },
-          { name: 'Half Day', value: totalHalf, color: COLORS.orange },
-          { name: 'Absent', value: totalAbsent, color: COLORS.red },
-          { name: 'Incomplete', value: totalInc, color: COLORS.amber },
+          { name: 'Present', value: totalPresent, fill: COLORS.emerald },
+          { name: 'Half Day', value: totalHalf, fill: COLORS.orange },
+          { name: 'Absent', value: totalAbsent, fill: COLORS.red },
+          { name: 'Incomplete', value: totalInc, fill: COLORS.amber },
         ].filter(function (d) { return d.value > 0 })
 
-        var chartData = filtered.map(function (r) {
+        var attChartData = filtered.map(function (r) {
           var pct = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
-          return { name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name, pct: pct, present: r.days_present, absent: r.days_absent, half: r.days_half }
+          return {
+            name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name,
+            pct: pct,
+            fill: pctToColor(pct)
+          }
         })
 
         return (
@@ -289,34 +302,26 @@ export default function AdminAnalysis() {
             </div>
 
             <div className="grid grid-cols-3 gap-6 mb-6">
-              {/* Pie chart */}
               <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <h3 className="text-sm font-bold text-gray-700 mb-3">Status breakdown</h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={2}>
-                      {pieData.map(function (d, i) { return <Cell key={i} fill={d.color} /> })}
-                    </Pie>
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={2} />
                     <Tooltip />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
 
-              {/* Bar chart — attendance % per employee */}
               <div className="col-span-2 bg-white border border-gray-200 rounded-xl p-5">
                 <h3 className="text-sm font-bold text-gray-700 mb-3">Attendance % by employee (lowest first)</h3>
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={chartData}>
+                  <BarChart data={attChartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-35} textAnchor="end" height={60} />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + '%' }} />
                     <Tooltip formatter={function (v) { return v + '%' }} />
-                    <Bar dataKey="pct" name="Attendance %">
-                      {chartData.map(function (d, i) {
-                        return <Cell key={i} fill={d.pct >= 90 ? COLORS.emerald : d.pct >= 75 ? COLORS.amber : COLORS.red} />
-                      })}
-                    </Bar>
+                    <Bar dataKey="pct" name="Attendance %" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -329,7 +334,7 @@ export default function AdminAnalysis() {
                 var pctClass = pct >= 90 ? 'text-emerald-600 font-semibold' : pct >= 75 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
                 return [
                   { text: r.name, sub: r.emp_code },
-                  r.department_name || '—',
+                  r.department_name || '\u2014',
                   { text: pct + '%', className: pctClass },
                   r.days_present || 0,
                   r.days_half || 0,
@@ -358,11 +363,11 @@ export default function AdminAnalysis() {
         var below8 = withAvg.filter(function (r) { return r.avgDaily < 8 }).length
         var above10 = withAvg.filter(function (r) { return r.avgDaily >= 10 }).length
 
-        var chartData = withAvg.map(function (r) {
+        var hrsChartData = withAvg.map(function (r) {
           return {
             name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name,
             avgDaily: r.avgDaily,
-            total: r.total_hours
+            fill: hrsToColor(r.avgDaily)
           }
         })
 
@@ -378,16 +383,12 @@ export default function AdminAnalysis() {
             <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
               <h3 className="text-sm font-bold text-gray-700 mb-4">Average daily hours by employee (lowest first)</h3>
               <ResponsiveContainer width="100%" height={Math.max(withAvg.length * 32, 200)}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}>
+                <BarChart data={hrsChartData} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" domain={[0, 14]} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + 'h' }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
-                  <Tooltip formatter={function (v, name) { return [v + 'h', name === 'avgDaily' ? 'Avg Daily' : 'Total'] }} />
-                  <Bar dataKey="avgDaily" name="Avg Daily">
-                    {chartData.map(function (d, i) {
-                      return <Cell key={i} fill={d.avgDaily >= 8 ? COLORS.emerald : d.avgDaily >= 6 ? COLORS.amber : COLORS.red} />
-                    })}
-                  </Bar>
+                  <Tooltip formatter={function (v) { return [v + 'h', 'Avg Daily'] }} />
+                  <Bar dataKey="avgDaily" name="Avg Daily" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -400,7 +401,7 @@ export default function AdminAnalysis() {
                 var flagColor = r.avgDaily < 6 ? 'text-red-600 bg-red-50' : r.avgDaily < 8 ? 'text-amber-600 bg-amber-50' : r.avgDaily >= 10 ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
                 return [
                   { text: r.name, sub: r.emp_code },
-                  r.department_name || '—',
+                  r.department_name || '\u2014',
                   { text: r.avgDaily + 'h', className: hrsClass },
                   r.total_hours + 'h',
                   r.days_present,
@@ -425,12 +426,11 @@ export default function AdminAnalysis() {
         var fullCompliance = filtered.filter(function (r) { return r.compliance_pct >= 90 }).length
         var lowCompliance = filtered.filter(function (r) { return r.compliance_pct < 50 }).length
 
-        var chartData = filtered.map(function (r) {
+        var darChartData = filtered.map(function (r) {
           return {
             name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name,
             pct: r.compliance_pct,
-            submitted: r.days_submitted,
-            expected: r.days_present
+            fill: pctToColor(r.compliance_pct)
           }
         })
 
@@ -447,16 +447,12 @@ export default function AdminAnalysis() {
             <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
               <h3 className="text-sm font-bold text-gray-700 mb-4">DAR submission rate by employee (lowest first)</h3>
               <ResponsiveContainer width="100%" height={Math.max(filtered.length * 32, 200)}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}>
+                <BarChart data={darChartData} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + '%' }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
-                  <Tooltip formatter={function (v, name) { return [name === 'pct' ? v + '%' : v, name === 'pct' ? 'Compliance' : name] }} />
-                  <Bar dataKey="pct" name="Compliance %">
-                    {chartData.map(function (d, i) {
-                      return <Cell key={i} fill={d.pct >= 90 ? COLORS.emerald : d.pct >= 50 ? COLORS.amber : COLORS.red} />
-                    })}
-                  </Bar>
+                  <Tooltip formatter={function (v) { return [v + '%', 'Compliance'] }} />
+                  <Bar dataKey="pct" name="Compliance %" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -468,7 +464,7 @@ export default function AdminAnalysis() {
                 var missing = (r.days_present || 0) - (r.days_submitted || 0)
                 return [
                   { text: r.name, sub: r.emp_code },
-                  r.department_name || '—',
+                  r.department_name || '\u2014',
                   { text: r.compliance_pct + '%', className: pctClass },
                   r.days_submitted || 0,
                   r.days_present || 0,
