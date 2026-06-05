@@ -4,6 +4,23 @@ import EmployeeImport from '../../components/EmployeeImport'
 
 var ROLES = ['staff', 'supervisor', 'manager', 'admin']
 
+var TAB_OPTIONS = [
+  { id: 'home', label: 'Home' },
+  { id: 'attendance', label: 'My Attendance' },
+  { id: 'claims', label: 'Claims' },
+  { id: 'team', label: 'Team Punch' },
+  { id: 'dept', label: 'My Department' },
+  { id: 'dar', label: 'DAR Writer' },
+  { id: 'analysis', label: 'Analysis' },
+]
+
+var DEFAULT_TABS = {
+  staff: ['home', 'attendance', 'claims'],
+  supervisor: ['home', 'attendance', 'claims', 'team'],
+  manager: ['home', 'attendance', 'claims', 'team', 'dept', 'analysis'],
+  admin: ['home', 'attendance', 'claims', 'team', 'dept', 'dar', 'analysis'],
+}
+
 export default function Employees() {
   var [employees, setEmployees] = useState([])
   var [departments, setDepartments] = useState([])
@@ -28,7 +45,7 @@ export default function Employees() {
   var [sortDir, setSortDir] = useState('asc')
 
   var [form, setForm] = useState({
-    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false
+    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: []
   })
   var [formError, setFormError] = useState('')
   var [mgrDepts, setMgrDepts] = useState([])
@@ -186,7 +203,7 @@ export default function Employees() {
   }
 
   function resetForm() {
-    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false })
+    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [] })
     setFormError('')
   }
 
@@ -204,7 +221,8 @@ export default function Employees() {
       role: emp.role,
       designation: emp.designation || '',
       date_of_joining: emp.date_of_joining || '',
-      dar_required: !!emp.dar_required
+      dar_required: !!emp.dar_required,
+      visible_tabs: emp.visible_tabs || DEFAULT_TABS[emp.role] || DEFAULT_TABS.staff
     })
     setFormError('')
     setEditId(emp.id)
@@ -282,7 +300,8 @@ export default function Employees() {
       role: form.role,
       designation: form.designation.trim() || null,
       date_of_joining: form.date_of_joining || null,
-      dar_required: form.dar_required
+      dar_required: form.dar_required,
+      visible_tabs: form.visible_tabs
     }
 
     var { error } = await supabase
@@ -641,6 +660,34 @@ export default function Employees() {
                     className="mt-2 px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 disabled:opacity-40"
                   >
                     {mgrDeptSaving ? 'Saving…' : 'Save Departments'}
+                  </button>
+                </div>
+              )}
+
+              {editId && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Visible Tabs</p>
+                  <div className="flex flex-wrap gap-2">
+                    {TAB_OPTIONS.map(function (tab) {
+                      var checked = (form.visible_tabs || []).includes(tab.id)
+                      return (
+                        <label key={tab.id} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="checkbox" checked={checked} onChange={function () {
+                            var current = form.visible_tabs || []
+                            var next = checked
+                              ? current.filter(function (t) { return t !== tab.id })
+                              : current.concat([tab.id])
+                            setForm({ ...form, visible_tabs: next })
+                          }} className="rounded border-gray-300 text-slate-800 focus:ring-slate-700" />
+                          <span className="text-xs text-gray-700">{tab.label}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <button type="button" onClick={function () {
+                    setForm({ ...form, visible_tabs: DEFAULT_TABS[form.role] || DEFAULT_TABS.staff })
+                  }} className="text-[10px] text-blue-600 mt-1 hover:underline">
+                    Reset to default for {form.role}
                   </button>
                 </div>
               )}

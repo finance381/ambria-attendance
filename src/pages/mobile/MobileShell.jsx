@@ -4,16 +4,22 @@ import { useAuth } from '../../lib/useAuth'
 import { refreshPushSubscription } from '../../lib/pushRefresh'
 import { useLanguage, LanguageToggle } from '../../lib/i18n'
 
-var TAB_KEYS = [
-  { to: '/', key: 'tab_home', icon: '🏠', roles: null },
-  { to: '/attendance', key: 'tab_attendance', icon: '📅', roles: null },
-  { to: '/claims', key: 'tab_claims', icon: '📝', roles: null },
-  { to: '/team', key: 'tab_team', icon: '👥', roles: null, empCodes: ['AMB001'] },
-  { to: '/dept', key: 'tab_dept', icon: '📋', roles: ['manager', 'admin'] },
-  { to: '/dar', key: 'tab_dar', icon: '📋', roles: null, empCodes: ['AMB001'] },
-  { to: '/analysis', key: 'tab_analysis', icon: '📊', roles: ['manager', 'admin'] },
+var ALL_TABS = [
+  { to: '/', key: 'tab_home', icon: '🏠', tabId: 'home' },
+  { to: '/attendance', key: 'tab_attendance', icon: '📅', tabId: 'attendance' },
+  { to: '/claims', key: 'tab_claims', icon: '📝', tabId: 'claims' },
+  { to: '/team', key: 'tab_team', icon: '👥', tabId: 'team' },
+  { to: '/dept', key: 'tab_dept', icon: '📋', tabId: 'dept' },
+  { to: '/dar', key: 'tab_dar', icon: '📝', tabId: 'dar' },
+  { to: '/analysis', key: 'tab_analysis', icon: '📊', tabId: 'analysis' },
 ]
 
+var DEFAULT_TABS = {
+  staff: ['home', 'attendance', 'claims'],
+  supervisor: ['home', 'attendance', 'claims', 'team'],
+  manager: ['home', 'attendance', 'claims', 'team', 'dept', 'analysis'],
+  admin: ['home', 'attendance', 'claims', 'team', 'dept', 'dar', 'analysis'],
+}
 export default function MobileShell() {
   var { employee } = useAuth()
   var { t } = useLanguage()
@@ -73,10 +79,9 @@ export default function MobileShell() {
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-          {TAB_KEYS.filter(function (tab) {
-            if (tab.empCodes) return tab.empCodes.includes(employee.emp_code)
-            if (!tab.roles) return true
-            return tab.roles.includes(employee.role)
+          {ALL_TABS.filter(function (tab) {
+            var allowed = employee.visible_tabs || DEFAULT_TABS[employee.role] || DEFAULT_TABS.staff
+            return allowed.includes(tab.tabId)
           }).map(function (tab) {
             return (
               <NavLink
