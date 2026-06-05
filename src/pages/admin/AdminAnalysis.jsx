@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, PieChart, Pie
+  Cell, Legend, PieChart, Pie
 } from 'recharts'
 
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -276,10 +276,10 @@ export default function AdminAnalysis() {
         var overallPct = totalEffective > 0 ? Math.round((totalPresent / totalEffective) * 100) : 0
 
         var pieData = [
-          { name: 'Present', value: totalPresent, fill: COLORS.emerald },
-          { name: 'Half Day', value: totalHalf, fill: COLORS.orange },
-          { name: 'Absent', value: totalAbsent, fill: COLORS.red },
-          { name: 'Incomplete', value: totalInc, fill: COLORS.amber },
+          { name: 'Present', value: totalPresent, color: COLORS.emerald },
+          { name: 'Half Day', value: totalHalf, color: COLORS.orange },
+          { name: 'Absent', value: totalAbsent, color: COLORS.red },
+          { name: 'Incomplete', value: totalInc, color: COLORS.amber },
         ].filter(function (d) { return d.value > 0 })
 
         var attChartData = filtered.map(function (r) {
@@ -306,7 +306,9 @@ export default function AdminAnalysis() {
                 <h3 className="text-sm font-bold text-gray-700 mb-3">Status breakdown</h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={2} />
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={2}>
+                      {pieData.map(function (d, i) { return <Cell key={i} fill={d.color} /> })}
+                    </Pie>
                     <Tooltip />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
@@ -321,7 +323,9 @@ export default function AdminAnalysis() {
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-35} textAnchor="end" height={60} />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + '%' }} />
                     <Tooltip formatter={function (v) { return v + '%' }} />
-                    <Bar dataKey="pct" name="Attendance %" />
+                    <Bar dataKey="pct" name="Attendance %">
+                      {attChartData.map(function (d, i) { return <Cell key={i} fill={d.fill} /> })}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -388,7 +392,9 @@ export default function AdminAnalysis() {
                   <XAxis type="number" domain={[0, 14]} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + 'h' }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
                   <Tooltip formatter={function (v) { return [v + 'h', 'Avg Daily'] }} />
-                  <Bar dataKey="avgDaily" name="Avg Daily" />
+                  <Bar dataKey="avgDaily" name="Avg Daily">
+                    {hrsChartData.map(function (d, i) { return <Cell key={i} fill={d.fill} /> })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -452,7 +458,9 @@ export default function AdminAnalysis() {
                   <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + '%' }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
                   <Tooltip formatter={function (v) { return [v + '%', 'Compliance'] }} />
-                  <Bar dataKey="pct" name="Compliance %" />
+                  <Bar dataKey="pct" name="Compliance %">
+                    {darChartData.map(function (d, i) { return <Cell key={i} fill={d.fill} /> })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
