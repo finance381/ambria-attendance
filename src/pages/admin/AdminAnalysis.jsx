@@ -167,11 +167,8 @@ export default function AdminAnalysis() {
   return (
     <div>
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Analysis</h2>
-          <p className="text-xs text-gray-500">{MONTHS[month - 1]} {year}</p>
-        </div>
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-gray-900 mb-3">Analysis</h2>
         <div className="flex items-center gap-3">
           {employee.role === 'admin' && depts.length > 0 && (
             <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
@@ -187,9 +184,11 @@ export default function AdminAnalysis() {
               {managerDeptIds.map(function (id) { return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option> })}
             </select>
           )}
-          <button onClick={prevMonth} className="px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">{'\u2190'}</button>
-          <span className="text-sm font-semibold text-gray-700 min-w-[90px] text-center">{MONTHS[month - 1]} {year}</span>
-          <button onClick={nextMonth} disabled={isCurrentMonth} className="px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-30">{'\u2192'}</button>
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+            <button onClick={prevMonth} className="px-2.5 py-1.5 text-sm rounded-md hover:bg-white transition-colors">←</button>
+            <span className="text-sm font-semibold text-gray-700 min-w-[90px] text-center">{MONTHS[month - 1]} {year}</span>
+            <button onClick={nextMonth} disabled={isCurrentMonth} className="px-2.5 py-1.5 text-sm rounded-md hover:bg-white transition-colors disabled:opacity-30">→</button>
+          </div>
         </div>
       </div>
 
@@ -207,7 +206,7 @@ export default function AdminAnalysis() {
           })}
         </div>
         <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
-          placeholder="Search name or code\u2026"
+          placeholder="Search name or code…"
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-slate-700" />
       </div>
 
@@ -229,6 +228,8 @@ export default function AdminAnalysis() {
 /* ========================== TIMING VIEW ========================== */
 function TimingView({ data, loading, month, year }) {
   var [showAll, setShowAll] = useState(false)
+  var [sortCol, setSortCol] = useState(null)
+  var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
 
   var filtered = data
@@ -251,7 +252,16 @@ function TimingView({ data, loading, month, year }) {
   var avgOut = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_out_secs || 0) }, 0) / filtered.length) : 0
   var avgHrs = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_hours || 0) }, 0) / filtered.length * 10) / 10 : 0
 
-  var tableRows = filtered.map(function (r) {
+  var TIMING_SORT_KEYS = ['name', 'department_name', 'days_worked', 'avg_in_secs', 'avg_out_secs', 'avg_hours', 'min_hours', 'max_hours']
+  var sortedFiltered = sortCol !== null ? filtered.slice().sort(function (a, b) {
+    var key = TIMING_SORT_KEYS[sortCol]
+    var va = a[key], vb = b[key]
+    if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase() }
+    var cmp = va < vb ? -1 : va > vb ? 1 : 0
+    return sortDir === 'desc' ? -cmp : cmp
+  }) : filtered
+
+  var tableRows = sortedFiltered.map(function (r) {
     var hrsClass = r.avg_hours >= 8 ? 'text-emerald-600 font-semibold' : r.avg_hours >= 6 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
     return [
       { text: r.name, sub: r.emp_code },
@@ -313,6 +323,8 @@ function TimingView({ data, loading, month, year }) {
       <DataTable
         headers={['Employee', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min', 'Max']}
         rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        sortCol={sortCol} sortDir={sortDir}
+        onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
       {tableRows.length > TABLE_PREVIEW && (
         <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
@@ -324,6 +336,8 @@ function TimingView({ data, loading, month, year }) {
 /* ========================== ATTENDANCE VIEW ========================== */
 function AttendanceView({ data, loading, month, year }) {
   var [showAll, setShowAll] = useState(false)
+  var [sortCol, setSortCol] = useState(null)
+  var [sortDir, setSortDir] = useState('asc')
   var [chartMode, setChartMode] = useState('bottom')
   var CHART_LIMIT = 15
   if (loading) return <Loader />
@@ -370,13 +384,24 @@ function AttendanceView({ data, loading, month, year }) {
   })
   var chartSlice = chartMode === 'bottom' ? attWithPct.slice(0, CHART_LIMIT) : attWithPct.slice(-CHART_LIMIT).reverse()
 
-  var tableRows = filtered.map(function (r) {
-    var pct = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
-    var pctClass = pct >= 90 ? 'text-emerald-600 font-semibold' : pct >= 75 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
+  var ATT_SORT_KEYS = ['name', 'department_name', '_pct', 'days_present', 'days_half', 'days_absent', 'days_incomplete', 'total_hours']
+  var withPct = filtered.map(function (r) {
+    return { ...r, _pct: r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0 }
+  })
+  var sortedAtt = sortCol !== null ? withPct.slice().sort(function (a, b) {
+    var key = ATT_SORT_KEYS[sortCol]
+    var va = a[key], vb = b[key]
+    if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase() }
+    var cmp = va < vb ? -1 : va > vb ? 1 : 0
+    return sortDir === 'desc' ? -cmp : cmp
+  }) : withPct
+
+  var tableRows = sortedAtt.map(function (r) {
+    var pctClass = r._pct >= 90 ? 'text-emerald-600 font-semibold' : r._pct >= 75 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
     return [
       { text: r.name, sub: r.emp_code },
       r.department_name || '\u2014',
-      { text: pct + '%', className: pctClass },
+      { text: r._pct + '%', className: pctClass },
       r.days_present || 0,
       r.days_half || 0,
       r.days_absent || 0,
@@ -466,6 +491,8 @@ function AttendanceView({ data, loading, month, year }) {
       <DataTable
         headers={['Employee', 'Dept', 'Att %', 'Present', 'Half', 'Absent', 'Incomplete', 'Hours']}
         rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        sortCol={sortCol} sortDir={sortDir}
+        onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
       {tableRows.length > TABLE_PREVIEW && (
         <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
@@ -477,6 +504,8 @@ function AttendanceView({ data, loading, month, year }) {
 /* ========================== HOURS VIEW ========================== */
 function HoursView({ data, loading, month, year }) {
   var [showAll, setShowAll] = useState(false)
+  var [sortCol, setSortCol] = useState(null)
+  var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
 
   var filtered = data.filter(function (r) { return !r.is_casual && r.effective_days > 0 })
@@ -498,7 +527,16 @@ function HoursView({ data, loading, month, year }) {
     }
   })
 
-  var tableRows = withAvg.map(function (r) {
+  var HRS_SORT_KEYS = ['name', 'department_name', 'avgDaily', 'total_hours', 'days_present', 'avgDaily']
+  var sortedHrs = sortCol !== null ? withAvg.slice().sort(function (a, b) {
+    var key = HRS_SORT_KEYS[sortCol]
+    var va = a[key], vb = b[key]
+    if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase() }
+    var cmp = va < vb ? -1 : va > vb ? 1 : 0
+    return sortDir === 'desc' ? -cmp : cmp
+  }) : withAvg
+
+  var tableRows = sortedHrs.map(function (r) {
     var hrsClass = r.avgDaily >= 8 ? 'text-emerald-600 font-semibold' : r.avgDaily >= 6 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
     var flag = r.avgDaily < 6 ? 'Low hours' : r.avgDaily < 8 ? 'Below target' : r.avgDaily >= 10 ? 'Extended shifts' : 'On track'
     var flagColor = r.avgDaily < 6 ? 'text-red-600 bg-red-50' : r.avgDaily < 8 ? 'text-amber-600 bg-amber-50' : r.avgDaily >= 10 ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
@@ -546,6 +584,8 @@ function HoursView({ data, loading, month, year }) {
       <DataTable
         headers={['Employee', 'Dept', 'Avg Daily', 'Total Hours', 'Days Present', 'Status']}
         rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        sortCol={sortCol} sortDir={sortDir}
+        onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
       {tableRows.length > TABLE_PREVIEW && (
         <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
@@ -557,6 +597,8 @@ function HoursView({ data, loading, month, year }) {
 /* ========================== DAR VIEW ========================== */
 function DARView({ data, loading, month, year }) {
   var [showAll, setShowAll] = useState(false)
+  var [sortCol, setSortCol] = useState(null)
+  var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
 
   var filtered = data.slice()
@@ -576,16 +618,27 @@ function DARView({ data, loading, month, year }) {
     }
   })
 
-  var tableRows = filtered.map(function (r) {
+  var DAR_SORT_KEYS = ['name', 'department_name', 'compliance_pct', 'days_submitted', 'days_present', '_missing']
+  var withMissing = filtered.map(function (r) {
+    return { ...r, _missing: (r.days_present || 0) - (r.days_submitted || 0) }
+  })
+  var sortedDar = sortCol !== null ? withMissing.slice().sort(function (a, b) {
+    var key = DAR_SORT_KEYS[sortCol]
+    var va = a[key], vb = b[key]
+    if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase() }
+    var cmp = va < vb ? -1 : va > vb ? 1 : 0
+    return sortDir === 'desc' ? -cmp : cmp
+  }) : withMissing
+
+  var tableRows = sortedDar.map(function (r) {
     var pctClass = r.compliance_pct >= 90 ? 'text-emerald-600 font-semibold' : r.compliance_pct >= 50 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
-    var missing = (r.days_present || 0) - (r.days_submitted || 0)
     return [
       { text: r.name, sub: r.emp_code },
       r.department_name || '\u2014',
       { text: r.compliance_pct + '%', className: pctClass },
       r.days_submitted || 0,
       r.days_present || 0,
-      missing > 0 ? { text: String(missing), className: 'text-red-600 font-semibold' } : '0'
+      r._missing > 0 ? { text: String(r._missing), className: 'text-red-600 font-semibold' } : '0'
     ]
   })
 
@@ -624,6 +677,8 @@ function DARView({ data, loading, month, year }) {
       <DataTable
         headers={['Employee', 'Dept', 'Compliance', 'Submitted', 'Days Present', 'Missing']}
         rows={showAll ? tableRows : tableRows.slice(0, TABLE_PREVIEW)}
+        sortCol={sortCol} sortDir={sortDir}
+        onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
       {tableRows.length > TABLE_PREVIEW && (
         <ShowAllToggle count={tableRows.length} expanded={showAll} onToggle={function () { setShowAll(!showAll) }} />
@@ -672,14 +727,23 @@ function ShowAllToggle({ count, expanded, onToggle }) {
   )
 }
 
-function DataTable({ headers, rows }) {
+function DataTable({ headers, rows, sortCol, sortDir, onSort }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             {headers.map(function (h, i) {
-              return <th key={i} className="text-left px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">{h}</th>
+              var active = sortCol === i
+              return (
+                <th key={i} onClick={onSort ? function () { onSort(i) } : undefined}
+                  className={'text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider select-none ' +
+                    (onSort ? 'cursor-pointer hover:text-gray-800 ' : '') +
+                    (active ? 'text-slate-800' : 'text-gray-500')}>
+                  {h}
+                  {active && <span className="ml-1 text-[9px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              )
             })}
           </tr>
         </thead>
