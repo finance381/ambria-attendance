@@ -326,7 +326,14 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
         <StatCard label="Avg Hours/Day" value={avgHrs + 'h'} color="text-blue-600" />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
+      <DataTable
+        headers={['Employee', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min', 'Max', 'Flag']}
+        rows={tableRows}
+        sortCol={sortCol} sortDir={sortDir}
+        onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
+      />
+
+      <div className="bg-white border border-gray-200 rounded-xl p-5 mt-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-gray-700">Shift window per employee (avg punch-in to punch-out)</h3>
           <ExportBtn onClick={function () {
@@ -361,13 +368,6 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-
-      <DataTable
-        headers={['Employee', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min', 'Max', 'Flag']}
-        rows={tableRows}
-        sortCol={sortCol} sortDir={sortDir}
-        onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
-      />
     </>
   )
 }

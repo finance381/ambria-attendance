@@ -165,6 +165,25 @@ serve(async (req) => {
     }
   }
 
+  // Persist all matched DARs into daily_reports for compliance tracking
+  let persistedCount = 0
+  for (const [darDate, empCodes] of Object.entries(submittedByDate)) {
+    const rows = [...empCodes].map(code => ({
+      emp_code: code,
+      report_date: darDate,
+      tasks: 'WhatsApp DAR (auto-logged)',
+      submitted_at: new Date().toISOString()
+    }))
+    if (rows.length > 0) {
+      const { error } = await supabase
+        .from('daily_reports')
+        .upsert(rows, { onConflict: 'emp_code,report_date', ignoreDuplicates: true })
+      if (!error) persistedCount += rows.length
+      else console.error(`daily_reports upsert error for ${darDate}:`, error.message)
+    }
+  }
+  console.log(`Persisted ${persistedCount} DAR records to daily_reports`)
+
   // Build report for today (primary)
   const todaySubmitted = submittedByDate[reportDate] || new Set()
   const todayMissing = [...allEmpCodes].filter(c => !todaySubmitted.has(c))
@@ -264,6 +283,7 @@ serve(async (req) => {
       date: reportDate,
       expected: allEmpCodes.size,
       submitted: todaySubmitted.size,
+      persisted: persistedCount,
       sent_to: sentTo,
       unknown_phones: unknownPhones
     }),
