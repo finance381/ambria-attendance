@@ -353,13 +353,12 @@ function HoursView({ data, prevData, loading, month, year, fromDate, toDate, doc
 function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null); var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
-  var bufDate = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
-  var lag = toDate > bufDate ? Math.min(2, Math.round((new Date(toDate + 'T00:00:00') - new Date(bufDate + 'T00:00:00')) / 86400000)) : 0
-  var filtered = data.map(function (r) { var ap = Math.max(0, (r.days_present || 0) - lag); var pc = ap > 0 ? Math.round((r.days_submitted || 0) / ap * 100) : (r.days_present > 0 ? r.compliance_pct : 100); return { ...r, days_present: ap, compliance_pct: Math.min(pc, 100) } })
+  var isRecent = toDate >= new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+  var filtered = data.slice()
   filtered.sort(function (a, b) { return a.compliance_pct - b.compliance_pct })
   var totalP = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
   var totalS = filtered.reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
-  var overallPct = totalP > 0 ? Math.round((totalS / totalP) * 100) : 0
+  var overallPct = totalP > 0 ? Math.min(100, Math.round((totalS / totalP) * 100)) : 0
   var full = filtered.filter(function (r) { return r.compliance_pct >= 90 }).length
   var low = filtered.filter(function (r) { return r.compliance_pct < 50 }).length
   var prevP = (prevData || []).reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
@@ -377,6 +376,7 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
 
   return (<>
     <ConcernBanner items={darConcerns.concat(darWarnings)} label="Low DAR compliance" />
+    {isRecent && <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">{'\u{1F551}'} DARs from the last 1-2 days may not be reflected yet (nightly consolidation runs at 9:30 PM)</p>}
     <div className="flex items-center justify-end mb-2"><ExportGroup onCSV={function () { downloadCSV('dar_' + MONTHS[month - 1] + year + '.csv', ['Employee', 'Code', 'Dept', 'Compliance%', 'Submitted', 'Present', 'Missing'], filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.compliance_pct, r.days_submitted, r.days_present, Math.max(0, (r.days_present || 0) - (r.days_submitted || 0))] })) }} onDocx={function () { exportAnalysisDocx('dar', filtered, docxOpts) }} /></div>
     <div className="grid grid-cols-5 gap-4 mb-5">
       <StatCard label="DAR Required" value={filtered.length} />

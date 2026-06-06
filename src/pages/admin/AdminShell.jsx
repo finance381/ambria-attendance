@@ -55,11 +55,10 @@ export default function AdminShell() {
       <nav className="bg-white border-b border-gray-200 overflow-x-auto">
         <div className="max-w-5xl mx-auto px-4 flex">
           {NAV_ITEMS.filter(function (item) {
+             if (item.roles && !item.roles.includes(employee.role)) return false
              if (item.empCodes) return item.empCodes.includes(employee.emp_code)
              return true
-           }).concat(
-           employee.role === 'admin' ? [{ to: '/admin/config', label: 'Config', icon: '⚙️' }] : []
-          ).map(function (item) {
+           }).map(function (item) {
             return (
               <NavLink
                 key={item.to}
