@@ -7,19 +7,14 @@ import MyAttendance from './pages/mobile/MyAttendance'
 import Settings from './pages/mobile/Settings'
 import AdminShell from './pages/admin/AdminShell'
 import AdminDashboard from './pages/admin/AdminDashboard'
-import Employees from './pages/admin/Employees'
-import DailyAttendance from './pages/admin/DailyAttendance'
-import MonthlyReport from './pages/admin/MonthlyReport'
+import AttendanceHub from './pages/admin/AttendanceHub'
+import PeopleHub from './pages/admin/PeopleHub'
+import RequestsHub from './pages/admin/RequestsHub'
+import ConfigHub from './pages/admin/ConfigHub'
 import PunchForTeam from './pages/mobile/PunchForTeam'
 import DeptAttendance from './pages/mobile/DeptAttendance'
 import MyClaims from './pages/mobile/MyClaims'
-import ClaimsQueue from './pages/admin/ClaimsQueue'
-import ConfigHub from './pages/admin/ConfigHub'
-import LeaveBalances from './pages/admin/LeaveBalances'
 import DARWriter from './pages/mobile/DARWriter'
-import AdminDARs from './pages/admin/AdminDARs'
-import Vendors from './pages/admin/Vendors'
-import CasualReports from './pages/admin/CasualReports'
 import AdminAnalysis from './pages/admin/AdminAnalysis'
 import Analysis from './pages/mobile/Analysis'
 
@@ -108,54 +103,24 @@ export default function App() {
         </ProtectedRoute>
       }>
         <Route index element={<AdminDashboard />} />
-        <Route path="employees" element={
-          <ProtectedRoute roles={['admin']}>
-            <Employees />
+        <Route path="attendance" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <AttendanceHub />
+          </ProtectedRoute>
+        } />
+        <Route path="people" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <PeopleHub />
+          </ProtectedRoute>
+        } />
+        <Route path="requests" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <RequestsHub />
           </ProtectedRoute>
         } />
         <Route path="config" element={
           <ProtectedRoute roles={['admin']}>
             <ConfigHub />
-          </ProtectedRoute>
-        } />
-        <Route path="attendance" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <DailyAttendance />
-          </ProtectedRoute>
-        } />
-        <Route path="monthly" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <MonthlyReport />
-          </ProtectedRoute>
-        } />
-        <Route path="claims" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <ClaimsQueue />
-          </ProtectedRoute>
-        } />
-        <Route path="leaves" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <LeaveBalances />
-          </ProtectedRoute>
-        } />
-        <Route path="dars" element={
-          <ProtectedRoute roles={['admin']}>
-            <AdminDARs />
-          </ProtectedRoute>
-        } />
-        <Route path="vendors" element={
-          <ProtectedRoute roles={['admin']}>
-            <Vendors />
-          </ProtectedRoute>
-        } />
-        <Route path="casuals" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <CasualReports />
-          </ProtectedRoute>
-        } />
-        <Route path="analysis" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <AdminAnalysis />
           </ProtectedRoute>
         } />
       </Route>

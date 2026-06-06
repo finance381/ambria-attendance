@@ -4,14 +4,10 @@ import { useAuth } from '../../lib/useAuth'
 
 var NAV_ITEMS = [
   { to: '/admin', label: 'Overview', icon: '📊' },
-  { to: '/admin/attendance', label: 'Daily Attendance', icon: '📋' },
-  { to: '/admin/monthly', label: 'Monthly Report', icon: '📊' },
-  { to: '/admin/claims', label: 'Claims', icon: '📝' },
-  { to: '/admin/leaves', label: 'Leave Balances', icon: '🏖️' },
-  { to: '/admin/employees', label: 'Employees', icon: '👥' },
-  { to: '/admin/vendors', label: 'Vendors', icon: '🏢' },
-  { to: '/admin/casuals', label: 'Casuals', icon: '👷' },
-  { to: '/admin/analysis', label: 'Analysis', icon: '📈' },
+  { to: '/admin/attendance', label: 'Attendance', icon: '📋' },
+  { to: '/admin/people', label: 'People', icon: '👥' },
+  { to: '/admin/requests', label: 'Requests', icon: '📝' },
+  { to: '/admin/config', label: 'Config', icon: '⚙️', roles: ['admin'] },
 ]
 
 export default function AdminShell() {
