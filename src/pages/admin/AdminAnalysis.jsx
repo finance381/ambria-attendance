@@ -142,6 +142,7 @@ export default function AdminAnalysis() {
     if (view === 'timing') loadTiming()
     if (view === 'attendance' || view === 'hours') loadMonthly()
     if (view === 'dar') loadDAR()
+    if (view === 'concerns') { loadTiming(); loadMonthly(); loadDAR() }
   }, [view, loadTiming, loadMonthly, loadDAR])
 
   function setMonthPreset(offset) {
@@ -169,6 +170,7 @@ export default function AdminAnalysis() {
     { key: 'attendance', label: 'Attendance', icon: '\u{1F4CB}' },
     { key: 'hours', label: 'Hours', icon: '\u{23F1}' },
     { key: 'dar', label: 'DAR Compliance', icon: '\u{1F4DD}' },
+    { key: 'concerns', label: 'Concerns', icon: '\u{26A0}' },
   ]
 
   return (
@@ -247,6 +249,9 @@ export default function AdminAnalysis() {
 
       {/* DAR VIEW */}
       {view === 'dar' && <DARView data={filterBySearch(darData)} loading={darLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
+
+      {/* CONCERNS VIEW */}
+      {view === 'concerns' && <ConcernsView timingData={timingData} monthlyData={monthlyData} darData={darData} loading={timingLoading || monthlyLoading || darLoading} fromDate={fromDate} toDate={toDate} />}
     </div>
   )
 }
@@ -714,6 +719,159 @@ function DARView({ data, loading, month, year, fromDate, toDate }) {
         sortCol={sortCol} sortDir={sortDir}
         onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
+    </>
+  )
+}
+
+/* ========================== CONCERNS VIEW ========================== */
+function ConcernsView({ timingData, monthlyData, darData, loading, fromDate, toDate }) {
+  if (loading) return <Loader />
+
+  var from = new Date(fromDate + 'T00:00:00')
+  var to = new Date(toDate + 'T00:00:00')
+  var rangeDays = Math.round((to - from) / 86400000) + 1
+
+  // Build per-employee concern scores
+  var empMap = {}
+
+  function getEmp(code, name, dept) {
+    if (!empMap[code]) empMap[code] = { emp_code: code, name: name || code, dept: dept || '\u2014', concerns: [], score: 0 }
+    return empMap[code]
+  }
+
+  // 1. Timing concerns: late arrivals (avg in after 12 PM = 43200 secs), low hours
+  ;(timingData || []).forEach(function (r) {
+    var e = getEmp(r.emp_code, r.name, r.department_name)
+    if (r.avg_in_secs > 43200) {
+      var lateness = Math.round((r.avg_in_secs - 43200) / 3600 * 10) / 10
+      e.concerns.push({ type: 'timing', label: 'Late avg punch-in', detail: fmtSecs(r.avg_in_secs), severity: Math.min(lateness * 15, 30) })
+      e.score += Math.min(lateness * 15, 30)
+    }
+    if (r.avg_hours > 0 && r.avg_hours < 6) {
+      e.concerns.push({ type: 'timing', label: 'Very low avg hours', detail: r.avg_hours + 'h/day', severity: 25 })
+      e.score += 25
+    } else if (r.avg_hours > 0 && r.avg_hours < 8) {
+      e.concerns.push({ type: 'timing', label: 'Below target hours', detail: r.avg_hours + 'h/day', severity: 10 })
+      e.score += 10
+    }
+  })
+
+  // 2. Attendance concerns: low attendance %, high absences, high incomplete days
+  ;(monthlyData || []).filter(function (r) { return !r.is_casual }).forEach(function (r) {
+    var e = getEmp(r.emp_code, r.name, r.department_name)
+    var workDays = (r.days_present || 0) + (r.days_half || 0)
+    var pct = r.attendance_pct != null ? r.attendance_pct : (r.effective_days > 0 ? Math.round(((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100) : 0)
+    if (pct < 50) {
+      e.concerns.push({ type: 'attendance', label: 'Critical attendance', detail: pct + '% (' + (r.days_absent || 0) + ' absent)', severity: 35 })
+      e.score += 35
+    } else if (pct < 75) {
+      e.concerns.push({ type: 'attendance', label: 'Low attendance', detail: pct + '% (' + (r.days_absent || 0) + ' absent)', severity: 20 })
+      e.score += 20
+    }
+    if ((r.days_incomplete || 0) >= 3) {
+      e.concerns.push({ type: 'attendance', label: 'Frequent incomplete days', detail: r.days_incomplete + ' incomplete', severity: 15 })
+      e.score += 15
+    }
+    // Hours from monthly data
+    var avgDaily = workDays > 0 ? Math.round((r.total_hours / workDays) * 10) / 10 : 0
+    if (workDays > 0 && avgDaily < 6) {
+      e.concerns.push({ type: 'hours', label: 'Very low daily hours', detail: avgDaily + 'h avg (' + r.total_hours + 'h total)', severity: 25 })
+      e.score += 25
+    } else if (workDays > 0 && avgDaily < 8) {
+      e.concerns.push({ type: 'hours', label: 'Below 8h daily target', detail: avgDaily + 'h avg', severity: 10 })
+      e.score += 10
+    }
+  })
+
+  // 3. DAR concerns: low compliance
+  ;(darData || []).forEach(function (r) {
+    var e = getEmp(r.emp_code, r.name, r.department_name)
+    if (r.compliance_pct < 30) {
+      e.concerns.push({ type: 'dar', label: 'Critical DAR compliance', detail: r.compliance_pct + '% (' + (r.days_submitted || 0) + '/' + (r.days_present || 0) + ')', severity: 25 })
+      e.score += 25
+    } else if (r.compliance_pct < 70) {
+      e.concerns.push({ type: 'dar', label: 'Low DAR compliance', detail: r.compliance_pct + '% (' + (r.days_submitted || 0) + '/' + (r.days_present || 0) + ')', severity: 12 })
+      e.score += 12
+    }
+  })
+
+  // Round scores and sort by score desc, take top 10
+  Object.values(empMap).forEach(function (e) { e.score = Math.round(e.score) })
+  var ranked = Object.values(empMap).filter(function (e) { return e.score > 0 })
+  ranked.sort(function (a, b) { return b.score - a.score })
+  var top10 = ranked.slice(0, 10)
+
+  var CONCERN_COLORS = {
+    timing: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: '\u{1F551}' },
+    attendance: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', icon: '\u{1F4CB}' },
+    hours: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: '\u{23F1}' },
+    dar: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: '\u{1F4DD}' },
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{fromDate} \u2192 {toDate} ({rangeDays} days) \u2014 Top {Math.min(10, top10.length)} employees needing attention</p>
+      </div>
+
+      {top10.length === 0 ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-6 py-10 text-center">
+          <p className="text-emerald-700 font-semibold">\u2705 No major concerns found for this period</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {top10.map(function (emp, idx) {
+            var barWidth = Math.min(Math.round((emp.score / (ranked[0].score || 1)) * 100), 100)
+            var barColor = emp.score >= 50 ? 'bg-red-500' : emp.score >= 25 ? 'bg-amber-500' : 'bg-blue-500'
+            return (
+              <div key={emp.emp_code} className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-xs font-bold text-gray-500">{'#' + (idx + 1)}</span>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{emp.name}</p>
+                      <p className="text-[10px] text-gray-400">{emp.emp_code} \u2022 {emp.dept}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={'text-lg font-bold ' + (emp.score >= 50 ? 'text-red-600' : emp.score >= 25 ? 'text-amber-600' : 'text-blue-600')}>{emp.score}</p>
+                    <p className="text-[9px] text-gray-400 uppercase">concern score</p>
+                  </div>
+                </div>
+                <div className="w-full h-1.5 bg-gray-100 rounded-full mb-3">
+                  <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: barWidth + '%' }} />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {emp.concerns.sort(function (a, b) { return b.severity - a.severity }).map(function (c, ci) {
+                    var colors = CONCERN_COLORS[c.type] || CONCERN_COLORS.attendance
+                    return (
+                      <div key={ci} className={'flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-semibold ' + colors.bg + ' ' + colors.text + ' ' + colors.border}>
+                        <span>{colors.icon}</span>
+                        <span>{c.label}</span>
+                        <span className="opacity-60">{c.detail}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="mt-5 bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <h3 className="text-xs font-bold text-gray-600 mb-2">Scoring criteria</h3>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[10px] text-gray-500">
+          <span>{'\u{1F551}'} Late punch-in (after 12 PM): up to 30 pts</span>
+          <span>{'\u{1F4CB}'} Attendance below 50%: 35 pts</span>
+          <span>{'\u{23F1}'} Avg hours below 6h: 25 pts</span>
+          <span>{'\u{1F4CB}'} Attendance below 75%: 20 pts</span>
+          <span>{'\u{23F1}'} Avg hours below 8h: 10 pts</span>
+          <span>{'\u{1F4DD}'} DAR compliance below 30%: 25 pts</span>
+          <span>{'\u{1F4CB}'} 3+ incomplete days: 15 pts</span>
+          <span>{'\u{1F4DD}'} DAR compliance below 70%: 12 pts</span>
+        </div>
+      </div>
     </>
   )
 }
