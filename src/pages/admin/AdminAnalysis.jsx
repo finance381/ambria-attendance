@@ -358,10 +358,10 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
   var isRecent = lag > 0
   var filtered = data.map(function (r) {
     if (lag === 0) return r
-    var ap = Math.max(0, (r.days_present || 0) - lag)
-    var as = Math.min(r.days_submitted || 0, ap)
-    var pc = ap > 0 ? Math.round(as / ap * 100) : 100
-    return { ...r, days_present: ap, days_submitted: as, compliance_pct: pc }
+    var adjPresent = Math.max(0, (r.days_present || 0) - lag)
+    var adjSubmitted = Math.min(r.days_submitted || 0, adjPresent)
+    var adjPct = adjPresent > 0 ? Math.round(adjSubmitted / adjPresent * 100) : 100
+    return { ...r, compliance_pct: Math.min(adjPct, 100), _adj_missing: Math.max(0, adjPresent - adjSubmitted) }
   })
   filtered.sort(function (a, b) { return a.compliance_pct - b.compliance_pct })
   var totalP = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
@@ -378,7 +378,7 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
 
   var darChart = filtered.map(function (r) { return { name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name, pct: r.compliance_pct, fill: pctToColor(r.compliance_pct) } })
   var KEYS = ['name', 'department_name', 'compliance_pct', 'days_submitted', 'days_present', '_missing']
-  var wm = filtered.map(function (r) { return { ...r, _missing: Math.max(0, (r.days_present || 0) - (r.days_submitted || 0)) } })
+  var wm = filtered.map(function (r) { return { ...r, _missing: lag > 0 ? (r._adj_missing || 0) : Math.max(0, (r.days_present || 0) - (r.days_submitted || 0)) } })
   var sortedDar = sortCol !== null ? wm.slice().sort(function (a, b) { var key = KEYS[sortCol]; var va = a[key], vb = b[key]; if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase() }; return (sortDir === 'desc' ? -1 : 1) * (va < vb ? -1 : va > vb ? 1 : 0) }) : wm
   var tableRows = sortedDar.map(function (r) { var pc = r.compliance_pct >= 90 ? 'text-emerald-600 font-semibold' : r.compliance_pct >= 50 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'; return [{ text: r.name, sub: r.emp_code }, r.department_name || '\u2014', { text: r.compliance_pct + '%', className: pc }, r.days_submitted || 0, r.days_present || 0, r._missing > 0 ? { text: String(r._missing), className: 'text-red-600 font-semibold' } : '0'] })
 
