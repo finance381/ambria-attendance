@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
+import { exportAnalysisDocx } from '../../lib/exportAnalysisDocx'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, Legend, PieChart, Pie
@@ -59,6 +60,22 @@ function downloadCSV(filename, headers, rows) {
   URL.revokeObjectURL(url)
 }
 
+/* ── compute previous period from current date range ── */
+function computePrevRange(fromDate, toDate) {
+  var cf = new Date(fromDate + 'T00:00:00')
+  var ct = new Date(toDate + 'T00:00:00')
+  var dur = ct - cf
+  var pt = new Date(cf.getTime() - 86400000)
+  var pf = new Date(pt.getTime() - dur)
+  return { from: pf.toISOString().slice(0, 10), to: pt.toISOString().slice(0, 10) }
+}
+
+/* ── delta helper for stat cards ── */
+function calcDelta(current, prev) {
+  if (prev == null || prev === 0 || current == null) return null
+  return Math.round(((current - prev) / Math.abs(prev)) * 100)
+}
+
 export default function AdminAnalysis() {
   var { employee } = useAuth()
   var now = new Date()
@@ -66,7 +83,7 @@ export default function AdminAnalysis() {
   var todayStr = now.toISOString().slice(0, 10)
   var [fromDate, setFromDate] = useState(firstOfMonth)
   var [toDate, setToDate] = useState(todayStr)
-  var [view, setView] = useState('timing')
+  var [view, setView] = useState('concerns')
   var [depts, setDepts] = useState([])
   var [deptFilter, setDeptFilter] = useState('')
   var [managerDeptIds, setManagerDeptIds] = useState([employee.department_id])
@@ -80,10 +97,24 @@ export default function AdminAnalysis() {
   var [darLoading, setDarLoading] = useState(false)
   var [search, setSearch] = useState('')
 
-  // Derive year/month from fromDate for RPCs (bridge until RPCs accept date range)
+  // Previous period data for delta comparison
+  var [prevTimingData, setPrevTimingData] = useState([])
+  var [prevMonthlyData, setPrevMonthlyData] = useState([])
+  var [prevDarData, setPrevDarData] = useState([])
+
+  // Derive year/month from fromDate for CSV filenames
   var fromParts = fromDate.split('-')
   var year = Number(fromParts[0])
   var month = Number(fromParts[1])
+
+  var prev = computePrevRange(fromDate, toDate)
+  var deptIdParam = deptFilter ? Number(deptFilter) : null
+
+  // Compute deptName for DOCX exports
+  var deptName = deptFilter
+    ? (depts.find(function (d) { return d.id === Number(deptFilter) }) || {}).name || deptNames[Number(deptFilter)] || ''
+    : ''
+  var docxOpts = { fromDate: fromDate, toDate: toDate, deptName: deptName }
 
   useEffect(function () {
     if (employee.role === 'manager') {
@@ -106,37 +137,42 @@ export default function AdminAnalysis() {
 
   var loadTiming = useCallback(async function () {
     setTimingLoading(true)
-    var { data } = await supabase.rpc('avg_punch_times', {
-      p_from_date: fromDate, p_to_date: toDate,
-      p_department_id: deptFilter ? Number(deptFilter) : null
-    })
-    setTimingData(data || [])
+    var [cur, prv] = await Promise.all([
+      supabase.rpc('avg_punch_times', { p_from_date: fromDate, p_to_date: toDate, p_department_id: deptIdParam }),
+      supabase.rpc('avg_punch_times', { p_from_date: prev.from, p_to_date: prev.to, p_department_id: deptIdParam }),
+    ])
+    setTimingData(cur.data || [])
+    setPrevTimingData(prv.data || [])
     setTimingLoading(false)
-  }, [fromDate, toDate, deptFilter])
+  }, [fromDate, toDate, prev.from, prev.to, deptIdParam])
 
   var loadMonthly = useCallback(async function () {
     setMonthlyLoading(true)
-    var { data } = await supabase.rpc('monthly_summary_range', {
-      p_from_date: fromDate, p_to_date: toDate,
-      p_department_id: deptFilter ? Number(deptFilter) : null
-    })
-    var filtered = data || []
+    var [cur, prv] = await Promise.all([
+      supabase.rpc('monthly_summary_range', { p_from_date: fromDate, p_to_date: toDate, p_department_id: deptIdParam }),
+      supabase.rpc('monthly_summary_range', { p_from_date: prev.from, p_to_date: prev.to, p_department_id: deptIdParam }),
+    ])
+    var filtered = cur.data || []
+    var prevFiltered = prv.data || []
     if (employee.role !== 'admin' && !deptFilter) {
       filtered = filtered.filter(function (r) { return managerDeptIds.includes(r.department_id) })
+      prevFiltered = prevFiltered.filter(function (r) { return managerDeptIds.includes(r.department_id) })
     }
     setMonthlyData(filtered)
+    setPrevMonthlyData(prevFiltered)
     setMonthlyLoading(false)
-  }, [fromDate, toDate, deptFilter, managerDeptIds, employee.role])
+  }, [fromDate, toDate, prev.from, prev.to, deptIdParam, managerDeptIds, employee.role, deptFilter])
 
   var loadDAR = useCallback(async function () {
     setDarLoading(true)
-    var { data } = await supabase.rpc('dar_compliance', {
-      p_from_date: fromDate, p_to_date: toDate,
-      p_department_id: deptFilter ? Number(deptFilter) : null
-    })
-    setDarData(data || [])
+    var [cur, prv] = await Promise.all([
+      supabase.rpc('dar_compliance', { p_from_date: fromDate, p_to_date: toDate, p_department_id: deptIdParam }),
+      supabase.rpc('dar_compliance', { p_from_date: prev.from, p_to_date: prev.to, p_department_id: deptIdParam }),
+    ])
+    setDarData(cur.data || [])
+    setPrevDarData(prv.data || [])
     setDarLoading(false)
-  }, [fromDate, toDate, deptFilter])
+  }, [fromDate, toDate, prev.from, prev.to, deptIdParam])
 
   useEffect(function () {
     if (view === 'timing') loadTiming()
@@ -166,11 +202,11 @@ export default function AdminAnalysis() {
   }
 
   var TABS = [
+    { key: 'concerns', label: 'Concerns', icon: '\u{26A0}' },
     { key: 'timing', label: 'Punch Timing', icon: '\u{1F551}' },
     { key: 'attendance', label: 'Attendance', icon: '\u{1F4CB}' },
     { key: 'hours', label: 'Hours', icon: '\u{23F1}' },
     { key: 'dar', label: 'DAR Compliance', icon: '\u{1F4DD}' },
-    { key: 'concerns', label: 'Concerns', icon: '\u{26A0}' },
   ]
 
   return (
@@ -234,31 +270,32 @@ export default function AdminAnalysis() {
           })}
         </div>
         <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
-          placeholder="Search name or code…"
+          placeholder="Search name or code\u2026"
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-slate-700" />
       </div>
 
+      {/* CONCERNS VIEW — first tab */}
+      {view === 'concerns' && <ConcernsView timingData={timingData} monthlyData={monthlyData} darData={darData}
+        prevTimingData={prevTimingData} prevMonthlyData={prevMonthlyData} prevDarData={prevDarData}
+        loading={timingLoading || monthlyLoading || darLoading} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
+
       {/* TIMING VIEW */}
-      {view === 'timing' && <TimingView data={filterBySearch(timingData)} loading={timingLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
+      {view === 'timing' && <TimingView data={filterBySearch(timingData)} prevData={prevTimingData} loading={timingLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
 
       {/* ATTENDANCE VIEW */}
-      {view === 'attendance' && <AttendanceView data={filterBySearch(monthlyData)} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
+      {view === 'attendance' && <AttendanceView data={filterBySearch(monthlyData)} prevData={prevMonthlyData} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
 
       {/* HOURS VIEW */}
-      {view === 'hours' && <HoursView data={filterBySearch(monthlyData)} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
+      {view === 'hours' && <HoursView data={filterBySearch(monthlyData)} prevData={prevMonthlyData} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
 
       {/* DAR VIEW */}
-      {view === 'dar' && <DARView data={filterBySearch(darData)} loading={darLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} />}
-
-      {/* CONCERNS VIEW */}
-      {view === 'concerns' && <ConcernsView timingData={timingData} monthlyData={monthlyData} darData={darData} loading={timingLoading || monthlyLoading || darLoading} fromDate={fromDate} toDate={toDate} />}
+      {view === 'dar' && <DARView data={filterBySearch(darData)} prevData={prevDarData} loading={darLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
     </div>
   )
 }
 
 /* ========================== TIMING VIEW ========================== */
-function TimingView({ data, loading, month, year, fromDate, toDate }) {
-  var [showAll, setShowAll] = useState(false)
+function TimingView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
@@ -269,12 +306,8 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
     var outH = r.avg_out_secs ? Math.round(r.avg_out_secs / 360) / 10 : 0
     return {
       name: r.name.length > 14 ? r.name.slice(0, 14) + '\u2026' : r.name,
-      fullName: r.name,
-      rangeStart: inH,
-      rangeLen: Math.max(outH - inH, 0.2),
-      inH: inH,
-      outH: outH,
-      hours: r.avg_hours || 0
+      fullName: r.name, rangeStart: inH,
+      rangeLen: Math.max(outH - inH, 0.2), inH: inH, outH: outH, hours: r.avg_hours || 0
     }
   })
   chartData.sort(function (a, b) { return a.inH - b.inH })
@@ -282,6 +315,14 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
   var avgIn = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_in_secs || 0) }, 0) / filtered.length) : 0
   var avgOut = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_out_secs || 0) }, 0) / filtered.length) : 0
   var avgHrs = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_hours || 0) }, 0) / filtered.length * 10) / 10 : 0
+
+  // Previous period stats
+  var prevAvgHrs = (prevData || []).length > 0 ? Math.round((prevData || []).reduce(function (s, r) { return s + (r.avg_hours || 0) }, 0) / prevData.length * 10) / 10 : null
+
+  // Compute expected working days in range
+  var from = new Date(fromDate + 'T00:00:00')
+  var to = new Date(toDate + 'T00:00:00')
+  var maxDay = Math.round((to - from) / 86400000) + 1
 
   var TIMING_SORT_KEYS = ['name', 'department_name', 'days_worked', 'avg_in_secs', 'avg_out_secs', 'avg_hours', 'min_hours', 'max_hours', '_flag']
   var sortedFiltered = sortCol !== null ? filtered.slice().sort(function (a, b) {
@@ -292,14 +333,8 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
     return sortDir === 'desc' ? -cmp : cmp
   }) : filtered
 
-  // Compute expected working days in range
-  var from = new Date(fromDate + 'T00:00:00')
-  var to = new Date(toDate + 'T00:00:00')
-  var maxDay = Math.round((to - from) / 86400000) + 1
-
   var tableRows = sortedFiltered.map(function (r) {
     var hrsClass = r.avg_hours >= 8 ? 'text-emerald-600 font-semibold' : r.avg_hours >= 6 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
-    // Flag logic matching DOCX report
     var flag = ''
     var flagColor = ''
     if (r.avg_hours > 0 && r.avg_hours < 8) { flag = 'Low hours'; flagColor = 'text-red-600 bg-red-50' }
@@ -322,13 +357,18 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
   return (
     <>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{fromDate} → {toDate} ({maxDay} days)</p>
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{fromDate} \u2192 {toDate} ({maxDay} days)</p>
+        <ExportGroup onCSV={function () {
+          downloadCSV('timing_' + MONTHS[month - 1] + year + '.csv',
+            ['Employee', 'Code', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min Hrs', 'Max Hrs'],
+            filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.days_worked, fmtSecs(r.avg_in_secs), fmtSecs(r.avg_out_secs), r.avg_hours, r.min_hours, r.max_hours] }))
+        }} onDocx={function () { exportAnalysisDocx('timing', filtered, docxOpts) }} />
       </div>
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <StatCard label="Employees" value={filtered.length} />
+        <StatCard label="Employees" value={filtered.length} prev={prevData ? prevData.length : null} />
         <StatCard label="Avg Punch In" value={fmtSecs(avgIn)} color="text-emerald-600" />
         <StatCard label="Avg Punch Out" value={fmtSecs(avgOut)} color="text-red-500" />
-        <StatCard label="Avg Hours/Day" value={avgHrs + 'h'} color="text-blue-600" />
+        <StatCard label="Avg Hours/Day" value={avgHrs + 'h'} color="text-blue-600" delta={calcDelta(avgHrs, prevAvgHrs)} />
       </div>
 
       <DataTable
@@ -339,14 +379,7 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
       />
 
       <div className="bg-white border border-gray-200 rounded-xl p-5 mt-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-700">Shift window per employee (avg punch-in to punch-out)</h3>
-          <ExportBtn onClick={function () {
-            downloadCSV('timing_' + MONTHS[month - 1] + year + '.csv',
-              ['Employee', 'Code', 'Dept', 'Days', 'Avg In', 'Avg Out', 'Avg Hrs', 'Min Hrs', 'Max Hrs'],
-              filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.days_worked, fmtSecs(r.avg_in_secs), fmtSecs(r.avg_out_secs), r.avg_hours, r.min_hours, r.max_hours] }))
-          }} />
-        </div>
+        <h3 className="text-sm font-bold text-gray-700 mb-4">Shift window per employee (avg punch-in to punch-out)</h3>
         <ResponsiveContainer width="100%" height={Math.max(chartData.length * 30, 200)}>
           <BarChart data={chartData} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -373,13 +406,20 @@ function TimingView({ data, loading, month, year, fromDate, toDate }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* DEPT AGGREGATION — Timing */}
+      <DeptAggregation data={filtered} metric="hours" label="Avg hours by department"
+        getValue={function (list) {
+          var total = list.reduce(function (s, r) { return s + (r.avg_hours || 0) }, 0)
+          return list.length > 0 ? Math.round(total / list.length * 10) / 10 : 0
+        }}
+        colorFn={hrsToColor} suffix="h" domain={[0, 14]} />
     </>
   )
 }
 
 /* ========================== ATTENDANCE VIEW ========================== */
-function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
-  var [showAll, setShowAll] = useState(false)
+function AttendanceView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
   var [chartMode, setChartMode] = useState('bottom')
@@ -400,6 +440,13 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
   var totalEffective = filtered.reduce(function (s, r) { return s + (r.effective_days || 0) }, 0)
   var overallPct = totalEffective > 0 ? Math.round(((totalPresent + totalHalf * 0.5) / totalEffective) * 100) : 0
 
+  // Previous period
+  var prevFiltered = (prevData || []).filter(function (r) { return !r.is_casual })
+  var prevTotalPresent = prevFiltered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
+  var prevTotalHalf = prevFiltered.reduce(function (s, r) { return s + (r.days_half || 0) }, 0)
+  var prevTotalEff = prevFiltered.reduce(function (s, r) { return s + (r.effective_days || 0) }, 0)
+  var prevOverallPct = prevTotalEff > 0 ? Math.round(((prevTotalPresent + prevTotalHalf * 0.5) / prevTotalEff) * 100) : null
+
   var pieData = [
     { name: 'Present', value: totalPresent, color: COLORS.emerald },
     { name: 'Half Day', value: totalHalf, color: COLORS.orange },
@@ -411,14 +458,16 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
   var deptMap = {}
   filtered.forEach(function (r) {
     var dn = r.department_name || 'Unknown'
-    if (!deptMap[dn]) deptMap[dn] = { present: 0, effective: 0, count: 0 }
+    if (!deptMap[dn]) deptMap[dn] = { present: 0, half: 0, effective: 0, count: 0 }
     deptMap[dn].present += (r.days_present || 0)
+    deptMap[dn].half += (r.days_half || 0)
     deptMap[dn].effective += (r.effective_days || 0)
     deptMap[dn].count++
   })
   var deptAggData = Object.keys(deptMap).map(function (dn) {
-    var pct = deptMap[dn].effective > 0 ? Math.round((deptMap[dn].present / deptMap[dn].effective) * 100) : 0
-    return { name: dn, pct: pct, count: deptMap[dn].count, fill: pctToColor(pct) }
+    var d = deptMap[dn]
+    var pct = d.effective > 0 ? Math.round(((d.present + d.half * 0.5) / d.effective) * 100) : 0
+    return { name: dn, pct: pct, count: d.count, fill: pctToColor(pct) }
   }).sort(function (a, b) { return a.pct - b.pct })
 
   // Employee chart: capped
@@ -456,16 +505,26 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
 
   return (
     <>
+      <div className="flex items-center justify-end mb-2">
+        <ExportGroup onCSV={function () {
+          downloadCSV('attendance_' + MONTHS[month - 1] + year + '.csv',
+            ['Employee', 'Code', 'Dept', 'Att%', 'Present', 'Half', 'Absent', 'Incomplete', 'Hours'],
+            filtered.map(function (r) {
+              var pct = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
+              return [r.name, r.emp_code, r.department_name, pct, r.days_present, r.days_half, r.days_absent, r.days_incomplete, r.total_hours]
+            }))
+        }} onDocx={function () { exportAnalysisDocx('attendance', filtered, docxOpts) }} />
+      </div>
       <div className="grid grid-cols-5 gap-4 mb-5">
-        <StatCard label="Staff" value={filtered.length} />
-        <StatCard label="Overall Attendance" value={overallPct + '%'} color={overallPct >= 90 ? 'text-emerald-600' : overallPct >= 75 ? 'text-amber-600' : 'text-red-600'} />
-        <StatCard label="Present Days" value={totalPresent} color="text-emerald-600" />
+        <StatCard label="Staff" value={filtered.length} prev={prevFiltered.length || null} />
+        <StatCard label="Overall Attendance" value={overallPct + '%'} color={overallPct >= 90 ? 'text-emerald-600' : overallPct >= 75 ? 'text-amber-600' : 'text-red-600'}
+          delta={calcDelta(overallPct, prevOverallPct)} />
+        <StatCard label="Present Days" value={totalPresent} color="text-emerald-600" delta={calcDelta(totalPresent, prevTotalPresent || null)} />
         <StatCard label="Absent Days" value={totalAbsent} color="text-red-600" />
         <StatCard label="Half Days" value={totalHalf} color="text-orange-600" />
       </div>
 
       <div className="grid grid-cols-3 gap-5 mb-5">
-        {/* PIE */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h3 className="text-sm font-bold text-gray-700 mb-3">Status breakdown</h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -479,7 +538,6 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
           </ResponsiveContainer>
         </div>
 
-        {/* EMPLOYEE BAR (capped) */}
         <div className="col-span-2 bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-gray-700">
@@ -490,14 +548,6 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
                 className={'px-2.5 py-1 text-[10px] font-bold rounded-md ' + (chartMode === 'bottom' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-600')}>Bottom</button>
               <button onClick={function () { setChartMode('top') }}
                 className={'px-2.5 py-1 text-[10px] font-bold rounded-md ' + (chartMode === 'top' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-600')}>Top</button>
-              <ExportBtn onClick={function () {
-                downloadCSV('attendance_' + MONTHS[month - 1] + year + '.csv',
-                  ['Employee', 'Code', 'Dept', 'Att%', 'Present', 'Half', 'Absent', 'Incomplete', 'Hours'],
-                  filtered.map(function (r) {
-                    var pct = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
-                    return [r.name, r.emp_code, r.department_name, pct, r.days_present, r.days_half, r.days_absent, r.days_incomplete, r.total_hours]
-                  }))
-              }} />
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
@@ -543,8 +593,7 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
 }
 
 /* ========================== HOURS VIEW ========================== */
-function HoursView({ data, loading, month, year, fromDate, toDate }) {
-  var [showAll, setShowAll] = useState(false)
+function HoursView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
@@ -561,12 +610,16 @@ function HoursView({ data, loading, month, year, fromDate, toDate }) {
   var below8 = withAvg.filter(function (r) { return r.avgDaily < 8 }).length
   var above10 = withAvg.filter(function (r) { return r.avgDaily >= 10 }).length
 
+  // Previous period
+  var prevFiltered = (prevData || []).filter(function (r) { return !r.is_casual && r.effective_days > 0 })
+  var prevAvg = prevFiltered.length > 0
+    ? Math.round(prevFiltered.reduce(function (s, r) {
+        var wd = (r.days_present || 0) + (r.days_half || 0)
+        return s + (wd > 0 ? r.total_hours / wd : 0)
+      }, 0) / prevFiltered.length * 10) / 10 : null
+
   var hrsChartData = withAvg.map(function (r) {
-    return {
-      name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name,
-      avgDaily: r.avgDaily,
-      fill: hrsToColor(r.avgDaily)
-    }
+    return { name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name, avgDaily: r.avgDaily, fill: hrsToColor(r.avgDaily) }
   })
 
   var HRS_SORT_KEYS = ['name', 'department_name', 'avgDaily', 'total_hours', 'days_present', 'avgDaily']
@@ -594,22 +647,22 @@ function HoursView({ data, loading, month, year, fromDate, toDate }) {
 
   return (
     <>
+      <div className="flex items-center justify-end mb-2">
+        <ExportGroup onCSV={function () {
+          downloadCSV('hours_' + MONTHS[month - 1] + year + '.csv',
+            ['Employee', 'Code', 'Dept', 'Avg Daily', 'Total Hours', 'Days Present'],
+            withAvg.map(function (r) { return [r.name, r.emp_code, r.department_name, r.avgDaily, r.total_hours, r.days_present] }))
+        }} onDocx={function () { exportAnalysisDocx('hours', filtered, docxOpts) }} />
+      </div>
       <div className="grid grid-cols-4 gap-4 mb-5">
         <StatCard label="Staff" value={withAvg.length} />
-        <StatCard label="Avg Daily Hours" value={overallAvg + 'h'} color="text-blue-600" />
+        <StatCard label="Avg Daily Hours" value={overallAvg + 'h'} color="text-blue-600" delta={calcDelta(overallAvg, prevAvg)} />
         <StatCard label="Below 8h Avg" value={below8} color="text-red-600" />
         <StatCard label="Above 10h Avg" value={above10} color="text-emerald-600" />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-700">Average daily hours by employee (lowest first)</h3>
-          <ExportBtn onClick={function () {
-            downloadCSV('hours_' + MONTHS[month - 1] + year + '.csv',
-              ['Employee', 'Code', 'Dept', 'Avg Daily', 'Total Hours', 'Days Present'],
-              withAvg.map(function (r) { return [r.name, r.emp_code, r.department_name, r.avgDaily, r.total_hours, r.days_present] }))
-          }} />
-        </div>
+        <h3 className="text-sm font-bold text-gray-700 mb-4">Average daily hours by employee (lowest first)</h3>
         <ResponsiveContainer width="100%" height={Math.max(withAvg.length * 28, 200)}>
           <BarChart data={hrsChartData} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -629,13 +682,20 @@ function HoursView({ data, loading, month, year, fromDate, toDate }) {
         sortCol={sortCol} sortDir={sortDir}
         onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
+
+      <DeptAggregation data={filtered} metric="hours" label="Avg daily hours by department"
+        getValue={function (list) {
+          var t = 0, d = 0
+          list.forEach(function (r) { var w = (r.days_present || 0) + (r.days_half || 0); t += r.total_hours; d += w })
+          return d > 0 ? Math.round(t / d * 10) / 10 : 0
+        }}
+        colorFn={hrsToColor} suffix="h" domain={[0, 14]} />
     </>
   )
 }
 
 /* ========================== DAR VIEW ========================== */
-function DARView({ data, loading, month, year, fromDate, toDate }) {
-  var [showAll, setShowAll] = useState(false)
+function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null)
   var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
@@ -649,12 +709,13 @@ function DARView({ data, loading, month, year, fromDate, toDate }) {
   var fullCompliance = filtered.filter(function (r) { return r.compliance_pct >= 90 }).length
   var lowCompliance = filtered.filter(function (r) { return r.compliance_pct < 50 }).length
 
+  // Previous period
+  var prevPresent = (prevData || []).reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
+  var prevSubmitted = (prevData || []).reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
+  var prevPct = prevPresent > 0 ? Math.round((prevSubmitted / prevPresent) * 100) : null
+
   var darChartData = filtered.map(function (r) {
-    return {
-      name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name,
-      pct: r.compliance_pct,
-      fill: pctToColor(r.compliance_pct)
-    }
+    return { name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name, pct: r.compliance_pct, fill: pctToColor(r.compliance_pct) }
   })
 
   var DAR_SORT_KEYS = ['name', 'department_name', 'compliance_pct', 'days_submitted', 'days_present', '_missing']
@@ -683,23 +744,24 @@ function DARView({ data, loading, month, year, fromDate, toDate }) {
 
   return (
     <>
+      <div className="flex items-center justify-end mb-2">
+        <ExportGroup onCSV={function () {
+          downloadCSV('dar_compliance_' + MONTHS[month - 1] + year + '.csv',
+            ['Employee', 'Code', 'Dept', 'Compliance%', 'Submitted', 'Days Present', 'Missing'],
+            filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.compliance_pct, r.days_submitted, r.days_present, (r.days_present || 0) - (r.days_submitted || 0)] }))
+        }} onDocx={function () { exportAnalysisDocx('dar', filtered, docxOpts) }} />
+      </div>
       <div className="grid grid-cols-5 gap-4 mb-5">
         <StatCard label="DAR Required" value={filtered.length} />
-        <StatCard label="Overall Compliance" value={overallPct + '%'} color={overallPct >= 90 ? 'text-emerald-600' : overallPct >= 75 ? 'text-amber-600' : 'text-red-600'} />
+        <StatCard label="Overall Compliance" value={overallPct + '%'} color={overallPct >= 90 ? 'text-emerald-600' : overallPct >= 75 ? 'text-amber-600' : 'text-red-600'}
+          delta={calcDelta(overallPct, prevPct)} />
         <StatCard label="Total Submitted" value={totalSubmitted} color="text-emerald-600" />
         <StatCard label="90%+ Compliance" value={fullCompliance} color="text-blue-600" />
         <StatCard label="Below 50%" value={lowCompliance} color="text-red-600" />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-700">DAR submission rate by employee (lowest first)</h3>
-          <ExportBtn onClick={function () {
-            downloadCSV('dar_compliance_' + MONTHS[month - 1] + year + '.csv',
-              ['Employee', 'Code', 'Dept', 'Compliance%', 'Submitted', 'Days Present', 'Missing'],
-              filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.compliance_pct, r.days_submitted, r.days_present, (r.days_present || 0) - (r.days_submitted || 0)] }))
-          }} />
-        </div>
+        <h3 className="text-sm font-bold text-gray-700 mb-4">DAR submission rate by employee (lowest first)</h3>
         <ResponsiveContainer width="100%" height={Math.max(filtered.length * 28, 200)}>
           <BarChart data={darChartData} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -719,87 +781,119 @@ function DARView({ data, loading, month, year, fromDate, toDate }) {
         sortCol={sortCol} sortDir={sortDir}
         onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }}
       />
+
+      <DeptAggregation data={filtered} metric="dar" label="DAR compliance by department"
+        getValue={function (list) {
+          var sub = list.reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
+          var prs = list.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
+          return prs > 0 ? Math.round(sub / prs * 100) : 0
+        }}
+        colorFn={pctToColor} suffix="%" domain={[0, 100]} />
     </>
   )
 }
 
 /* ========================== CONCERNS VIEW ========================== */
-function ConcernsView({ timingData, monthlyData, darData, loading, fromDate, toDate }) {
+var DEFAULT_THRESHOLDS = {
+  lateAfterHour: 12,
+  lowHrs: 8,
+  criticalHrs: 6,
+  lowAtt: 75,
+  criticalAtt: 50,
+  incompleteMin: 3,
+  lowDar: 70,
+  criticalDar: 30,
+}
+
+function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMonthlyData, prevDarData, loading, fromDate, toDate, docxOpts }) {
+  var [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS)
+  var [showSettings, setShowSettings] = useState(false)
+  var [drillDown, setDrillDown] = useState(null)
   if (loading) return <Loader />
 
   var from = new Date(fromDate + 'T00:00:00')
   var to = new Date(toDate + 'T00:00:00')
   var rangeDays = Math.round((to - from) / 86400000) + 1
+  var th = thresholds
+  var lateAfterSecs = th.lateAfterHour * 3600
 
   // Build per-employee concern scores
   var empMap = {}
-
   function getEmp(code, name, dept) {
-    if (!empMap[code]) empMap[code] = { emp_code: code, name: name || code, dept: dept || '\u2014', concerns: [], score: 0 }
+    if (!empMap[code]) empMap[code] = { emp_code: code, name: name || code, dept: dept || '\u2014', concerns: [], score: 0, raw: {} }
     return empMap[code]
   }
 
-  // 1. Timing concerns: late arrivals (avg in after 12 PM = 43200 secs), low hours
   ;(timingData || []).forEach(function (r) {
     var e = getEmp(r.emp_code, r.name, r.department_name)
-    if (r.avg_in_secs > 43200) {
-      var lateness = Math.round((r.avg_in_secs - 43200) / 3600 * 10) / 10
+    e.raw.timing = r
+    if (r.avg_in_secs > lateAfterSecs) {
+      var lateness = Math.round((r.avg_in_secs - lateAfterSecs) / 3600 * 10) / 10
       e.concerns.push({ type: 'timing', label: 'Late avg punch-in', detail: fmtSecs(r.avg_in_secs), severity: Math.min(lateness * 15, 30) })
       e.score += Math.min(lateness * 15, 30)
     }
-    if (r.avg_hours > 0 && r.avg_hours < 6) {
+    if (r.avg_hours > 0 && r.avg_hours < th.criticalHrs) {
       e.concerns.push({ type: 'timing', label: 'Very low avg hours', detail: r.avg_hours + 'h/day', severity: 25 })
       e.score += 25
-    } else if (r.avg_hours > 0 && r.avg_hours < 8) {
+    } else if (r.avg_hours > 0 && r.avg_hours < th.lowHrs) {
       e.concerns.push({ type: 'timing', label: 'Below target hours', detail: r.avg_hours + 'h/day', severity: 10 })
       e.score += 10
     }
   })
 
-  // 2. Attendance concerns: low attendance %, high absences, high incomplete days
   ;(monthlyData || []).filter(function (r) { return !r.is_casual }).forEach(function (r) {
     var e = getEmp(r.emp_code, r.name, r.department_name)
-    var workDays = (r.days_present || 0) + (r.days_half || 0)
+    e.raw.monthly = r
     var pct = r.attendance_pct != null ? r.attendance_pct : (r.effective_days > 0 ? Math.round(((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100) : 0)
-    if (pct < 50) {
+    if (pct < th.criticalAtt) {
       e.concerns.push({ type: 'attendance', label: 'Critical attendance', detail: pct + '% (' + (r.days_absent || 0) + ' absent)', severity: 35 })
       e.score += 35
-    } else if (pct < 75) {
+    } else if (pct < th.lowAtt) {
       e.concerns.push({ type: 'attendance', label: 'Low attendance', detail: pct + '% (' + (r.days_absent || 0) + ' absent)', severity: 20 })
       e.score += 20
     }
-    if ((r.days_incomplete || 0) >= 3) {
+    if ((r.days_incomplete || 0) >= th.incompleteMin) {
       e.concerns.push({ type: 'attendance', label: 'Frequent incomplete days', detail: r.days_incomplete + ' incomplete', severity: 15 })
       e.score += 15
     }
-    // Hours from monthly data
+    var workDays = (r.days_present || 0) + (r.days_half || 0)
     var avgDaily = workDays > 0 ? Math.round((r.total_hours / workDays) * 10) / 10 : 0
-    if (workDays > 0 && avgDaily < 6) {
+    if (workDays > 0 && avgDaily < th.criticalHrs) {
       e.concerns.push({ type: 'hours', label: 'Very low daily hours', detail: avgDaily + 'h avg (' + r.total_hours + 'h total)', severity: 25 })
       e.score += 25
-    } else if (workDays > 0 && avgDaily < 8) {
-      e.concerns.push({ type: 'hours', label: 'Below 8h daily target', detail: avgDaily + 'h avg', severity: 10 })
+    } else if (workDays > 0 && avgDaily < th.lowHrs) {
+      e.concerns.push({ type: 'hours', label: 'Below ' + th.lowHrs + 'h daily target', detail: avgDaily + 'h avg', severity: 10 })
       e.score += 10
     }
   })
 
-  // 3. DAR concerns: low compliance
   ;(darData || []).forEach(function (r) {
     var e = getEmp(r.emp_code, r.name, r.department_name)
-    if (r.compliance_pct < 30) {
+    e.raw.dar = r
+    if (r.compliance_pct < th.criticalDar) {
       e.concerns.push({ type: 'dar', label: 'Critical DAR compliance', detail: r.compliance_pct + '% (' + (r.days_submitted || 0) + '/' + (r.days_present || 0) + ')', severity: 25 })
       e.score += 25
-    } else if (r.compliance_pct < 70) {
+    } else if (r.compliance_pct < th.lowDar) {
       e.concerns.push({ type: 'dar', label: 'Low DAR compliance', detail: r.compliance_pct + '% (' + (r.days_submitted || 0) + '/' + (r.days_present || 0) + ')', severity: 12 })
       e.score += 12
     }
   })
 
-  // Round scores and sort by score desc, take top 10
   Object.values(empMap).forEach(function (e) { e.score = Math.round(e.score) })
   var ranked = Object.values(empMap).filter(function (e) { return e.score > 0 })
   ranked.sort(function (a, b) { return b.score - a.score })
-  var top10 = ranked.slice(0, 10)
+  var scored = ranked.slice(0, 10)
+
+  // Previous period count for delta
+  var prevCount = 0
+  var prevEmpMap = {}
+  ;(prevTimingData || []).forEach(function (r) { prevEmpMap[r.emp_code] = true })
+  ;(prevMonthlyData || []).filter(function (r) { return !r.is_casual }).forEach(function (r) {
+    var pct = r.attendance_pct != null ? r.attendance_pct : (r.effective_days > 0 ? Math.round(((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100) : 0)
+    if (pct < th.lowAtt) prevEmpMap[r.emp_code] = true
+  })
+  ;(prevDarData || []).forEach(function (r) { if (r.compliance_pct < th.lowDar) prevEmpMap[r.emp_code] = true })
+  prevCount = Object.keys(prevEmpMap).length
 
   var CONCERN_COLORS = {
     timing: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: '\u{1F551}' },
@@ -808,29 +902,63 @@ function ConcernsView({ timingData, monthlyData, darData, loading, fromDate, toD
     dar: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: '\u{1F4DD}' },
   }
 
+  function updateThreshold(key, val) {
+    setThresholds(function (prev) { var n = { ...prev }; n[key] = Number(val); return n })
+  }
+
   return (
     <>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{fromDate} \u2192 {toDate} ({rangeDays} days) \u2014 Top {Math.min(10, top10.length)} employees needing attention</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{fromDate} \u2192 {toDate} ({rangeDays} days) \u2014 Top {Math.min(10, scored.length)} employees needing attention</p>
+        <div className="flex items-center gap-2">
+          <button onClick={function () { setShowSettings(!showSettings) }}
+            className={'px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-colors ' + (showSettings ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
+            {'\u2699'} Thresholds
+          </button>
+          <ExportGroup onCSV={function () {
+            downloadCSV('concerns_' + fromDate + '.csv',
+              ['Rank', 'Name', 'Code', 'Dept', 'Score', 'Concerns'],
+              scored.map(function (c, i) { return [i + 1, c.name, c.emp_code, c.dept, c.score, c.concerns.map(function (x) { return x.label }).join('; ')] }))
+          }} onDocx={function () { exportAnalysisDocx('concerns', scored, docxOpts) }} />
+        </div>
       </div>
 
-      {top10.length === 0 ? (
+      {/* ADJUSTABLE THRESHOLDS */}
+      {showSettings && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+          <div className="grid grid-cols-4 gap-4 text-xs">
+            <ThresholdInput label="Late after (hour)" value={th.lateAfterHour} min={8} max={18} onChange={function (v) { updateThreshold('lateAfterHour', v) }} />
+            <ThresholdInput label={'Low hours (<' + th.lowHrs + 'h)'} value={th.lowHrs} min={4} max={12} onChange={function (v) { updateThreshold('lowHrs', v) }} />
+            <ThresholdInput label={'Critical hours (<' + th.criticalHrs + 'h)'} value={th.criticalHrs} min={2} max={8} onChange={function (v) { updateThreshold('criticalHrs', v) }} />
+            <ThresholdInput label={'Low att% (<' + th.lowAtt + '%)'} value={th.lowAtt} min={50} max={95} onChange={function (v) { updateThreshold('lowAtt', v) }} />
+            <ThresholdInput label={'Critical att% (<' + th.criticalAtt + '%)'} value={th.criticalAtt} min={20} max={70} onChange={function (v) { updateThreshold('criticalAtt', v) }} />
+            <ThresholdInput label="Incomplete days min" value={th.incompleteMin} min={1} max={10} onChange={function (v) { updateThreshold('incompleteMin', v) }} />
+            <ThresholdInput label={'Low DAR (<' + th.lowDar + '%)'} value={th.lowDar} min={30} max={90} onChange={function (v) { updateThreshold('lowDar', v) }} />
+            <ThresholdInput label={'Critical DAR (<' + th.criticalDar + '%)'} value={th.criticalDar} min={10} max={50} onChange={function (v) { updateThreshold('criticalDar', v) }} />
+          </div>
+          <button onClick={function () { setThresholds(DEFAULT_THRESHOLDS) }}
+            className="mt-3 px-3 py-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-lg hover:bg-gray-100">Reset defaults</button>
+        </div>
+      )}
+
+      {scored.length === 0 ? (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-6 py-10 text-center">
-          <p className="text-emerald-700 font-semibold">\u2705 No major concerns found for this period</p>
+          <p className="text-emerald-700 font-semibold">{'\u2705'} No major concerns found for this period</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {top10.map(function (emp, idx) {
+          {scored.map(function (emp, idx) {
             var barWidth = Math.min(Math.round((emp.score / (ranked[0].score || 1)) * 100), 100)
             var barColor = emp.score >= 50 ? 'bg-red-500' : emp.score >= 25 ? 'bg-amber-500' : 'bg-blue-500'
             return (
-              <div key={emp.emp_code} className="bg-white border border-gray-200 rounded-xl p-4">
+              <div key={emp.emp_code} className="bg-white border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-gray-300 transition-colors"
+                onClick={function () { setDrillDown(emp) }}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-xs font-bold text-gray-500">{'#' + (idx + 1)}</span>
                     <div>
                       <p className="text-sm font-bold text-gray-900">{emp.name}</p>
-                      <p className="text-[10px] text-gray-400">{emp.emp_code} \u2022 {emp.dept}</p>
+                      <p className="text-[10px] text-gray-400">{emp.emp_code} {'\u2022'} {emp.dept}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -859,30 +987,169 @@ function ConcernsView({ timingData, monthlyData, darData, loading, fromDate, toD
         </div>
       )}
 
+      {/* DRILL-DOWN MODAL */}
+      {drillDown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={function () { setDrillDown(null) }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6" onClick={function (e) { e.stopPropagation() }}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">{drillDown.name}</h3>
+                <p className="text-xs text-gray-400">{drillDown.emp_code} {'\u2022'} {drillDown.dept}</p>
+              </div>
+              <button onClick={function () { setDrillDown(null) }} className="text-gray-400 hover:text-gray-600 text-xl font-bold">{'\u00D7'}</button>
+            </div>
+            <div className="mb-4">
+              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Concern Score</p>
+              <p className={'text-3xl font-bold ' + (drillDown.score >= 50 ? 'text-red-600' : drillDown.score >= 25 ? 'text-amber-600' : 'text-blue-600')}>{drillDown.score}</p>
+            </div>
+
+            {/* Timing details */}
+            {drillDown.raw.timing && (
+              <div className="mb-4 bg-purple-50 rounded-lg p-3">
+                <p className="text-xs font-bold text-purple-700 mb-2">{'\u{1F551}'} Punch Timing</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-purple-900">
+                  <span>Avg In: <b>{fmtSecs(drillDown.raw.timing.avg_in_secs)}</b></span>
+                  <span>Avg Out: <b>{fmtSecs(drillDown.raw.timing.avg_out_secs)}</b></span>
+                  <span>Avg Hours: <b>{drillDown.raw.timing.avg_hours}h</b></span>
+                  <span>Days Worked: <b>{drillDown.raw.timing.days_worked}</b></span>
+                  <span>Min Hours: <b>{drillDown.raw.timing.min_hours}h</b></span>
+                  <span>Max Hours: <b>{drillDown.raw.timing.max_hours}h</b></span>
+                </div>
+              </div>
+            )}
+
+            {/* Attendance details */}
+            {drillDown.raw.monthly && (
+              <div className="mb-4 bg-red-50 rounded-lg p-3">
+                <p className="text-xs font-bold text-red-700 mb-2">{'\u{1F4CB}'} Attendance</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-red-900">
+                  <span>Present: <b>{drillDown.raw.monthly.days_present}</b></span>
+                  <span>Absent: <b>{drillDown.raw.monthly.days_absent}</b></span>
+                  <span>Half Days: <b>{drillDown.raw.monthly.days_half || 0}</b></span>
+                  <span>Incomplete: <b>{drillDown.raw.monthly.days_incomplete || 0}</b></span>
+                  <span>Total Hours: <b>{drillDown.raw.monthly.total_hours}h</b></span>
+                  <span>Effective Days: <b>{drillDown.raw.monthly.effective_days}</b></span>
+                </div>
+              </div>
+            )}
+
+            {/* DAR details */}
+            {drillDown.raw.dar && (
+              <div className="mb-4 bg-blue-50 rounded-lg p-3">
+                <p className="text-xs font-bold text-blue-700 mb-2">{'\u{1F4DD}'} DAR Compliance</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-blue-900">
+                  <span>Compliance: <b>{drillDown.raw.dar.compliance_pct}%</b></span>
+                  <span>Submitted: <b>{drillDown.raw.dar.days_submitted}</b></span>
+                  <span>Days Present: <b>{drillDown.raw.dar.days_present}</b></span>
+                  <span>Missing: <b>{Math.max(0, (drillDown.raw.dar.days_present || 0) - (drillDown.raw.dar.days_submitted || 0))}</b></span>
+                </div>
+              </div>
+            )}
+
+            {/* Concern breakdown */}
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase mb-2">Score Breakdown</p>
+              <div className="space-y-1.5">
+                {drillDown.concerns.sort(function (a, b) { return b.severity - a.severity }).map(function (c, i) {
+                  var colors = CONCERN_COLORS[c.type] || CONCERN_COLORS.attendance
+                  return (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span>{colors.icon}</span>
+                        <span className={colors.text + ' font-semibold'}>{c.label}</span>
+                        <span className="text-gray-400">{c.detail}</span>
+                      </div>
+                      <span className="font-bold text-gray-700">+{Math.round(c.severity)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mt-5 bg-gray-50 border border-gray-200 rounded-xl p-4">
         <h3 className="text-xs font-bold text-gray-600 mb-2">Scoring criteria</h3>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[10px] text-gray-500">
-          <span>{'\u{1F551}'} Late punch-in (after 12 PM): up to 30 pts</span>
-          <span>{'\u{1F4CB}'} Attendance below 50%: 35 pts</span>
-          <span>{'\u{23F1}'} Avg hours below 6h: 25 pts</span>
-          <span>{'\u{1F4CB}'} Attendance below 75%: 20 pts</span>
-          <span>{'\u{23F1}'} Avg hours below 8h: 10 pts</span>
-          <span>{'\u{1F4DD}'} DAR compliance below 30%: 25 pts</span>
-          <span>{'\u{1F4CB}'} 3+ incomplete days: 15 pts</span>
-          <span>{'\u{1F4DD}'} DAR compliance below 70%: 12 pts</span>
+          <span>{'\u{1F551}'} Late punch-in (after {th.lateAfterHour > 12 ? (th.lateAfterHour - 12) + ' PM' : th.lateAfterHour + ' AM'}): up to 30 pts</span>
+          <span>{'\u{1F4CB}'} Attendance below {th.criticalAtt}%: 35 pts</span>
+          <span>{'\u{23F1}'} Avg hours below {th.criticalHrs}h: 25 pts</span>
+          <span>{'\u{1F4CB}'} Attendance below {th.lowAtt}%: 20 pts</span>
+          <span>{'\u{23F1}'} Avg hours below {th.lowHrs}h: 10 pts</span>
+          <span>{'\u{1F4DD}'} DAR compliance below {th.criticalDar}%: 25 pts</span>
+          <span>{'\u{1F4CB}'} {th.incompleteMin}+ incomplete days: 15 pts</span>
+          <span>{'\u{1F4DD}'} DAR compliance below {th.lowDar}%: 12 pts</span>
         </div>
       </div>
     </>
   )
 }
 
+/* ========================== DEPT AGGREGATION (reusable) ========================== */
+function DeptAggregation({ data, label, getValue, colorFn, suffix, domain }) {
+  var deptMap = {}
+  data.forEach(function (r) {
+    var dn = r.department_name || 'Unknown'
+    if (!deptMap[dn]) deptMap[dn] = []
+    deptMap[dn].push(r)
+  })
+  var deptData = Object.keys(deptMap).map(function (dn) {
+    var val = getValue(deptMap[dn])
+    return { name: dn, value: val, count: deptMap[dn].length, fill: colorFn(val) }
+  }).sort(function (a, b) { return a.value - b.value })
+
+  if (deptData.length <= 1) return null
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-5">
+      <h3 className="text-sm font-bold text-gray-700 mb-3">{label}</h3>
+      <ResponsiveContainer width="100%" height={Math.max(deptData.length * 40, 120)}>
+        <BarChart data={deptData} layout="vertical" margin={{ left: 110, right: 40, top: 5, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+          <XAxis type="number" domain={domain} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + suffix }} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+          <Tooltip formatter={function (v) { return v + suffix }} />
+          <Bar dataKey="value" barSize={18} radius={[0, 4, 4, 0]}>
+            {deptData.map(function (d, i) { return <Cell key={i} fill={d.fill} /> })}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 /* ========================== SHARED COMPONENTS ========================== */
 
-function StatCard({ label, value, color }) {
+function StatCard({ label, value, color, delta, prev }) {
+  var showDelta = delta != null && delta !== 0
+  var showPrev = !showDelta && prev != null
   return (
     <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
-      <p className={'text-2xl font-bold ' + (color || 'text-gray-900')}>{value}</p>
+      <div className="flex items-end gap-2">
+        <p className={'text-2xl font-bold ' + (color || 'text-gray-900')}>{value}</p>
+        {showDelta && (
+          <span className={'text-[10px] font-bold mb-1 ' + (delta > 0 ? 'text-emerald-600' : 'text-red-600')}>
+            {delta > 0 ? '\u2191' : '\u2193'}{Math.abs(delta)}%
+          </span>
+        )}
+        {showPrev && prev !== value && (
+          <span className="text-[10px] text-gray-400 mb-1">was {prev}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ThresholdInput({ label, value, min, max, onChange }) {
+  return (
+    <div>
+      <label className="text-[10px] font-semibold text-gray-500 block mb-1">{label}</label>
+      <input type="range" min={min} max={max} value={value}
+        onChange={function (e) { onChange(e.target.value) }}
+        className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-slate-700" />
+      <span className="text-[10px] font-bold text-slate-700">{value}</span>
     </div>
   )
 }
@@ -895,24 +1162,24 @@ function Loader() {
   )
 }
 
-function ExportBtn({ onClick }) {
+function ExportGroup({ onCSV, onDocx }) {
   return (
-    <button onClick={onClick}
-      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
-      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-      </svg>
-      CSV
-    </button>
-  )
-}
-
-function ShowAllToggle({ count, expanded, onToggle }) {
-  return (
-    <button onClick={onToggle}
-      className="w-full mt-2 py-2 text-xs font-semibold text-slate-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-      {expanded ? 'Show top ' + TABLE_PREVIEW + ' only' : 'Show all ' + count + ' employees \u2193'}
-    </button>
+    <div className="flex items-center gap-1">
+      <button onClick={onCSV}
+        className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        CSV
+      </button>
+      <button onClick={onDocx}
+        className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        DOCX
+      </button>
+    </div>
   )
 }
 
@@ -930,7 +1197,7 @@ function DataTable({ headers, rows, sortCol, sortDir, onSort }) {
                     (onSort ? 'cursor-pointer hover:text-gray-800 ' : '') +
                     (active ? 'text-slate-800' : 'text-gray-500')}>
                   {h}
-                  {active && <span className="ml-1 text-[9px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                  {active && <span className="ml-1 text-[9px]">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>}
                 </th>
               )
             })}
