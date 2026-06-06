@@ -393,7 +393,7 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
       <StatCard label="90%+ Compliance" value={full} color="text-blue-600" />
       <StatCard label="Below 50%" value={low} color="text-red-600" />
     </div>
-    <DataTable headers={['Employee', 'Dept', 'Compliance', 'Submitted', 'Days Present', 'Missing']} rows={tableRows} sortCol={sortCol} sortDir={sortDir} onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }} />
+    <DataTable headers={['Employee', 'Dept', 'Compliance', 'Submitted', 'Days Present', lag > 0 ? 'Pending' : 'Missing']} rows={tableRows} sortCol={sortCol} sortDir={sortDir} onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }} />
     <div className="bg-white border border-gray-200 rounded-xl p-5 mt-5">
       <h3 className="text-sm font-bold text-gray-700 mb-4">DAR submission rate by employee (lowest first)</h3>
       <ResponsiveContainer width="100%" height={Math.max(filtered.length * 28, 200)}>
