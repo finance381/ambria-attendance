@@ -393,7 +393,7 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
   var totalAbsent = filtered.reduce(function (s, r) { return s + (r.days_absent || 0) }, 0)
   var totalInc = filtered.reduce(function (s, r) { return s + (r.days_incomplete || 0) }, 0)
   var totalEffective = filtered.reduce(function (s, r) { return s + (r.effective_days || 0) }, 0)
-  var overallPct = totalEffective > 0 ? Math.round((totalPresent / totalEffective) * 100) : 0
+  var overallPct = totalEffective > 0 ? Math.round(((totalPresent + totalHalf * 0.5) / totalEffective) * 100) : 0
 
   var pieData = [
     { name: 'Present', value: totalPresent, color: COLORS.emerald },
@@ -425,7 +425,7 @@ function AttendanceView({ data, loading, month, year, fromDate, toDate }) {
 
   var ATT_SORT_KEYS = ['name', 'department_name', '_pct', 'days_present', 'days_half', 'days_absent', 'days_incomplete', 'total_hours']
   var withPct = filtered.map(function (r) {
-    return { ...r, _pct: r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0 }
+    return { ...r, _pct: r.attendance_pct != null ? r.attendance_pct : (r.effective_days > 0 ? Math.round(((r.days_present + r.days_half * 0.5) / r.effective_days) * 100) : 0) }
   })
   var sortedAtt = sortCol !== null ? withPct.slice().sort(function (a, b) {
     var key = ATT_SORT_KEYS[sortCol]
