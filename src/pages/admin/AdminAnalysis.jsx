@@ -353,9 +353,8 @@ function HoursView({ data, prevData, loading, month, year, fromDate, toDate, doc
 function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null); var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
-  var bufDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-  var lag = toDate > bufDate ? 1 : 0
-  var isRecent = lag > 0
+  var lag = 0
+  var isRecent = toDate >= new Date().toISOString().slice(0, 10)
   var filtered = data.map(function (r) {
     if (lag === 0) return r
     var adjPresent = Math.max(0, (r.days_present || 0) - lag)
