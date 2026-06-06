@@ -832,13 +832,6 @@ function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMo
   ;(timingData || []).forEach(function (r) {
     var e = getEmp(r.emp_code, r.name, r.department_name)
     e.raw.timing = r
-    if (r.avg_hours > 0 && r.avg_hours < th.criticalHrs) {
-      e.concerns.push({ type: 'timing', label: 'Very low avg hours', detail: r.avg_hours + 'h/day', severity: 25 })
-      e.score += 25
-    } else if (r.avg_hours > 0 && r.avg_hours < th.lowHrs) {
-      e.concerns.push({ type: 'timing', label: 'Below target hours', detail: r.avg_hours + 'h/day', severity: 10 })
-      e.score += 10
-    }
   })
 
   ;(monthlyData || []).filter(function (r) { return !r.is_casual }).forEach(function (r) {
@@ -858,11 +851,13 @@ function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMo
     }
     var workDays = (r.days_present || 0) + (r.days_half || 0)
     var avgDaily = workDays > 0 ? Math.round((r.total_hours / workDays) * 10) / 10 : 0
-    if (workDays > 0 && avgDaily < th.criticalHrs) {
-      e.concerns.push({ type: 'hours', label: 'Very low daily hours', detail: avgDaily + 'h avg (' + r.total_hours + 'h total)', severity: 25 })
+    var empTarget = r.expected_hours || th.lowHrs
+    var empCritical = r.expected_hours ? Math.round(r.expected_hours * 0.6 * 10) / 10 : th.criticalHrs
+    if (workDays > 0 && avgDaily < empCritical) {
+      e.concerns.push({ type: 'hours', label: 'Very low daily hours', detail: avgDaily + 'h avg (target ' + empTarget + 'h)', severity: 25 })
       e.score += 25
-    } else if (workDays > 0 && avgDaily < th.lowHrs) {
-      e.concerns.push({ type: 'hours', label: 'Below ' + th.lowHrs + 'h daily target', detail: avgDaily + 'h avg', severity: 10 })
+    } else if (workDays > 0 && avgDaily < empTarget) {
+      e.concerns.push({ type: 'hours', label: 'Below ' + empTarget + 'h daily target', detail: avgDaily + 'h avg', severity: 10 })
       e.score += 10
     }
   })
