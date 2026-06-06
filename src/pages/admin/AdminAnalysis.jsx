@@ -546,7 +546,8 @@ function HoursView({ data, loading, month, year, fromDate, toDate }) {
 
   var filtered = data.filter(function (r) { return !r.is_casual && r.effective_days > 0 })
   var withAvg = filtered.map(function (r) {
-    return { ...r, avgDaily: r.days_present > 0 ? Math.round((r.total_hours / r.days_present) * 10) / 10 : 0 }
+    var workDays = (r.days_present || 0) + (r.days_half || 0)
+    return { ...r, avgDaily: workDays > 0 ? Math.round((r.total_hours / workDays) * 10) / 10 : 0 }
   })
   withAvg.sort(function (a, b) { return a.avgDaily - b.avgDaily })
 
