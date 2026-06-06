@@ -353,8 +353,8 @@ function HoursView({ data, prevData, loading, month, year, fromDate, toDate, doc
 function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null); var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
-  var bufDate = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
-  var lag = toDate > bufDate ? Math.min(2, Math.round((new Date(toDate + 'T00:00:00') - new Date(bufDate + 'T00:00:00')) / 86400000)) : 0
+  var bufDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  var lag = toDate > bufDate ? 1 : 0
   var isRecent = lag > 0
   var filtered = data.map(function (r) {
     if (lag === 0) return r
