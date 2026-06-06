@@ -700,7 +700,14 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
   var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
 
-  var filtered = data.slice()
+  var bufferDate = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+  var darLagDays = toDate > bufferDate ? Math.min(2, Math.round((new Date(toDate + 'T00:00:00') - new Date(bufferDate + 'T00:00:00')) / 86400000)) : 0
+
+  var filtered = data.map(function (r) {
+    var adjPresent = Math.max(0, (r.days_present || 0) - darLagDays)
+    var adjPct = adjPresent > 0 ? Math.round((r.days_submitted || 0) / adjPresent * 100) : (r.days_present > 0 ? r.compliance_pct : 100)
+    return { ...r, days_present: adjPresent, compliance_pct: Math.min(adjPct, 100) }
+  })
   filtered.sort(function (a, b) { return a.compliance_pct - b.compliance_pct })
 
   var totalPresent = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
@@ -795,7 +802,6 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
 
 /* ========================== CONCERNS VIEW ========================== */
 var DEFAULT_THRESHOLDS = {
-  lateAfterHour: 12,
   lowHrs: 8,
   criticalHrs: 6,
   lowAtt: 75,
@@ -815,7 +821,6 @@ function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMo
   var to = new Date(toDate + 'T00:00:00')
   var rangeDays = Math.round((to - from) / 86400000) + 1
   var th = thresholds
-  var lateAfterSecs = th.lateAfterHour * 3600
 
   // Build per-employee concern scores
   var empMap = {}
@@ -827,11 +832,6 @@ function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMo
   ;(timingData || []).forEach(function (r) {
     var e = getEmp(r.emp_code, r.name, r.department_name)
     e.raw.timing = r
-    if (r.avg_in_secs > lateAfterSecs) {
-      var lateness = Math.round((r.avg_in_secs - lateAfterSecs) / 3600 * 10) / 10
-      e.concerns.push({ type: 'timing', label: 'Late avg punch-in', detail: fmtSecs(r.avg_in_secs), severity: Math.min(lateness * 15, 30) })
-      e.score += Math.min(lateness * 15, 30)
-    }
     if (r.avg_hours > 0 && r.avg_hours < th.criticalHrs) {
       e.concerns.push({ type: 'timing', label: 'Very low avg hours', detail: r.avg_hours + 'h/day', severity: 25 })
       e.score += 25
@@ -867,14 +867,21 @@ function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMo
     }
   })
 
+  // DAR buffer: last 2 days won't have DARs yet (nightly consolidation lag)
+  var todayDate = new Date().toISOString().slice(0, 10)
+  var bufferDate = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+  var darLagDays = toDate > bufferDate ? Math.min(2, Math.round((new Date(toDate + 'T00:00:00') - new Date(bufferDate + 'T00:00:00')) / 86400000)) : 0
+
   ;(darData || []).forEach(function (r) {
     var e = getEmp(r.emp_code, r.name, r.department_name)
-    e.raw.dar = r
-    if (r.compliance_pct < th.criticalDar) {
-      e.concerns.push({ type: 'dar', label: 'Critical DAR compliance', detail: r.compliance_pct + '% (' + (r.days_submitted || 0) + '/' + (r.days_present || 0) + ')', severity: 25 })
+    var adjPresent = Math.max(0, (r.days_present || 0) - darLagDays)
+    var adjPct = adjPresent > 0 ? Math.round((r.days_submitted || 0) / adjPresent * 100) : 100
+    e.raw.dar = { ...r, adj_compliance_pct: adjPct, adj_days_present: adjPresent }
+    if (adjPct < th.criticalDar) {
+      e.concerns.push({ type: 'dar', label: 'Critical DAR compliance', detail: adjPct + '% (' + (r.days_submitted || 0) + '/' + adjPresent + ')', severity: 25 })
       e.score += 25
-    } else if (r.compliance_pct < th.lowDar) {
-      e.concerns.push({ type: 'dar', label: 'Low DAR compliance', detail: r.compliance_pct + '% (' + (r.days_submitted || 0) + '/' + (r.days_present || 0) + ')', severity: 12 })
+    } else if (adjPct < th.lowDar) {
+      e.concerns.push({ type: 'dar', label: 'Low DAR compliance', detail: adjPct + '% (' + (r.days_submitted || 0) + '/' + adjPresent + ')', severity: 12 })
       e.score += 12
     }
   })
@@ -927,8 +934,7 @@ function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMo
       {showSettings && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
           <div className="grid grid-cols-4 gap-4 text-xs">
-            <ThresholdInput label="Late after (hour)" value={th.lateAfterHour} min={8} max={18} onChange={function (v) { updateThreshold('lateAfterHour', v) }} />
-            <ThresholdInput label={'Low hours (<' + th.lowHrs + 'h)'} value={th.lowHrs} min={4} max={12} onChange={function (v) { updateThreshold('lowHrs', v) }} />
+            <ThresholdInput label={'Low hours (<' + th.lowHrs + 'h)'} value={th.lowHrs} />
             <ThresholdInput label={'Critical hours (<' + th.criticalHrs + 'h)'} value={th.criticalHrs} min={2} max={8} onChange={function (v) { updateThreshold('criticalHrs', v) }} />
             <ThresholdInput label={'Low att% (<' + th.lowAtt + '%)'} value={th.lowAtt} min={50} max={95} onChange={function (v) { updateThreshold('lowAtt', v) }} />
             <ThresholdInput label={'Critical att% (<' + th.criticalAtt + '%)'} value={th.criticalAtt} min={20} max={70} onChange={function (v) { updateThreshold('criticalAtt', v) }} />
@@ -1072,7 +1078,6 @@ function ConcernsView({ timingData, monthlyData, darData, prevTimingData, prevMo
       <div className="mt-5 bg-gray-50 border border-gray-200 rounded-xl p-4">
         <h3 className="text-xs font-bold text-gray-600 mb-2">Scoring criteria</h3>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[10px] text-gray-500">
-          <span>{'\u{1F551}'} Late punch-in (after {th.lateAfterHour > 12 ? (th.lateAfterHour - 12) + ' PM' : th.lateAfterHour + ' AM'}): up to 30 pts</span>
           <span>{'\u{1F4CB}'} Attendance below {th.criticalAtt}%: 35 pts</span>
           <span>{'\u{23F1}'} Avg hours below {th.criticalHrs}h: 25 pts</span>
           <span>{'\u{1F4CB}'} Attendance below {th.lowAtt}%: 20 pts</span>
