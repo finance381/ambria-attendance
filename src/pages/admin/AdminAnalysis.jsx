@@ -353,8 +353,16 @@ function HoursView({ data, prevData, loading, month, year, fromDate, toDate, doc
 function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxOpts }) {
   var [sortCol, setSortCol] = useState(null); var [sortDir, setSortDir] = useState('asc')
   if (loading) return <Loader />
-  var isRecent = toDate >= new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
-  var filtered = data.slice()
+  var bufDate = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+  var lag = toDate > bufDate ? Math.min(2, Math.round((new Date(toDate + 'T00:00:00') - new Date(bufDate + 'T00:00:00')) / 86400000)) : 0
+  var isRecent = lag > 0
+  var filtered = data.map(function (r) {
+    if (lag === 0) return r
+    var ap = Math.max(0, (r.days_present || 0) - lag)
+    var as = Math.min(r.days_submitted || 0, ap)
+    var pc = ap > 0 ? Math.round(as / ap * 100) : 100
+    return { ...r, days_present: ap, days_submitted: as, compliance_pct: pc }
+  })
   filtered.sort(function (a, b) { return a.compliance_pct - b.compliance_pct })
   var totalP = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
   var totalS = filtered.reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
