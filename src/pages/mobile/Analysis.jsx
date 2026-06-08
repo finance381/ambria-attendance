@@ -44,7 +44,7 @@ function DonutChart({ pct, size, color, stroke }) {
   stroke = stroke || 4
   var r = (size - stroke) / 2
   var circ = 2 * Math.PI * r
-  var offset = circ - (pct / 100) * circ
+  var offset = circ - (Math.min(pct, 100) / 100) * circ
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
@@ -55,26 +55,7 @@ function DonutChart({ pct, size, color, stroke }) {
   )
 }
 
-function MiniBar({ values, max, height, colors }) {
-  height = height || 32
-  var barW = Math.max(2, Math.floor(100 / (values.length || 1)) - 1)
-  if (barW > 6) barW = 6
-  var gap = 1
-  var totalW = values.length * (barW + gap)
-  return (
-    <svg width={totalW} height={height} viewBox={'0 0 ' + totalW + ' ' + height}>
-      {values.map(function (v, i) {
-        var h = max > 0 ? (v / max) * (height - 2) : 0
-        var c = colors ? colors[i] : '#94a3b8'
-        return <rect key={i} x={i * (barW + gap)} y={height - h - 1} width={barW} height={Math.max(h, 1)}
-          rx={1} fill={c} opacity={0.85} />
-      })}
-    </svg>
-  )
-}
-
 function TimeRangeBar({ inSecs, outSecs }) {
-  // Map 6AM-11PM (21600-82800) to 0-100%
   var minT = 21600, maxT = 82800, span = maxT - minT
   var left = Math.max(0, Math.min(100, ((inSecs - minT) / span) * 100))
   var right = Math.max(0, Math.min(100, ((outSecs - minT) / span) * 100))
@@ -223,7 +204,10 @@ export default function Analysis() {
     { key: 'dar', label: 'DARs', emoji: '📝' },
   ]
 
-  var isLoading = (view === 'timing' && timingLoading) || ((view === 'attendance' || view === 'hours') && monthlyLoading) || (view === 'dar' && darLoading)
+  var isLoading = (view === 'timing' && timingLoading) ||
+    ((view === 'attendance' || view === 'hours') && monthlyLoading) ||
+    (view === 'dar' && darLoading) ||
+    (view === 'concerns' && (timingLoading || monthlyLoading || darLoading))
 
   return (
     <div className="pb-4">
@@ -291,6 +275,110 @@ export default function Analysis() {
         </div>
       )}
 
+      {/* ─── CONCERNS VIEW ─── */}
+      {view === 'concerns' && !timingLoading && !monthlyLoading && !darLoading && (function () {
+        var empMap = {}
+        function getEmp(id, name, code, dept) {
+          if (!empMap[id]) empMap[id] = { id: id, name: name, emp_code: code, department_name: dept, score: 0, tags: [] }
+          return empMap[id]
+        }
+
+        timingData.forEach(function (r) {
+          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
+          var avgInHr = (r.avg_in_secs || 0) / 3600
+          if (avgInHr >= 12) { e.score += 30; e.tags.push({ label: 'Late arrival', color: '#dc2626' }) }
+          else if (avgInHr >= 11) { e.score += 15; e.tags.push({ label: 'Late-ish', color: '#f97316' }) }
+          if (r.avg_hours < 6) { e.score += 25; e.tags.push({ label: 'Very low hours', color: '#dc2626' }) }
+          else if (r.avg_hours < 8) { e.score += 10; e.tags.push({ label: 'Low hours', color: '#d97706' }) }
+        })
+
+        monthlyData.filter(function (r) { return !r.is_casual && r.effective_days > 0 }).forEach(function (r) {
+          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
+          var attPct = ((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100
+          if (attPct < 50) { e.score += 35; e.tags.push({ label: 'Critical attendance', color: '#dc2626' }) }
+          else if (attPct < 75) { e.score += 20; e.tags.push({ label: 'Low attendance', color: '#f97316' }) }
+          if ((r.days_incomplete || 0) >= 3) { e.score += 15; e.tags.push({ label: r.days_incomplete + ' incomplete', color: '#d97706' }) }
+          var daysWorked = (r.days_present || 0) + (r.days_half || 0)
+          var avgH = daysWorked > 0 ? r.total_hours / daysWorked : 0
+          if (avgH > 0 && avgH < 6) { e.score += 25; e.tags.push({ label: 'Avg <6h', color: '#dc2626' }) }
+          else if (avgH > 0 && avgH < 8) { e.score += 10; e.tags.push({ label: 'Avg <8h', color: '#d97706' }) }
+        })
+
+        darData.forEach(function (r) {
+          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
+          if (r.compliance_pct < 30) { e.score += 25; e.tags.push({ label: 'DAR <30%', color: '#dc2626' }) }
+          else if (r.compliance_pct < 70) { e.score += 12; e.tags.push({ label: 'DAR <70%', color: '#d97706' }) }
+        })
+
+        var ranked = Object.values(empMap).filter(function (e) { return e.score > 0 })
+        ranked.sort(function (a, b) { return b.score - a.score })
+        var top10 = ranked.slice(0, 10)
+        var maxScore = top10.length > 0 ? top10[0].score : 100
+
+        return (
+          <>
+            <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Top Concerns · {MONTHS[month - 1]} {year}</p>
+              <p className="text-[10px] text-slate-400">Employees ranked by composite concern score across timing, attendance, hours, and DAR compliance.</p>
+            </div>
+
+            {top10.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No concerns this period 🎉</p>}
+
+            <div className="space-y-1.5">
+              {top10.map(function (e, i) {
+                var barPct = maxScore > 0 ? Math.round((e.score / maxScore) * 100) : 0
+                var barColor = e.score >= 60 ? '#dc2626' : e.score >= 30 ? '#f97316' : '#d97706'
+                return (
+                  <div key={e.id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
+                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold text-white flex-shrink-0"
+                        style={{ background: barColor }}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[13px] font-bold text-slate-800 truncate">{e.name}</p>
+                          <p className="text-sm font-extrabold" style={{ color: barColor }}>{Math.round(e.score)}</p>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium">{e.emp_code} · {e.department_name || ''}</p>
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
+                          <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: barPct + '%', background: barColor }} />
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {e.tags.map(function (t, ti) {
+                            return (
+                              <span key={ti} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                                style={{ background: t.color, opacity: 0.85 }}>
+                                {t.label}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-4 bg-slate-50 border border-slate-100 rounded-2xl p-3">
+              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Scoring Criteria</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] text-slate-500">
+                <span>Late arrival (after 12PM): <strong>30</strong></span>
+                <span>Critical attend (&lt;50%): <strong>35</strong></span>
+                <span>Very low hours (&lt;6h): <strong>25</strong></span>
+                <span>DAR &lt;30%: <strong>25</strong></span>
+                <span>Low attendance (&lt;75%): <strong>20</strong></span>
+                <span>3+ incomplete days: <strong>15</strong></span>
+                <span>DAR &lt;70%: <strong>12</strong></span>
+                <span>Low hours (&lt;8h): <strong>10</strong></span>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+
       {/* ─── TIMING VIEW ─── */}
       {view === 'timing' && !timingLoading && (function () {
         var filtered = filterBySearch(timingData)
@@ -298,8 +386,7 @@ export default function Analysis() {
         var avgOut = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_out_secs || 0) }, 0) / filtered.length) : 0
         var avgHrs = filtered.length > 0 ? Math.round(filtered.reduce(function (s, r) { return s + (r.avg_hours || 0) }, 0) / filtered.length * 10) / 10 : 0
 
-        // Build distribution of in-times (hourly buckets 6AM-1PM)
-        var inBuckets = new Array(8).fill(0) // 6,7,8,9,10,11,12,1PM
+        var inBuckets = new Array(8).fill(0)
         filtered.forEach(function (r) {
           var h = Math.floor((r.avg_in_secs || 0) / 3600)
           var idx = Math.max(0, Math.min(7, h - 6))
@@ -315,7 +402,6 @@ export default function Analysis() {
               <StatCard label="Avg Hrs" value={avgHrs + 'h'} color="#3b82f6" icon="⏱" />
             </div>
 
-            {/* In-time distribution mini chart */}
             {filtered.length > 0 && (
               <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Punch-In Distribution</p>
@@ -339,7 +425,6 @@ export default function Analysis() {
               </div>
             )}
 
-            {/* Employee cards */}
             <div className="space-y-1.5">
               {filtered.map(function (r) {
                 return (
@@ -374,8 +459,8 @@ export default function Analysis() {
       {view === 'attendance' && !monthlyLoading && (function () {
         var filtered = filterBySearch(monthlyData).filter(function (r) { return !r.is_casual })
         filtered.sort(function (a, b) {
-          var pctA = a.effective_days > 0 ? a.days_present / a.effective_days : 0
-          var pctB = b.effective_days > 0 ? b.days_present / b.effective_days : 0
+          var pctA = a.effective_days > 0 ? (a.days_present + (a.days_half || 0) * 0.5) / a.effective_days : 0
+          var pctB = b.effective_days > 0 ? (b.days_present + (b.days_half || 0) * 0.5) / b.effective_days : 0
           return pctA - pctB
         })
 
@@ -383,10 +468,9 @@ export default function Analysis() {
         var totalEffective = filtered.reduce(function (s, r) { return s + (r.effective_days || 0) }, 0)
         var overallPct = totalEffective > 0 ? Math.round((totalPresent / totalEffective) * 100) : 0
 
-        // Build attendance % distribution buckets
-        var attBuckets = [0, 0, 0, 0, 0] // <60, 60-74, 75-84, 85-94, 95-100
+        var attBuckets = [0, 0, 0, 0, 0]
         filtered.forEach(function (r) {
-          var p = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
+          var p = r.attendance_pct != null ? r.attendance_pct : (r.effective_days > 0 ? Math.round(((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100) : 0)
           if (p < 60) attBuckets[0]++
           else if (p < 75) attBuckets[1]++
           else if (p < 85) attBuckets[2]++
@@ -411,7 +495,6 @@ export default function Analysis() {
               <StatCard label="Absent" value={filtered.reduce(function (s, r) { return s + (r.days_absent || 0) }, 0)} color="#dc2626" icon="✕" />
             </div>
 
-            {/* Attendance distribution chart */}
             {filtered.length > 0 && (
               <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Attendance Distribution</p>
@@ -483,7 +566,6 @@ export default function Analysis() {
         var below8 = avgHrsPerPerson.filter(function (r) { return r.avgDaily < 8 }).length
         var above10 = avgHrsPerPerson.filter(function (r) { return r.avgDaily >= 10 }).length
 
-        // Build hour distribution for mini chart
         var hrValues = avgHrsPerPerson.map(function (r) { return r.avgDaily })
         var hrColors = avgHrsPerPerson.map(function (r) { return hrsColor(r.avgDaily) })
         var maxHr = hrValues.length > 0 ? Math.max.apply(null, hrValues) : 14
@@ -496,7 +578,6 @@ export default function Analysis() {
               <StatCard label="≥ 10h Avg" value={above10} color="#059669" icon="💪" />
             </div>
 
-            {/* Hours distribution bar */}
             {hrValues.length > 0 && (
               <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Hours per Person (sorted low→high)</p>
@@ -564,7 +645,7 @@ export default function Analysis() {
 
         var totalPresent = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
         var totalSubmitted = filtered.reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
-        var overallPct = totalPresent > 0 ? Math.round((totalSubmitted / totalPresent) * 100) : 0
+        var overallPct = totalPresent > 0 ? Math.min(100, Math.round((totalSubmitted / totalPresent) * 100)) : 0
         var perfect = filtered.filter(function (r) { return r.compliance_pct >= 100 }).length
         var zero = filtered.filter(function (r) { return r.compliance_pct === 0 }).length
         var isRecent = year === now.getFullYear() && month === now.getMonth() + 1
@@ -612,117 +693,6 @@ export default function Analysis() {
                 )
               })}
               {filtered.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No data</p>}
-            </div>
-          </>
-        )
-      })()}
-
-      {/* ─── CONCERNS VIEW ─── */}
-      {view === 'concerns' && !timingLoading && !monthlyLoading && !darLoading && (function () {
-        // Build employee map from all data sources
-        var empMap = {}
-        function getEmp(id, name, code, dept) {
-          if (!empMap[id]) empMap[id] = { id: id, name: name, emp_code: code, department_name: dept, score: 0, tags: [] }
-          return empMap[id]
-        }
-
-        // Score from timing
-        timingData.forEach(function (r) {
-          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
-          var avgInHr = (r.avg_in_secs || 0) / 3600
-          if (avgInHr >= 12) { e.score += 30; e.tags.push({ label: 'Late arrival', color: '#dc2626' }) }
-          else if (avgInHr >= 11) { e.score += 15; e.tags.push({ label: 'Late-ish', color: '#f97316' }) }
-          if (r.avg_hours < 6) { e.score += 25; e.tags.push({ label: 'Very low hours', color: '#dc2626' }) }
-          else if (r.avg_hours < 8) { e.score += 10; e.tags.push({ label: 'Low hours', color: '#d97706' }) }
-        })
-
-        // Score from monthly (attendance)
-        monthlyData.filter(function (r) { return !r.is_casual && r.effective_days > 0 }).forEach(function (r) {
-          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
-          var attPct = ((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100
-          if (attPct < 50) { e.score += 35; e.tags.push({ label: 'Critical attendance', color: '#dc2626' }) }
-          else if (attPct < 75) { e.score += 20; e.tags.push({ label: 'Low attendance', color: '#f97316' }) }
-          if ((r.days_incomplete || 0) >= 3) { e.score += 15; e.tags.push({ label: r.days_incomplete + ' incomplete', color: '#d97706' }) }
-          var daysWorked = (r.days_present || 0) + (r.days_half || 0)
-          var avgH = daysWorked > 0 ? r.total_hours / daysWorked : 0
-          if (avgH > 0 && avgH < 6) { e.score += 25; e.tags.push({ label: 'Avg <6h', color: '#dc2626' }) }
-          else if (avgH > 0 && avgH < 8) { e.score += 10; e.tags.push({ label: 'Avg <8h', color: '#d97706' }) }
-        })
-
-        // Score from DAR
-        darData.forEach(function (r) {
-          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
-          if (r.compliance_pct < 30) { e.score += 25; e.tags.push({ label: 'DAR <30%', color: '#dc2626' }) }
-          else if (r.compliance_pct < 70) { e.score += 12; e.tags.push({ label: 'DAR <70%', color: '#d97706' }) }
-        })
-
-        var ranked = Object.values(empMap).filter(function (e) { return e.score > 0 })
-        ranked.sort(function (a, b) { return b.score - a.score })
-        var top10 = ranked.slice(0, 10)
-        var maxScore = top10.length > 0 ? top10[0].score : 100
-
-        return (
-          <>
-            <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Top Concerns · {MONTHS[month - 1]} {year}</p>
-              <p className="text-[10px] text-slate-400">Employees ranked by composite concern score across timing, attendance, hours, and DAR compliance.</p>
-            </div>
-
-            {top10.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No concerns this period 🎉</p>}
-
-            <div className="space-y-1.5">
-              {top10.map(function (e, i) {
-                var barPct = maxScore > 0 ? Math.round((e.score / maxScore) * 100) : 0
-                var barColor = e.score >= 60 ? '#dc2626' : e.score >= 30 ? '#f97316' : '#d97706'
-                return (
-                  <div key={e.id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
-                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold text-white flex-shrink-0"
-                        style={{ background: barColor }}>
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[13px] font-bold text-slate-800 truncate">{e.name}</p>
-                          <p className="text-sm font-extrabold" style={{ color: barColor }}>{Math.round(e.score)}</p>
-                        </div>
-                        <p className="text-[10px] text-slate-400 font-medium">{e.emp_code} · {e.department_name || ''}</p>
-                        {/* Score bar */}
-                        <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
-                          <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: barPct + '%', background: barColor }} />
-                        </div>
-                        {/* Tags */}
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {e.tags.map(function (t, ti) {
-                            return (
-                              <span key={ti} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
-                                style={{ background: t.color, opacity: 0.85 }}>
-                                {t.label}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Scoring reference */}
-            <div className="mt-4 bg-slate-50 border border-slate-100 rounded-2xl p-3">
-              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Scoring Criteria</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] text-slate-500">
-                <span>Late arrival (after 12PM): <strong>30</strong></span>
-                <span>Critical attend (&lt;50%): <strong>35</strong></span>
-                <span>Very low hours (&lt;6h): <strong>25</strong></span>
-                <span>DAR &lt;30%: <strong>25</strong></span>
-                <span>Low attendance (&lt;75%): <strong>20</strong></span>
-                <span>3+ incomplete days: <strong>15</strong></span>
-                <span>DAR &lt;70%: <strong>12</strong></span>
-                <span>Low hours (&lt;8h): <strong>10</strong></span>
-              </div>
             </div>
           </>
         )
