@@ -112,7 +112,7 @@ export default function Analysis() {
   var now = new Date()
   var [year, setYear] = useState(now.getFullYear())
   var [month, setMonth] = useState(now.getMonth() + 1)
-  var [view, setView] = useState('timing')
+  var [view, setView] = useState('concerns')
   var [depts, setDepts] = useState([])
   var [deptFilter, setDeptFilter] = useState('')
   var [managerDeptIds, setManagerDeptIds] = useState([employee.department_id])
@@ -153,9 +153,13 @@ export default function Analysis() {
       p_year: year, p_month: month,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
-    setTimingData(data || [])
+    var filtered = data || []
+    if (employee.role !== 'admin' && !deptFilter) {
+      filtered = filtered.filter(function (r) { return managerDeptIds.includes(r.department_id) })
+    }
+    setTimingData(filtered)
     setTimingLoading(false)
-  }, [year, month, deptFilter])
+  }, [year, month, deptFilter, managerDeptIds, employee.role])
 
   var loadMonthly = useCallback(async function () {
     setMonthlyLoading(true)
@@ -177,15 +181,20 @@ export default function Analysis() {
       p_year: year, p_month: month,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
-    setDarData(data || [])
+    var filtered = data || []
+    if (employee.role !== 'admin' && !deptFilter) {
+      filtered = filtered.filter(function (r) { return managerDeptIds.includes(r.department_id) })
+    }
+    setDarData(filtered)
     setDarLoading(false)
-  }, [year, month, deptFilter])
+  }, [year, month, deptFilter, managerDeptIds, employee.role])
 
   useEffect(function () {
     if (view === 'timing') loadTiming()
     if (view === 'attendance') loadMonthly()
     if (view === 'hours') loadMonthly()
     if (view === 'dar') loadDAR()
+    if (view === 'concerns') { loadTiming(); loadMonthly(); loadDAR() }
   }, [view, loadTiming, loadMonthly, loadDAR])
 
   function prevMonth() {
@@ -207,6 +216,7 @@ export default function Analysis() {
   }
 
   var views = [
+    { key: 'concerns', label: 'Concerns', emoji: '🚨' },
     { key: 'timing', label: 'Timing', emoji: '⏱' },
     { key: 'attendance', label: 'Attend', emoji: '📊' },
     { key: 'hours', label: 'Hours', emoji: '⏳' },
@@ -369,7 +379,7 @@ export default function Analysis() {
           return pctA - pctB
         })
 
-        var totalPresent = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
+        var totalPresent = filtered.reduce(function (s, r) { return s + (r.days_present || 0) + (r.days_half || 0) * 0.5 }, 0)
         var totalEffective = filtered.reduce(function (s, r) { return s + (r.effective_days || 0) }, 0)
         var overallPct = totalEffective > 0 ? Math.round((totalPresent / totalEffective) * 100) : 0
 
@@ -429,7 +439,7 @@ export default function Analysis() {
 
             <div className="space-y-1.5">
               {filtered.map(function (r) {
-                var pct = r.effective_days > 0 ? Math.round((r.days_present / r.effective_days) * 100) : 0
+                var pct = r.attendance_pct != null ? r.attendance_pct : (r.effective_days > 0 ? Math.round(((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100) : 0)
                 return (
                   <div key={r.employee_id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
                     style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
@@ -463,7 +473,8 @@ export default function Analysis() {
       {view === 'hours' && !monthlyLoading && (function () {
         var filtered = filterBySearch(monthlyData).filter(function (r) { return !r.is_casual && r.effective_days > 0 })
         var avgHrsPerPerson = filtered.map(function (r) {
-          return { ...r, avgDaily: r.days_present > 0 ? Math.round((r.total_hours / r.days_present) * 10) / 10 : 0 }
+          var daysWorked = (r.days_present || 0) + (r.days_half || 0)
+          return { ...r, avgDaily: daysWorked > 0 ? Math.round((r.total_hours / daysWorked) * 10) / 10 : 0 }
         })
         avgHrsPerPerson.sort(function (a, b) { return a.avgDaily - b.avgDaily })
 
@@ -556,9 +567,15 @@ export default function Analysis() {
         var overallPct = totalPresent > 0 ? Math.round((totalSubmitted / totalPresent) * 100) : 0
         var perfect = filtered.filter(function (r) { return r.compliance_pct >= 100 }).length
         var zero = filtered.filter(function (r) { return r.compliance_pct === 0 }).length
+        var isRecent = year === now.getFullYear() && month === now.getMonth() + 1
 
         return (
           <>
+            {isRecent && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+                <p className="text-[10px] text-amber-700 font-medium">🕑 Today's DARs may not be reflected yet (nightly consolidation at 11:20 PM)</p>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2 mb-3">
               <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 px-3 py-3 flex items-center gap-2"
                 style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -595,6 +612,117 @@ export default function Analysis() {
                 )
               })}
               {filtered.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No data</p>}
+            </div>
+          </>
+        )
+      })()}
+
+      {/* ─── CONCERNS VIEW ─── */}
+      {view === 'concerns' && !timingLoading && !monthlyLoading && !darLoading && (function () {
+        // Build employee map from all data sources
+        var empMap = {}
+        function getEmp(id, name, code, dept) {
+          if (!empMap[id]) empMap[id] = { id: id, name: name, emp_code: code, department_name: dept, score: 0, tags: [] }
+          return empMap[id]
+        }
+
+        // Score from timing
+        timingData.forEach(function (r) {
+          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
+          var avgInHr = (r.avg_in_secs || 0) / 3600
+          if (avgInHr >= 12) { e.score += 30; e.tags.push({ label: 'Late arrival', color: '#dc2626' }) }
+          else if (avgInHr >= 11) { e.score += 15; e.tags.push({ label: 'Late-ish', color: '#f97316' }) }
+          if (r.avg_hours < 6) { e.score += 25; e.tags.push({ label: 'Very low hours', color: '#dc2626' }) }
+          else if (r.avg_hours < 8) { e.score += 10; e.tags.push({ label: 'Low hours', color: '#d97706' }) }
+        })
+
+        // Score from monthly (attendance)
+        monthlyData.filter(function (r) { return !r.is_casual && r.effective_days > 0 }).forEach(function (r) {
+          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
+          var attPct = ((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100
+          if (attPct < 50) { e.score += 35; e.tags.push({ label: 'Critical attendance', color: '#dc2626' }) }
+          else if (attPct < 75) { e.score += 20; e.tags.push({ label: 'Low attendance', color: '#f97316' }) }
+          if ((r.days_incomplete || 0) >= 3) { e.score += 15; e.tags.push({ label: r.days_incomplete + ' incomplete', color: '#d97706' }) }
+          var daysWorked = (r.days_present || 0) + (r.days_half || 0)
+          var avgH = daysWorked > 0 ? r.total_hours / daysWorked : 0
+          if (avgH > 0 && avgH < 6) { e.score += 25; e.tags.push({ label: 'Avg <6h', color: '#dc2626' }) }
+          else if (avgH > 0 && avgH < 8) { e.score += 10; e.tags.push({ label: 'Avg <8h', color: '#d97706' }) }
+        })
+
+        // Score from DAR
+        darData.forEach(function (r) {
+          var e = getEmp(r.employee_id, r.name, r.emp_code, r.department_name)
+          if (r.compliance_pct < 30) { e.score += 25; e.tags.push({ label: 'DAR <30%', color: '#dc2626' }) }
+          else if (r.compliance_pct < 70) { e.score += 12; e.tags.push({ label: 'DAR <70%', color: '#d97706' }) }
+        })
+
+        var ranked = Object.values(empMap).filter(function (e) { return e.score > 0 })
+        ranked.sort(function (a, b) { return b.score - a.score })
+        var top10 = ranked.slice(0, 10)
+        var maxScore = top10.length > 0 ? top10[0].score : 100
+
+        return (
+          <>
+            <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Top Concerns · {MONTHS[month - 1]} {year}</p>
+              <p className="text-[10px] text-slate-400">Employees ranked by composite concern score across timing, attendance, hours, and DAR compliance.</p>
+            </div>
+
+            {top10.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No concerns this period 🎉</p>}
+
+            <div className="space-y-1.5">
+              {top10.map(function (e, i) {
+                var barPct = maxScore > 0 ? Math.round((e.score / maxScore) * 100) : 0
+                var barColor = e.score >= 60 ? '#dc2626' : e.score >= 30 ? '#f97316' : '#d97706'
+                return (
+                  <div key={e.id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
+                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold text-white flex-shrink-0"
+                        style={{ background: barColor }}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[13px] font-bold text-slate-800 truncate">{e.name}</p>
+                          <p className="text-sm font-extrabold" style={{ color: barColor }}>{Math.round(e.score)}</p>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium">{e.emp_code} · {e.department_name || ''}</p>
+                        {/* Score bar */}
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
+                          <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: barPct + '%', background: barColor }} />
+                        </div>
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {e.tags.map(function (t, ti) {
+                            return (
+                              <span key={ti} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                                style={{ background: t.color, opacity: 0.85 }}>
+                                {t.label}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Scoring reference */}
+            <div className="mt-4 bg-slate-50 border border-slate-100 rounded-2xl p-3">
+              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Scoring Criteria</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] text-slate-500">
+                <span>Late arrival (after 12PM): <strong>30</strong></span>
+                <span>Critical attend (&lt;50%): <strong>35</strong></span>
+                <span>Very low hours (&lt;6h): <strong>25</strong></span>
+                <span>DAR &lt;30%: <strong>25</strong></span>
+                <span>Low attendance (&lt;75%): <strong>20</strong></span>
+                <span>3+ incomplete days: <strong>15</strong></span>
+                <span>DAR &lt;70%: <strong>12</strong></span>
+                <span>Low hours (&lt;8h): <strong>10</strong></span>
+              </div>
             </div>
           </>
         )
