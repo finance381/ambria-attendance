@@ -44,7 +44,8 @@ function DonutChart({ pct, size, color, stroke }) {
   stroke = stroke || 4
   var r = (size - stroke) / 2
   var circ = 2 * Math.PI * r
-  var offset = circ - (Math.min(pct, 100) / 100) * circ
+  var clamped = Math.min(pct, 100)
+  var offset = clamped >= 100 ? 0.001 : circ - (clamped / 100) * circ
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
