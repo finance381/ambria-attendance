@@ -126,11 +126,16 @@ serve(async (req) => {
   for (const group of (groups || [])) {
     try {
       const resp = await fetch(
-        `https://gate.whapi.cloud/messages/list/${group.whatsapp_group_id}?count=200`,
+        `https://gate.whapi.cloud/messages/list/${group.whatsapp_group_id}?count=500`,
         { headers: { 'Authorization': `Bearer ${WHAPI_TOKEN}` } }
       )
+      if (!resp.ok) {
+        console.error(`Whapi ${group.group_name}: HTTP ${resp.status} ${resp.statusText}`)
+        continue
+      }
       const data = await resp.json()
       const messages = data.messages || []
+      console.log(`${group.group_name}: ${messages.length} msgs fetched`)
 
       for (const msg of messages) {
         // Skip old messages
@@ -162,6 +167,7 @@ serve(async (req) => {
       await new Promise(r => setTimeout(r, 1000))
     } catch (err) {
       console.error(`Failed to fetch ${group.group_name}:`, err)
+      console.error(`FETCH_FAIL: ${group.group_name}`)
     }
   }
 
@@ -183,6 +189,11 @@ serve(async (req) => {
     }
   }
   console.log(`Persisted ${persistedCount} DAR records to daily_reports`)
+
+  // Log date distribution for debugging
+  for (const [d, codes] of Object.entries(submittedByDate)) {
+    console.log(`submittedByDate[${d}]: ${codes.size} employees`)
+  }
 
   // Build report for today (primary)
   const todaySubmitted = submittedByDate[reportDate] || new Set()
