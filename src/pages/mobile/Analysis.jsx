@@ -484,7 +484,7 @@ export default function Analysis() {
         return (
           <>
             <div className="grid grid-cols-3 gap-2 mb-3">
-              <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 px-3 py-3 flex items-center gap-2"
+              <div className="relative rounded-2xl bg-white border border-slate-100 px-3 py-3 flex items-center gap-2"
                 style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <DonutChart pct={overallPct} size={38} color={pctColor(overallPct)} stroke={3.5} />
                 <div>
