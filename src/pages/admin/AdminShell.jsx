@@ -3,12 +3,19 @@ import { useAuth } from '../../lib/useAuth'
 //import AdminAnalysis from './pages/admin/AdminAnalysis'
 
 var NAV_ITEMS = [
-  { to: '/admin', label: 'Overview', icon: '📊' },
-  { to: '/admin/attendance', label: 'Attendance', icon: '📋' },
-  { to: '/admin/people', label: 'People', icon: '👥' },
-  { to: '/admin/requests', label: 'Requests', icon: '📝' },
+  { to: '/admin', label: 'Overview', icon: '📊', tabKey: 'home' },
+  { to: '/admin/attendance', label: 'Attendance', icon: '📋', tabKey: 'attendance' },
+  { to: '/admin/people', label: 'People', icon: '👥', tabKey: 'team' },
+  { to: '/admin/requests', label: 'Requests', icon: '📝', tabKey: 'claims' },
   { to: '/admin/config', label: 'Config', icon: '⚙️', roles: ['admin'] },
 ]
+
+var DEFAULT_TABS = {
+  staff: ['home', 'attendance', 'claims'],
+  supervisor: ['home', 'attendance', 'claims', 'team'],
+  manager: ['home', 'attendance', 'claims', 'team', 'dept', 'analysis'],
+  admin: ['home', 'attendance', 'claims', 'team', 'dept', 'dar', 'analysis'],
+}
 
 export default function AdminShell() {
   var { employee, logout } = useAuth()
