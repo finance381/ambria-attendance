@@ -99,32 +99,30 @@ export default function Employees() {
 
   async function handleBulkDeactivate() {
     setBulkSaving(true)
-    var failed = 0
-    for (var i = 0; i < selectedIds.length; i++) {
-      var { error } = await supabase
-        .from('employees')
-        .update({ active: false })
-        .eq('id', selectedIds[i])
-      if (error) failed++
-    }
+    var { data, error } = await supabase.rpc('bulk_update_employees', {
+      p_ids: selectedIds, p_action: 'deactivate', p_payload: {}
+    })
     setBulkSaving(false)
-    showToast((selectedIds.length - failed) + ' employees deactivated' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    if (error || (data && data.error)) {
+      showToast('Error: ' + ((data && data.error) || error.message))
+    } else {
+      showToast(data.updated + ' employees deactivated')
+    }
     clearSelection()
     loadAll()
   }
 
   async function handleBulkReactivate() {
     setBulkSaving(true)
-    var failed = 0
-    for (var i = 0; i < selectedIds.length; i++) {
-      var { error } = await supabase
-        .from('employees')
-        .update({ active: true })
-        .eq('id', selectedIds[i])
-      if (error) failed++
-    }
+    var { data, error } = await supabase.rpc('bulk_update_employees', {
+      p_ids: selectedIds, p_action: 'reactivate', p_payload: {}
+    })
     setBulkSaving(false)
-    showToast((selectedIds.length - failed) + ' employees reactivated' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    if (error || (data && data.error)) {
+      showToast('Error: ' + ((data && data.error) || error.message))
+    } else {
+      showToast(data.updated + ' employees reactivated')
+    }
     clearSelection()
     loadAll()
   }
@@ -132,32 +130,30 @@ export default function Employees() {
   async function handleBulkDepartment() {
     if (!bulkDept) return
     setBulkSaving(true)
-    var failed = 0
-    for (var i = 0; i < selectedIds.length; i++) {
-      var { error } = await supabase
-        .from('employees')
-        .update({ department_id: Number(bulkDept) })
-        .eq('id', selectedIds[i])
-      if (error) failed++
-    }
+    var { data, error } = await supabase.rpc('bulk_update_employees', {
+      p_ids: selectedIds, p_action: 'department', p_payload: { department_id: Number(bulkDept) }
+    })
     setBulkSaving(false)
-    showToast((selectedIds.length - failed) + ' employees reassigned' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    if (error || (data && data.error)) {
+      showToast('Error: ' + ((data && data.error) || error.message))
+    } else {
+      showToast(data.updated + ' employees reassigned')
+    }
     clearSelection()
     loadAll()
   }
 
   async function handleBulkRole() {
     setBulkSaving(true)
-    var failed = 0
-    for (var i = 0; i < selectedIds.length; i++) {
-      var { error } = await supabase
-        .from('employees')
-        .update({ role: bulkRole })
-        .eq('id', selectedIds[i])
-      if (error) failed++
-    }
+    var { data, error } = await supabase.rpc('bulk_update_employees', {
+      p_ids: selectedIds, p_action: 'role', p_payload: { role: bulkRole }
+    })
     setBulkSaving(false)
-    showToast((selectedIds.length - failed) + ' roles updated' + (failed > 0 ? ', ' + failed + ' failed' : ''))
+    if (error || (data && data.error)) {
+      showToast('Error: ' + ((data && data.error) || error.message))
+    } else {
+      showToast(data.updated + ' roles updated')
+    }
     clearSelection()
     loadAll()
   }
