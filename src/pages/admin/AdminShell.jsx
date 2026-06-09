@@ -63,7 +63,11 @@ export default function AdminShell() {
         <div className="max-w-5xl mx-auto px-4 flex">
           {NAV_ITEMS.filter(function (item) {
              if (item.roles && !item.roles.includes(employee.role)) return false
-             if (item.empCodes) return item.empCodes.includes(employee.emp_code)
+             if (item.empCodes && !item.empCodes.includes(employee.emp_code)) return false
+             if (item.tabKey) {
+               var tabs = employee.visible_tabs || DEFAULT_TABS[employee.role] || DEFAULT_TABS.staff
+               if (!tabs.includes(item.tabKey)) return false
+             }
              return true
            }).map(function (item) {
             return (
