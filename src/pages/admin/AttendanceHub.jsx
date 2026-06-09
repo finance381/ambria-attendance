@@ -8,7 +8,6 @@ import AdminAnalysis from './AdminAnalysis'
 var ALL_TABS = [
   { id: 'daily', label: 'Daily', icon: '📋' },
   { id: 'monthly', label: 'Monthly', icon: '📊' },
-  { id: 'dars', label: 'DARs', icon: '📝', roles: ['admin'] },
   { id: 'analysis', label: 'Analysis', icon: '📈' },
 ]
 

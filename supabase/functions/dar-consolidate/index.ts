@@ -172,7 +172,10 @@ serve(async (req) => {
   }
 
   // Persist all matched DARs into daily_reports for compliance tracking
-  let persistedCount = 0
+  let attemptedCount = 0
+  const { count: beforeCount } = await supabase
+    .from('daily_reports')
+    .select('*', { count: 'exact', head: true })
   for (const [darDate, empCodes] of Object.entries(submittedByDate)) {
     const rows = [...empCodes].map(code => ({
       emp_code: code,
@@ -184,11 +187,15 @@ serve(async (req) => {
       const { error } = await supabase
         .from('daily_reports')
         .upsert(rows, { onConflict: 'emp_code,report_date', ignoreDuplicates: true })
-      if (!error) persistedCount += rows.length
+      if (!error) attemptedCount += rows.length
       else console.error(`daily_reports upsert error for ${darDate}:`, error.message)
     }
   }
-  console.log(`Persisted ${persistedCount} DAR records to daily_reports`)
+  const { count: afterCount } = await supabase
+    .from('daily_reports')
+    .select('*', { count: 'exact', head: true })
+  const actualInserted = (afterCount || 0) - (beforeCount || 0)
+  console.log(`Persisted ${actualInserted} new DAR records (${attemptedCount} attempted)`)
 
   // Log date distribution for debugging
   for (const [d, codes] of Object.entries(submittedByDate)) {
@@ -294,7 +301,8 @@ serve(async (req) => {
       date: reportDate,
       expected: allEmpCodes.size,
       submitted: todaySubmitted.size,
-      persisted: persistedCount,
+      persisted: actualInserted,
+      persisted_attempted: attemptedCount,
       sent_to: sentTo,
       unknown_phones: unknownPhones
     }),
