@@ -658,6 +658,11 @@ export default function Analysis() {
                 <p className="text-[10px] text-amber-700 font-medium">🕑 Today's DARs may not be reflected yet (nightly consolidation at 11:20 PM)</p>
               </div>
             )}
+            {filtered.length > 0 && filtered[0].dar_cutoff && (
+              <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 mb-3">
+                <p className="text-[10px] text-slate-500 font-medium">📅 DAR data through <strong className="text-slate-700">{filtered[0].dar_cutoff}</strong></p>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2 mb-3">
               <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 px-3 py-3 flex items-center gap-2"
                 style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>

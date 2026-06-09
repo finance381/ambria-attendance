@@ -22,7 +22,7 @@ function parseDate(text: string, msgTimestamp: string): string {
   const clean = header.replace(/\*/g, '').replace(/_/g, '')
 
   // Pattern 1: DD/MM/YYYY or DD/MM/YY or DD-MM-YYYY or DD-MM-YY
-  const slashMatch = clean.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
+  const slashMatch = clean.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/)
   if (slashMatch) {
     const d = parseInt(slashMatch[1])
     const m = parseInt(slashMatch[2])
@@ -272,7 +272,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: phone + '@s.whatsapp.net',
+          to: phone.includes('@') ? phone : phone + '@s.whatsapp.net',
           body: report,
         }),
       })

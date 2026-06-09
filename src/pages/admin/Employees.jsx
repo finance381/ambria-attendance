@@ -45,7 +45,7 @@ export default function Employees() {
   var [sortDir, setSortDir] = useState('asc')
 
   var [form, setForm] = useState({
-    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: []
+    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [], expected_hours: ''
   })
   var [formError, setFormError] = useState('')
   var [mgrDepts, setMgrDepts] = useState([])
@@ -203,7 +203,7 @@ export default function Employees() {
   }
 
   function resetForm() {
-    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [] })
+    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [], expected_hours: '' })
     setFormError('')
   }
 
@@ -222,7 +222,8 @@ export default function Employees() {
       designation: emp.designation || '',
       date_of_joining: emp.date_of_joining || '',
       dar_required: !!emp.dar_required,
-      visible_tabs: emp.visible_tabs || DEFAULT_TABS[emp.role] || DEFAULT_TABS.staff
+      visible_tabs: emp.visible_tabs || DEFAULT_TABS[emp.role] || DEFAULT_TABS.staff,
+      expected_hours: emp.expected_hours != null ? String(emp.expected_hours) : ''
     })
     setFormError('')
     setEditId(emp.id)
@@ -301,7 +302,8 @@ export default function Employees() {
       designation: form.designation.trim() || null,
       date_of_joining: form.date_of_joining || null,
       dar_required: form.dar_required,
-      visible_tabs: form.visible_tabs
+      visible_tabs: form.visible_tabs,
+      expected_hours: form.expected_hours ? Number(form.expected_hours) : null
     }
 
     var { error } = await supabase
@@ -615,6 +617,10 @@ export default function Employees() {
 
               <Field label="Date of Joining">
                 <input type="date" value={form.date_of_joining} onChange={function (e) { setForm({ ...form, date_of_joining: e.target.value }) }} className="form-input" />
+              </Field>
+
+              <Field label="Expected Hours/Day">
+                <input type="number" value={form.expected_hours} onChange={function (e) { setForm({ ...form, expected_hours: e.target.value }) }} className="form-input" placeholder="9" min="1" max="24" step="0.5" />
               </Field>
 
               <label className="flex items-center gap-2 cursor-pointer">

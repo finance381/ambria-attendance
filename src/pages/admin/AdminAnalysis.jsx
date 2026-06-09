@@ -384,6 +384,7 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
   return (<>
     <ConcernBanner items={darConcerns.concat(darWarnings)} label="Low DAR compliance" />
     {isRecent && <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">{'\u{1F551}'} DARs from today may not be reflected yet (nightly consolidation runs at 11:20 PM)</p>}
+    {filtered.length > 0 && filtered[0].dar_cutoff && <p className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3">{'\u{1F4C5}'} DAR data through <strong>{filtered[0].dar_cutoff}</strong></p>}
     <div className="flex items-center justify-end mb-2"><ExportGroup onCSV={function () { downloadCSV('dar_' + MONTHS[month - 1] + year + '.csv', ['Employee', 'Code', 'Dept', 'Compliance%', 'Submitted', 'Present', 'Missing'], filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.compliance_pct, r.days_submitted, r.days_present, Math.max(0, (r.days_present || 0) - (r.days_submitted || 0))] })) }} onDocx={function () { exportAnalysisDocx('dar', filtered, docxOpts) }} /></div>
     <div className="grid grid-cols-5 gap-4 mb-5">
       <StatCard label="DAR Required" value={filtered.length} />
