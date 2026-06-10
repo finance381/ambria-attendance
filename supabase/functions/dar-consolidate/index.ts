@@ -215,7 +215,6 @@ serve(async (req) => {
   let report = `📋 *DAR Report — ${reportDate}*\n`
   report += `✅ Submitted: ${todaySubmittedActive.size}/${allEmpCodes.size}\n`
   report += `❌ Missing: ${todayMissing.length}\n`
-  report += `🏠 Absent/Leave: ${absentEmps.length}\n`
   report += `─────────────────\n`
 
   if (todayMissing.length > 0) {
@@ -231,23 +230,6 @@ serve(async (req) => {
     for (const dept of Object.keys(missingByDept).sort()) {
       report += `\n*${dept}*\n`
       for (const name of missingByDept[dept].sort()) {
-        report += `• ${name}\n`
-      }
-    }
-  }
-
-
-  if (absentEmps.length > 0) {
-    report += `\n*🏠 Absent / On Leave (no punch):*\n`
-    const absentByDept: Record<string, string[]> = {}
-    for (const e of absentEmps) {
-      const dept = (e as any).departments?.name || 'Other'
-      if (!absentByDept[dept]) absentByDept[dept] = []
-      absentByDept[dept].push(e.name)
-    }
-    for (const dept of Object.keys(absentByDept).sort()) {
-      report += `\n*${dept}*\n`
-      for (const name of absentByDept[dept].sort()) {
         report += `• ${name}\n`
       }
     }
