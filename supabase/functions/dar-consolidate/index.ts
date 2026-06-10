@@ -145,8 +145,8 @@ serve(async (req) => {
         if (!isDARMessage(text)) continue
 
         // Extract sender phone (strip @s.whatsapp.net, normalize)
-        let from = (msg.from || '').replace('@s.whatsapp.net', '').replace(/^\+/, '')
-        if (!from || from.includes('@')) continue
+        let from = (msg.from || '').replace(/@[a-z.]+$/i, '').replace(/^\+/, '')
+        if (!from) continue
 
         // Normalize: ensure 91 prefix
         if (from.length === 10) from = '91' + from
@@ -204,6 +204,7 @@ serve(async (req) => {
 
   // Build report for today (primary)
   const todaySubmitted = submittedByDate[reportDate] || new Set()
+  const todaySubmittedActive = new Set([...todaySubmitted].filter(c => allEmpCodes.has(c)))
   const todayMissing = [...allEmpCodes].filter(c => !todaySubmitted.has(c))
 
   function empInfo(code: string): { name: string, dept: string } {
@@ -212,7 +213,7 @@ serve(async (req) => {
   }
 
   let report = `📋 *DAR Report — ${reportDate}*\n`
-  report += `✅ Submitted: ${todaySubmitted.size}/${allEmpCodes.size}\n`
+  report += `✅ Submitted: ${todaySubmittedActive.size}/${allEmpCodes.size}\n`
   report += `❌ Missing: ${todayMissing.length}\n`
   report += `🏠 Absent/Leave: ${absentEmps.length}\n`
   report += `─────────────────\n`
