@@ -2,11 +2,22 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
 const MONTH_MAP: Record<string, number> = {
+  // Standard abbreviations
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  // Full names
   january: 1, february: 2, march: 3, april: 4, june: 6,
-  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  // Known employee typos
+  jyne: 6,    // Ompal
+  jue: 6,     // autocorrect miss
+  // Common truncations
+  janu: 1, febr: 2, marc: 3, apri: 4,
+  sept: 9, octo: 10, nove: 11, dece: 12,
 }
+
+// Build month regex from all keys (longest first to avoid partial matches)
+const MONTH_NAMES = Object.keys(MONTH_MAP).sort((a, b) => b.length - a.length).join('|')
 
 function parseDate(text: string, msgTimestamp: string): string {
   // Get IST "today" from message timestamp
@@ -15,33 +26,110 @@ function parseDate(text: string, msgTimestamp: string): string {
   const istNow = new Date(msgDate.getTime() + istOffset)
   const fallback = istNow.toISOString().slice(0, 10)
   const currentYear = istNow.getFullYear()
+  const fallbackMs = new Date(fallback + 'T00:00:00Z').getTime()
 
   // Only check first 5 lines for date
   const header = text.split('\n').slice(0, 5).join('\n')
-  // Strip WhatsApp bold/italic markers
-  const clean = header.replace(/\*/g, '').replace(/_/g, '')
 
-  // Pattern 1: DD/MM/YYYY or DD/MM/YY or DD-MM-YYYY or DD-MM-YY
-  const slashMatch = clean.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/)
-  if (slashMatch) {
-    const d = parseInt(slashMatch[1])
-    const m = parseInt(slashMatch[2])
-    let y = parseInt(slashMatch[3])
+  // Aggressive cleanup:
+  // 1. Strip WhatsApp bold/italic markers (* and _)
+  // 2. Replace en-dash (–), em-dash (—), and other unicode dashes with space
+  // 3. Replace zero-width spaces, non-breaking spaces, and other invisible chars with space
+  // 4. Collapse multiple spaces
+  const clean = header
+    .replace(/\*/g, '')
+    .replace(/_/g, '')
+    .replace(/[\u2013\u2014\u2015\u2012\u2010]/g, ' ')
+    .replace(/[\u200B\u200C\u200D\uFEFF\u00A0]/g, ' ')
+    .replace(/\s+/g, ' ')
+
+  // Helper: validate parsed date is within ±2 days of message date
+  function validateDate(parsed: string): string {
+    const parsedMs = new Date(parsed + 'T00:00:00Z').getTime()
+    if (Math.abs(parsedMs - fallbackMs) > 2 * 86400000) return fallback
+    return parsed
+  }
+
+  // Helper: format date string
+  function fmt(y: number, m: number, d: number): string {
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  }
+
+  // ── Pattern 1: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY (numeric separators) ──
+  const numMatch = clean.match(/(\d{1,2})\s*[\/\-\.]\s*(\d{1,2})\s*[\/\-\.]\s*(\d{2,4})/)
+  if (numMatch) {
+    const d = parseInt(numMatch[1])
+    const m = parseInt(numMatch[2])
+    let y = parseInt(numMatch[3])
     if (y < 100) y += 2000
     if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
-      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      return validateDate(fmt(y, m, d))
     }
   }
 
-  // Pattern 2: DDth Month YYYY / DD Month YYYY / DD Month YY / DD Month
-  const textMatch = clean.match(/(\d{1,2})(?:st|nd|rd|th)?\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(\d{2,4})?/i)
+  // ── Pattern 1b: DD MM YYYY (spaces as separators, all numeric) ──
+  const spaceNumMatch = clean.match(/\b(\d{1,2})\s+(\d{1,2})\s+(\d{4})\b/)
+  if (spaceNumMatch) {
+    const d = parseInt(spaceNumMatch[1])
+    const m = parseInt(spaceNumMatch[2])
+    const y = parseInt(spaceNumMatch[3])
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
+      return validateDate(fmt(y, m, d))
+    }
+  }
+
+  // ── Pattern 2: YYYY-MM-DD / YYYY/MM/DD (ISO format) ──
+  const isoMatch = clean.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/)
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1])
+    const m = parseInt(isoMatch[2])
+    const d = parseInt(isoMatch[3])
+    if (y >= 2020 && y <= 2030 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return validateDate(fmt(y, m, d))
+    }
+  }
+
+  // ── Pattern 3: DD[ordinal][sep]Month[sep][Year] (text month, DD first) ──
+  // Handles: 9th june 2026, 9 th june 2026, 5.june.2026, 10june2026, 10-Jun-2026,
+  //          10 Jun'26, DAR –9 th june 2026 (after en-dash → space cleanup)
+  const textMonthRegex = new RegExp(
+    '(\\d{1,2})' +
+    '\\s*(?:st|nd|rd|th)?' +
+    '[\\s.,\\-/]*' +
+    '(' + MONTH_NAMES + ')' +
+    '[\\s.,\\-/]*' +
+    "(?:'?(\\d{2,4}))?",
+    'i'
+  )
+  const textMatch = clean.match(textMonthRegex)
   if (textMatch) {
     const d = parseInt(textMatch[1])
     const m = MONTH_MAP[textMatch[2].toLowerCase()]
     let y = textMatch[3] ? parseInt(textMatch[3]) : currentYear
     if (y < 100) y += 2000
     if (d >= 1 && d <= 31 && m) {
-      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      return validateDate(fmt(y, m, d))
+    }
+  }
+
+  // ── Pattern 4: Month DD[,] [YYYY] (American: June 10, 2026 / June 10) ──
+  const amRegex = new RegExp(
+    '(' + MONTH_NAMES + ')' +
+    '[\\s.,\\-/]+' +
+    '(\\d{1,2})' +
+    '(?:st|nd|rd|th)?' +
+    '[\\s,]*' +
+    "(?:'?(\\d{2,4}))?",
+    'i'
+  )
+  const amMatch = clean.match(amRegex)
+  if (amMatch) {
+    const m = MONTH_MAP[amMatch[1].toLowerCase()]
+    const d = parseInt(amMatch[2])
+    let y = amMatch[3] ? parseInt(amMatch[3]) : currentYear
+    if (y < 100) y += 2000
+    if (d >= 1 && d <= 31 && m) {
+      return validateDate(fmt(y, m, d))
     }
   }
 
@@ -51,12 +139,10 @@ function parseDate(text: string, msgTimestamp: string): string {
 function isDARMessage(text: string): boolean {
   if (!text || text.length < 20) return false
   const lower = text.toLowerCase()
-  // Must contain DAR indicators
   const hasDar = lower.includes('dar') || lower.includes('punch in') || lower.includes('punch out') ||
     lower.includes("today's output") || lower.includes('activities performed')
-  // Exclude known non-DAR patterns
   const isNonDar = lower.startsWith('poa') || lower.includes('this message was deleted') ||
-    lower.includes('<media omitted>')
+    lower.includes('<media omitted>') || lower.includes('dar format')
   return hasDar && !isNonDar
 }
 
@@ -70,7 +156,7 @@ serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const WHAPI_TOKEN = Deno.env.get('WHAPI_API_TOKEN')!
 
-  // Report on yesterday + day-before (late submissions)
+  // Report on yesterday (IST)
   const now = new Date()
   const istOffset = 5.5 * 60 * 60 * 1000
   const istNow = new Date(now.getTime() + istOffset)
@@ -82,7 +168,7 @@ serve(async (req) => {
     .select('whatsapp_group_id, group_name')
     .eq('active', true)
 
-  // Load phone map
+  // Load phone map (supports multiple phones per emp_code for alt numbers)
   const { data: phoneMap } = await supabase
     .from('dar_phone_map')
     .select('phone, emp_code, name')
@@ -114,10 +200,9 @@ serve(async (req) => {
   const activeEmps = (allEmps || []).filter(e => presentIds.has(e.id))
   const allEmpCodes = new Set(activeEmps.map(e => e.emp_code))
 
-  // Fetch messages from each group (last 48h)
+  // Fetch messages from each group (last 72h window)
   const cutoffEpoch = Math.floor((now.getTime() - 72 * 60 * 60 * 1000) / 1000)
 
-  // darDate -> Set of emp_codes who submitted
   const submittedByDate: Record<string, Set<string>> = {}
   submittedByDate[reportDate] = new Set()
 
@@ -138,14 +223,13 @@ serve(async (req) => {
       console.log(`${group.group_name}: ${messages.length} msgs fetched`)
 
       for (const msg of messages) {
-        // Skip old messages
         if (msg.timestamp && parseInt(msg.timestamp) < cutoffEpoch) continue
 
         const text = msg.text?.body || msg.text || ''
         if (!isDARMessage(text)) continue
 
-        // Extract sender phone (strip @s.whatsapp.net, normalize)
-        let from = (msg.from || '').replace(/@[a-z.]+$/i, '').replace(/^\+/, '')
+        // Extract sender phone (strip any @suffix: @s.whatsapp.net, @lid, etc.)
+        let from = (msg.from || '').replace(/@.*$/, '').replace(/^\+/, '')
         if (!from) continue
 
         // Normalize: ensure 91 prefix
@@ -163,7 +247,6 @@ serve(async (req) => {
         submittedByDate[darDate].add(employee.emp_code)
       }
 
-      // Rate limit: 1 sec between group fetches
       await new Promise(r => setTimeout(r, 1000))
     } catch (err) {
       console.error(`Failed to fetch ${group.group_name}:`, err)
@@ -171,7 +254,7 @@ serve(async (req) => {
     }
   }
 
-  // Persist all matched DARs into daily_reports for compliance tracking
+  // Persist all matched DARs into daily_reports
   let attemptedCount = 0
   const { count: beforeCount } = await supabase
     .from('daily_reports')
@@ -197,12 +280,11 @@ serve(async (req) => {
   const actualInserted = (afterCount || 0) - (beforeCount || 0)
   console.log(`Persisted ${actualInserted} new DAR records (${attemptedCount} attempted)`)
 
-  // Log date distribution for debugging
   for (const [d, codes] of Object.entries(submittedByDate)) {
     console.log(`submittedByDate[${d}]: ${codes.size} employees`)
   }
 
-  // Build report for today (primary)
+  // Build report
   const todaySubmitted = submittedByDate[reportDate] || new Set()
   const todaySubmittedActive = new Set([...todaySubmitted].filter(c => allEmpCodes.has(c)))
   const todayMissing = [...allEmpCodes].filter(c => !todaySubmitted.has(c))
@@ -218,7 +300,6 @@ serve(async (req) => {
   report += `─────────────────\n`
 
   if (todayMissing.length > 0) {
-    // Group missing by department
     const missingByDept: Record<string, string[]> = {}
     for (const code of todayMissing) {
       const info = empInfo(code)
@@ -283,7 +364,7 @@ serve(async (req) => {
     JSON.stringify({
       date: reportDate,
       expected: allEmpCodes.size,
-      submitted: todaySubmitted.size,
+      submitted: todaySubmittedActive.size,
       persisted: actualInserted,
       persisted_attempted: attemptedCount,
       sent_to: sentTo,
