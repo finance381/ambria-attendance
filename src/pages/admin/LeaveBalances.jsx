@@ -13,15 +13,60 @@ export default function LeaveBalances() {
 
   var loadData = useCallback(async function () {
     setLoading(true)
-    var [balRes, deptRes] = await Promise.all([
-      supabase.rpc('admin_all_leave_balances'),
-      supabase.from('departments').select('id, name').eq('active', true).order('name')
+    var [cacheRes, deptRes, configRes] = await Promise.all([
+      supabase.from('leave_balance_cache').select('*'),
+      supabase.from('departments').select('id, name').eq('active', true).order('name'),
+      supabase.from('app_config').select('key, value').in('key', ['annual_leaves', 'annual_half_days'])
     ])
 
-    if (balRes.error || (balRes.data && balRes.data.error)) {
-      setError((balRes.data && balRes.data.error) || balRes.error.message)
+    if (cacheRes.error) {
+      setError(cacheRes.error.message)
     } else {
-      setData(balRes.data)
+      var deptMap = {}
+      ;(deptRes.data || []).forEach(function (d) { deptMap[d.id] = d.name })
+      var configs = {}
+      ;(configRes.data || []).forEach(function (c) {
+        var v = c.value; if (typeof v === 'string') v = v.replace(/^"|"$/g, '')
+        configs[c.key] = parseInt(v) || 0
+      })
+      var annualTotal = configs['annual_leaves'] || 76
+      var halfTotal = configs['annual_half_days'] || 6
+
+      // Compute FY and quarter from today
+      var today = new Date()
+      var fy_start, fy_end, q_start, q_end, q_label
+      var yr = today.getFullYear(), mo = today.getMonth() + 1
+      if (mo >= 4) { fy_start = yr + '-04-01'; fy_end = (yr + 1) + '-03-31' }
+      else { fy_start = (yr - 1) + '-04-01'; fy_end = yr + '-03-31' }
+      if (mo >= 4 && mo <= 6) { q_start = yr + '-04-01'; q_end = yr + '-06-30'; q_label = 'Q1' }
+      else if (mo >= 7 && mo <= 9) { q_start = yr + '-07-01'; q_end = yr + '-09-30'; q_label = 'Q2' }
+      else if (mo >= 10 && mo <= 12) { q_start = yr + '-10-01'; q_end = yr + '-12-31'; q_label = 'Q3' }
+      else { q_start = yr + '-01-01'; q_end = yr + '-03-31'; q_label = 'Q4' }
+
+      var balances = (cacheRes.data || []).map(function (r) {
+        return {
+          employee_id: r.employee_id,
+          emp_code: r.emp_code,
+          name: r.name,
+          department_id: r.department_id,
+          department_name: deptMap[r.department_id] || '—',
+          annual_total: annualTotal,
+          annual_used: r.leaves_used || 0,
+          annual_remaining: r.annual_remaining || 0,
+          quarter_total: r.quarterly_quota || Math.ceil(annualTotal / 4),
+          quarter_used: r.quarterly_used || 0,
+          quarter_remaining: r.quarterly_remaining || 0,
+          half_annual_total: halfTotal,
+          half_used: r.half_days_used || 0,
+          half_remaining: halfTotal - (r.half_days_used || 0)
+        }
+      })
+
+      setData({
+        fy_start: fy_start, fy_end: fy_end,
+        quarter_start: q_start, quarter_end: q_end, quarter_label: q_label,
+        balances: balances, computed_at: (cacheRes.data[0] || {}).computed_at
+      })
     }
     setDepartments(deptRes.data || [])
     setLoading(false)
@@ -70,9 +115,14 @@ export default function LeaveBalances() {
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">Leave Balances</h2>
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-xs text-gray-500 mb-1">
         FY {fyLabel} · Quarter {data ? data.quarter_label : ''} ({data ? formatDate(data.quarter_start) + ' – ' + formatDate(data.quarter_end) : ''})
       </p>
+      <div className="flex items-center gap-3 mb-4">
+        {data && data.computed_at && <p className="text-[10px] text-gray-400">Last refreshed: {new Date(data.computed_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
+        <button onClick={async function () { setLoading(true); await supabase.rpc('refresh_leave_balance_cache'); loadData() }}
+          className="text-[10px] font-bold text-blue-600 hover:text-blue-800">↻ Refresh now</button>
+      </div>
 
       <div className="flex flex-wrap gap-3 mb-4">
         <div>
