@@ -189,13 +189,35 @@ serve(async (req) => {
     .eq('active', true)
     .eq('dar_required', true)
 
-  // Exclude employees with zero punches on reportDate (absent/leave)
-  const { data: presentPunches } = await supabase
+  // Exclude employees who are absent: zero punches OR total hours < 4 (absent threshold)
+  const { data: punchData } = await supabase
     .from('punches')
-    .select('employee_id')
+    .select('employee_id, punch_type, punched_at')
     .eq('attendance_date', reportDate)
 
-  const presentIds = new Set((presentPunches || []).map((p: any) => p.employee_id))
+  // Calculate hours worked per employee
+  const empPunches: Record<string, { ins: number[], outs: number[] }> = {}
+  for (const p of (punchData || [])) {
+    if (!empPunches[p.employee_id]) empPunches[p.employee_id] = { ins: [], outs: [] }
+    const ts = new Date(p.punched_at).getTime()
+    if (p.punch_type === 'IN') empPunches[p.employee_id].ins.push(ts)
+    else empPunches[p.employee_id].outs.push(ts)
+  }
+
+  const presentIds = new Set<string>()
+  for (const [empId, punches] of Object.entries(empPunches)) {
+    const ins = punches.ins.sort((a, b) => a - b)
+    const outs = punches.outs.sort((a, b) => a - b)
+    let totalMs = 0
+    // Pair each IN with the next OUT
+    for (let i = 0; i < ins.length; i++) {
+      const outTime = outs.find(o => o > ins[i])
+      if (outTime) totalMs += outTime - ins[i]
+    }
+    const totalHours = totalMs / (1000 * 60 * 60)
+    if (totalHours >= 4) presentIds.add(empId)
+  }
+
   const absentEmps = (allEmps || []).filter(e => !presentIds.has(e.id))
   const activeEmps = (allEmps || []).filter(e => presentIds.has(e.id))
   const allEmpCodes = new Set(activeEmps.map(e => e.emp_code))
@@ -297,6 +319,7 @@ serve(async (req) => {
   let report = `📋 *DAR Report — ${reportDate}*\n`
   report += `✅ Submitted: ${todaySubmittedActive.size}/${allEmpCodes.size}\n`
   report += `❌ Missing: ${todayMissing.length}\n`
+  report += `🏠 Absent/Leave: ${absentEmps.length}\n`
   report += `─────────────────\n`
 
   if (todayMissing.length > 0) {
