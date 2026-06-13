@@ -142,7 +142,7 @@ function isDARMessage(text: string): boolean {
   const hasDar = lower.includes('dar') || lower.includes('punch in') || lower.includes('punch out') ||
     lower.includes("today's output") || lower.includes('activities performed')
   const isNonDar = lower.startsWith('poa') || lower.includes('this message was deleted') ||
-    lower.includes('<media omitted>') || lower.includes('dar format')
+    lower.includes('<media omitted>')
   return hasDar && !isNonDar
 }
 
@@ -233,7 +233,7 @@ serve(async (req) => {
   for (const group of (groups || [])) {
     try {
       const resp = await fetch(
-        `https://gate.whapi.cloud/messages/list/${group.whatsapp_group_id}?count=500`,
+        `https://gate.whapi.cloud/messages/list/${group.whatsapp_group_id}?count=1000`,
         { headers: { 'Authorization': `Bearer ${WHAPI_TOKEN}` } }
       )
       if (!resp.ok) {
@@ -251,8 +251,20 @@ serve(async (req) => {
         if (!isDARMessage(text)) continue
 
         // Extract sender phone (strip any @suffix: @s.whatsapp.net, @lid, etc.)
-        let from = (msg.from || '').replace(/@.*$/, '').replace(/^\+/, '')
+        const rawFrom = msg.from || ''
+        const isLid = rawFrom.includes('@lid')
+        let from = rawFrom.replace(/@.*$/, '').replace(/^\+/, '')
         if (!from) continue
+
+        // LIDs are not phone numbers — try participant field as fallback
+        if (isLid) {
+          const participant = (msg.participant || '').replace(/@.*$/, '').replace(/^\+/, '')
+          from = participant || ''
+          if (!from) {
+            console.log(`LID miss: ${rawFrom} text="${text.slice(0, 50)}"`)
+            continue
+          }
+        }
 
         // Normalize: ensure 91 prefix
         if (from.length === 10) from = '91' + from
