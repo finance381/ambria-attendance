@@ -208,18 +208,27 @@ serve(async (req) => {
   for (const [empId, punches] of Object.entries(empPunches)) {
     const ins = punches.ins.sort((a, b) => a - b)
     const outs = punches.outs.sort((a, b) => a - b)
+
+    // If employee has any IN punch, they showed up — check hours only if they also have OUTs
+    if (ins.length > 0 && outs.length === 0) {
+      presentIds.add(empId)
+      continue
+    }
+
     let totalMs = 0
-    // Pair each IN with the next OUT
     for (let i = 0; i < ins.length; i++) {
       const outTime = outs.find(o => o > ins[i])
       if (outTime) totalMs += outTime - ins[i]
     }
     const totalHours = totalMs / (1000 * 60 * 60)
-    if (totalHours >= 4) presentIds.add(empId)
+    if (totalHours >= 4 || (ins.length > outs.length)) presentIds.add(empId)
   }
 
-  const absentEmps = (allEmps || []).filter(e => !presentIds.has(e.id))
-  const activeEmps = (allEmps || []).filter(e => presentIds.has(e.id))
+  // Safety: if punch query returned nothing but we have many employees, skip absent filter
+  const punchQueryFailed = (punchData === null || punchData.length === 0) && (allEmps || []).length > 10
+  if (punchQueryFailed) console.log('WARN: punch query returned no data — skipping absent filter')
+  const absentEmps = punchQueryFailed ? [] : (allEmps || []).filter(e => !presentIds.has(e.id))
+  const activeEmps = punchQueryFailed ? (allEmps || []) : (allEmps || []).filter(e => presentIds.has(e.id))
   const allEmpCodes = new Set(activeEmps.map(e => e.emp_code))
 
   // Fetch messages from each group (last 72h window)
@@ -232,16 +241,27 @@ serve(async (req) => {
 
   for (const group of (groups || [])) {
     try {
-      const resp = await fetch(
-        `https://gate.whapi.cloud/messages/list/${group.whatsapp_group_id}?count=1000`,
-        { headers: { 'Authorization': `Bearer ${WHAPI_TOKEN}` } }
-      )
-      if (!resp.ok) {
-        console.error(`Whapi ${group.group_name}: HTTP ${resp.status} ${resp.statusText}`)
-        continue
+      // Paginate: fetch up to 1500 msgs (3 pages of 500) to cover high-volume groups
+      let messages: any[] = []
+      let nextPageToken: string | undefined = undefined
+      for (let page = 0; page < 3; page++) {
+        let url = `https://gate.whapi.cloud/messages/list/${group.whatsapp_group_id}?count=500`
+        if (nextPageToken) url += `&page_token=${nextPageToken}`
+        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${WHAPI_TOKEN}` } })
+        if (!resp.ok) {
+          console.error(`Whapi ${group.group_name}: HTTP ${resp.status} ${resp.statusText}`)
+          break
+        }
+        const data = await resp.json()
+        const batch = data.messages || []
+        messages.push(...batch)
+        // Stop if less than 500 returned (no more pages) or all msgs are past cutoff
+        if (batch.length < 500 || !data.next_page_token) break
+        const lastTs = parseInt(batch[batch.length - 1]?.timestamp || '0')
+        if (lastTs < cutoffEpoch) break
+        nextPageToken = data.next_page_token
+        await new Promise(r => setTimeout(r, 500))
       }
-      const data = await resp.json()
-      const messages = data.messages || []
       console.log(`${group.group_name}: ${messages.length} msgs fetched`)
 
       for (const msg of messages) {
