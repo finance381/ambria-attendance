@@ -350,8 +350,6 @@ serve(async (req) => {
 
   let report = `📋 *DAR Report — ${reportDate}*\n`
   report += `✅ Submitted: ${todaySubmittedActive.size}/${allEmpCodes.size}\n`
-  report += `❌ Missing: ${todayMissing.length}\n`
-  report += `🏠 Absent/Leave: ${absentEmps.length}\n`
   report += `─────────────────\n`
 
   if (todayMissing.length > 0) {
@@ -409,6 +407,74 @@ serve(async (req) => {
     }
   }
 
+  // Build Message 2: Attendance Report (absent + incomplete)
+  // Incomplete = employees who punched IN but have no OUT punch
+  const incompleteEmps: typeof allEmps = []
+  for (const e of (allEmps || [])) {
+    const p = empPunches[e.id]
+    if (p && p.ins.length > 0 && p.outs.length === 0) {
+      incompleteEmps.push(e)
+    }
+  }
+
+  let report2 = `🏠 *Attendance Report — ${reportDate}*\n`
+  report2 += `─────────────────\n`
+
+  // Absent section
+  report2 += `\n*Absent/Leave: ${absentEmps.length}*\n`
+  if (absentEmps.length > 0) {
+    const absentByDept: Record<string, string[]> = {}
+    for (const e of absentEmps) {
+      const dept = e.departments?.name || 'Other'
+      if (!absentByDept[dept]) absentByDept[dept] = []
+      absentByDept[dept].push(e.name)
+    }
+    for (const dept of Object.keys(absentByDept).sort()) {
+      report2 += `\n*${dept}*\n`
+      for (const name of absentByDept[dept].sort()) {
+        report2 += `• ${name}\n`
+      }
+    }
+  }
+
+  // Incomplete section
+  report2 += `\n*Incomplete Punch: ${incompleteEmps.length}*\n`
+  if (incompleteEmps.length > 0) {
+    const incByDept: Record<string, string[]> = {}
+    for (const e of incompleteEmps) {
+      const dept = e.departments?.name || 'Other'
+      if (!incByDept[dept]) incByDept[dept] = []
+      incByDept[dept].push(e.name)
+    }
+    for (const dept of Object.keys(incByDept).sort()) {
+      report2 += `\n*${dept}*\n`
+      for (const name of incByDept[dept].sort()) {
+        report2 += `• ${name}\n`
+      }
+    }
+  }
+
+  // Send Message 2 to all recipients
+  for (const phone of recipients) {
+    try {
+      await fetch('https://gate.whapi.cloud/messages/text', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${WHAPI_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: phone.includes('@') ? phone : phone + '@s.whatsapp.net',
+          body: report2,
+        }),
+      })
+      await new Promise(r => setTimeout(r, 1000))
+    } catch (err) {
+      console.error(`Failed to send report2 to ${phone}:`, err)
+    }
+  }
+
+  console.log(report2)
   console.log(report)
   if (unknownPhones.length > 0) {
     console.log(`Unknown phones (${unknownPhones.length}):`, unknownPhones.join(', '))
