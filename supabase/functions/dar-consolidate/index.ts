@@ -200,7 +200,7 @@ serve(async (req) => {
   for (const p of (punchData || [])) {
     if (!empPunches[p.employee_id]) empPunches[p.employee_id] = { ins: [], outs: [] }
     const ts = new Date(p.punched_at).getTime()
-    if (p.punch_type === 'IN') empPunches[p.employee_id].ins.push(ts)
+    if (p.punch_type.toUpperCase() === 'IN') empPunches[p.employee_id].ins.push(ts)
     else empPunches[p.employee_id].outs.push(ts)
   }
 
