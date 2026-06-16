@@ -25,20 +25,19 @@ serve(async (req) => {
   let toDate: string
   let periodLabel: string
 
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
   if (day <= 15) {
-    // Running on 2nd: report on 16th–end of previous month
+    // Running on 3rd: report on 16th–end of previous month
     const prevMonth = month === 0 ? 11 : month - 1
     const prevYear = month === 0 ? year - 1 : year
     const lastDay = new Date(prevYear, prevMonth + 1, 0).getDate()
     fromDate = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-16`
     toDate = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${lastDay}`
-    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     periodLabel = `${monthNames[prevMonth]} 16–${lastDay}, ${prevYear}`
   } else {
-    // Running on 16th: report on 1st–15th of current month
+    // Running on 17th: report on 1st–15th of current month
     fromDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
     toDate = `${year}-${String(month + 1).padStart(2, '0')}-15`
-    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     periodLabel = `${monthNames[month]} 1–15, ${year}`
   }
 
@@ -56,6 +55,7 @@ serve(async (req) => {
     .select('emp_code, report_date')
     .gte('report_date', fromDate)
     .lte('report_date', toDate)
+    .limit(5000)
 
   // Count present days per employee from punches
   const { data: punchDays } = await supabase
@@ -63,6 +63,7 @@ serve(async (req) => {
     .select('employee_id, attendance_date')
     .gte('attendance_date', fromDate)
     .lte('attendance_date', toDate)
+    .limit(5000)
 
   // Build employee lookup
   const empByCode: Record<string, { name: string, dept: string, emp_id?: string }> = {}
