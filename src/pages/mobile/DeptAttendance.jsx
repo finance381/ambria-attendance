@@ -129,9 +129,12 @@ export default function DeptAttendance() {
 
   var loadMonthly = useCallback(async function () {
     setMLoading(true)
-    var { data } = await supabase.rpc('monthly_summary', {
-      p_year: mYear,
-      p_month: mMonth,
+    var startDate = mYear + '-' + String(mMonth).padStart(2, '0') + '-01'
+    var endDay = new Date(mYear, mMonth, 0).getDate()
+    var endDate = mYear + '-' + String(mMonth).padStart(2, '0') + '-' + String(endDay).padStart(2, '0')
+    var { data } = await supabase.rpc('monthly_summary_range', {
+      p_from_date: startDate,
+      p_to_date: endDate,
       p_department_id: deptFilter ? Number(deptFilter) : (employee.role === 'admin' ? null : (managerDeptIds.length === 1 ? managerDeptIds[0] : null))
     })
     var filtered = employee.role === 'admin' ? (data || []) :
