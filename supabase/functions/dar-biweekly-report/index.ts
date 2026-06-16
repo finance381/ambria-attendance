@@ -12,8 +12,8 @@ serve(async (req) => {
   const WHAPI_TOKEN = Deno.env.get('WHAPI_API_TOKEN')!
 
   // Determine the 15-day window
-  // Runs on 2nd → covers 16th–end of prev month
-  // Runs on 16th → covers 1st–15th of current month
+  // Runs on 3rd  → covers 16th–end of prev month
+  // Runs on 17th → covers 1st–15th of current month
   const now = new Date()
   const istOffset = 5.5 * 60 * 60 * 1000
   const istNow = new Date(now.getTime() + istOffset)
@@ -43,98 +43,41 @@ serve(async (req) => {
 
   console.log(`Bi-weekly DAR report: ${fromDate} to ${toDate}`)
 
-  // Fetch DAR compliance data
-  const { data: allEmps } = await supabase
-    .from('employees')
-    .select('emp_code, name, department_id, departments(name)')
-    .eq('active', true)
-    .eq('dar_required', true)
+  // Single RPC call — same source of truth as admin dashboard
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('dar_compliance', {
+    p_from_date: fromDate,
+    p_to_date: toDate
+  })
 
-  const { data: darRecords } = await supabase
-    .from('daily_reports')
-    .select('emp_code, report_date')
-    .gte('report_date', fromDate)
-    .lte('report_date', toDate)
-    .limit(5000)
-
-  // Count present days per employee from punches
-  const { data: punchDays } = await supabase
-    .from('punches')
-    .select('employee_id, attendance_date')
-    .gte('attendance_date', fromDate)
-    .lte('attendance_date', toDate)
-    .limit(5000)
-
-  // Build employee lookup
-  const empByCode: Record<string, { name: string, dept: string, emp_id?: string }> = {}
-  for (const e of (allEmps || [])) {
-    empByCode[e.emp_code] = {
-      name: e.name,
-      dept: (e as any).departments?.name || 'Other'
-    }
+  if (rpcError) {
+    console.error('dar_compliance RPC error:', rpcError)
+    return new Response(JSON.stringify({ error: rpcError.message }), { status: 500 })
   }
 
-  // Count DAR submissions per emp_code
-  const darCounts: Record<string, number> = {}
-  for (const r of (darRecords || [])) {
-    darCounts[r.emp_code] = (darCounts[r.emp_code] || 0) + 1
-  }
-
-  // Count unique present days per employee
-  // We need emp_code from employees table matched by employee_id
-  const { data: empIdMap } = await supabase
-    .from('employees')
-    .select('id, emp_code')
-    .eq('active', true)
-    .eq('dar_required', true)
-
-  const idToCode: Record<string, string> = {}
-  for (const e of (empIdMap || [])) {
-    idToCode[e.id] = e.emp_code
-  }
-
-  const presentDays: Record<string, Set<string>> = {}
-  for (const p of (punchDays || [])) {
-    const code = idToCode[p.employee_id]
-    if (!code) continue
-    if (!presentDays[code]) presentDays[code] = new Set()
-    presentDays[code].add(p.attendance_date)
-  }
-
-  // Build per-employee compliance
-  interface EmpCompliance {
-    name: string
+  interface RpcRow {
+    employee_id: string
     emp_code: string
-    dept: string
+    name: string
+    department_id: number
+    department_name: string
     days_present: number
     days_submitted: number
-    pct: number
+    dar_cutoff: string
+    compliance_pct: number
   }
 
-  const results: EmpCompliance[] = []
-  for (const [code, info] of Object.entries(empByCode)) {
-    const present = presentDays[code]?.size || 0
-    const submitted = darCounts[code] || 0
-    const pct = present > 0 ? Math.min(100, Math.round((submitted / present) * 100)) : (submitted > 0 ? 100 : 0)
-    results.push({
-      name: info.name,
-      emp_code: code,
-      dept: info.dept,
-      days_present: present,
-      days_submitted: submitted,
-      pct
-    })
-  }
+  const results: RpcRow[] = rpcResult || []
 
-  results.sort((a, b) => a.pct - b.pct)
+  // Sort worst compliance first
+  results.sort((a, b) => a.compliance_pct - b.compliance_pct)
 
   const totalEmployees = results.length
   const totalPresent = results.reduce((s, r) => s + r.days_present, 0)
   const totalSubmitted = results.reduce((s, r) => s + r.days_submitted, 0)
   const overallPct = totalPresent > 0 ? Math.min(100, Math.round((totalSubmitted / totalPresent) * 100)) : 0
-  const perfect = results.filter(r => r.pct >= 100).length
-  const below50 = results.filter(r => r.pct < 50).length
-  const zero = results.filter(r => r.pct === 0 && r.days_present > 0).length
+  const perfect = results.filter(r => r.compliance_pct >= 100).length
+  const below50 = results.filter(r => r.compliance_pct < 50).length
+  const zero = results.filter(r => r.compliance_pct === 0 && r.days_present > 0).length
 
   // Build report message
   let report = `📊 *Bi-Weekly DAR Compliance Report*\n`
@@ -148,10 +91,11 @@ serve(async (req) => {
   report += `─────────────────\n`
 
   // Group by department
-  const byDept: Record<string, EmpCompliance[]> = {}
+  const byDept: Record<string, RpcRow[]> = {}
   for (const r of results) {
-    if (!byDept[r.dept]) byDept[r.dept] = []
-    byDept[r.dept].push(r)
+    const dept = r.department_name || 'Other'
+    if (!byDept[dept]) byDept[dept] = []
+    byDept[dept].push(r)
   }
 
   for (const dept of Object.keys(byDept).sort()) {
@@ -162,8 +106,8 @@ serve(async (req) => {
 
     report += `\n*${dept}* (${deptPct}%)\n`
     for (const r of deptEmps) {
-      const icon = r.pct >= 90 ? '✅' : r.pct >= 50 ? '⚠️' : '❌'
-      report += `${icon} ${r.name}: ${r.pct}% (${r.days_submitted}/${r.days_present})\n`
+      const icon = r.compliance_pct >= 90 ? '✅' : r.compliance_pct >= 50 ? '⚠️' : '❌'
+      report += `${icon} ${r.name}: ${r.compliance_pct}% (${r.days_submitted}/${r.days_present})\n`
     }
   }
 
