@@ -145,8 +145,11 @@ export default function Analysis() {
 
   var loadMonthly = useCallback(async function () {
     setMonthlyLoading(true)
-    var { data } = await supabase.rpc('monthly_summary', {
-      p_year: year, p_month: month,
+    var startDate = year + '-' + String(month).padStart(2, '0') + '-01'
+    var endDay = new Date(year, month, 0).getDate()
+    var endDate = year + '-' + String(month).padStart(2, '0') + '-' + String(endDay).padStart(2, '0')
+    var { data } = await supabase.rpc('monthly_summary_range', {
+      p_from_date: startDate, p_to_date: endDate,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
     var filtered = data || []

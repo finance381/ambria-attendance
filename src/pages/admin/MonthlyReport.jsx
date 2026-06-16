@@ -35,11 +35,15 @@ export default function MonthlyReport() {
   var loadData = useCallback(async function () {
     setLoading(true)
     var [summaryRes, deptRes] = await Promise.all([
-      supabase.rpc('monthly_summary', {
-        p_year: year,
-        p_month: month,
-        p_department_id: deptFilter ? Number(deptFilter) : null
-      }),
+      (function () {
+        var s = year + '-' + String(month).padStart(2, '0') + '-01'
+        var ed = new Date(year, month, 0).getDate()
+        var e = year + '-' + String(month).padStart(2, '0') + '-' + String(ed).padStart(2, '0')
+        return supabase.rpc('monthly_summary_range', {
+          p_from_date: s, p_to_date: e,
+          p_department_id: deptFilter ? Number(deptFilter) : null
+        })
+      })(),
       supabase.from('departments').select('id, name').eq('active', true).order('name')
     ])
 
@@ -312,8 +316,11 @@ export default function MonthlyReport() {
 
     for (var i = 0; i < months.length; i++) {
       var m = months[i]
-      var { data: mData } = await supabase.rpc('monthly_summary', {
-        p_year: m.year, p_month: m.month,
+      var ms = m.year + '-' + String(m.month).padStart(2, '0') + '-01'
+      var med = new Date(m.year, m.month, 0).getDate()
+      var me = m.year + '-' + String(m.month).padStart(2, '0') + '-' + String(med).padStart(2, '0')
+      var { data: mData } = await supabase.rpc('monthly_summary_range', {
+        p_from_date: ms, p_to_date: me,
         p_department_id: deptFilter ? Number(deptFilter) : null
       })
 
