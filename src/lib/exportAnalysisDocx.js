@@ -1,22 +1,11 @@
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  HeadingLevel, AlignmentType, BorderStyle, WidthType, ShadingType
+  AlignmentType, BorderStyle, WidthType, ShadingType
 } from 'docx'
+import { supabase } from './supabase'
+import { FIELD_GROUPS } from '../components/ExportFieldPicker'
 
-/* ── helpers ───────────────────────────────────────────── */
-
-function secsToTime(secs) {
-  if (secs == null) return '—'
-  var h = Math.floor(secs / 3600)
-  var m = Math.floor((secs % 3600) / 60)
-  var ampm = h >= 12 ? 'PM' : 'AM'
-  h = h % 12 || 12
-  return h + ':' + String(m).padStart(2, '0') + ' ' + ampm
-}
-
-function num(v, d) { return v != null ? Number(v).toFixed(d === undefined ? 1 : d) : '—' }
-function pct(v) { return v != null ? Math.round(v) + '%' : '—' }
-function rangeFmt(from, to) { return from + '  to  ' + to }
+/* ── style tokens ──────────────────────────────────────── */
 
 var BORDER = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
 var BORDERS = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER }
@@ -28,38 +17,475 @@ function hdrCell(text, width) {
   return new TableCell({
     borders: BORDERS, width: { size: width, type: WidthType.DXA },
     shading: HDR_FILL, margins: CELL_MARGINS,
-    children: [new Paragraph({ alignment: AlignmentType.LEFT,
-      children: [new TextRun({ text: text, bold: true, font: 'Arial', size: 18, color: 'FFFFFF' })]
+    children: [new Paragraph({ alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: text, bold: true, font: 'Arial', size: 16, color: 'FFFFFF' })]
     })]
   })
 }
 
 function dataCell(text, width, opts) {
-  var align = (opts && opts.right) ? AlignmentType.RIGHT : AlignmentType.LEFT
+  var align = (opts && opts.right) ? AlignmentType.RIGHT : AlignmentType.CENTER
+  if (opts && opts.left) align = AlignmentType.LEFT
   var shading = (opts && opts.alt) ? ALT_FILL : undefined
   var color = (opts && opts.color) || '334155'
   return new TableCell({
     borders: BORDERS, width: { size: width, type: WidthType.DXA },
     shading: shading, margins: CELL_MARGINS,
     children: [new Paragraph({ alignment: align,
-      children: [new TextRun({ text: String(text || '—'), font: 'Arial', size: 18, color: color })]
+      children: [new TextRun({ text: String(text != null ? text : '—'), font: 'Arial', size: 16, color: color })]
     })]
   })
 }
 
-function title(text) {
-  return new Paragraph({
-    spacing: { after: 100 },
-    children: [new TextRun({ text: text, bold: true, font: 'Arial', size: 28, color: '0F172A' })]
-  })
+function secsToTime(secs) {
+  if (secs == null) return '—'
+  var h = Math.floor(secs / 3600)
+  var m = Math.floor((secs % 3600) / 60)
+  var ampm = h >= 12 ? 'PM' : 'AM'
+  h = h % 12 || 12
+  return h + ':' + String(m).padStart(2, '0') + ' ' + ampm
 }
 
-function subtitle(text) {
-  return new Paragraph({
-    spacing: { after: 200 },
-    children: [new TextRun({ text: text, font: 'Arial', size: 20, color: '64748B' })]
-  })
+function fmtTime(ts) {
+  if (!ts) return '—'
+  var d = new Date(ts)
+  var h = d.getHours()
+  var m = String(d.getMinutes()).padStart(2, '0')
+  var ampm = h >= 12 ? 'PM' : 'AM'
+  h = h % 12 || 12
+  return h + ':' + m + ' ' + ampm
 }
+
+function pctColor(v) { return v < 50 ? 'DC2626' : v < 75 ? 'D97706' : '059669' }
+function hrsColor(v) { return v < 6 ? 'DC2626' : v < 8 ? 'D97706' : '059669' }
+
+/* ── data fetchers ─────────────────────────────────────── */
+
+async function fetchMonthly(fromDate, toDate, deptId) {
+  var { data } = await supabase.rpc('monthly_summary_range', {
+    p_from_date: fromDate, p_to_date: toDate,
+    p_department_id: deptId || null,
+  })
+  return data || []
+}
+
+async function fetchTiming(fromDate, toDate, deptId) {
+  var { data } = await supabase.rpc('avg_punch_times', {
+    p_from_date: fromDate, p_to_date: toDate,
+    p_department_id: deptId || null,
+  })
+  return data || []
+}
+
+async function fetchDAR(fromDate, toDate, deptId) {
+  var { data } = await supabase.rpc('dar_compliance', {
+    p_from_date: fromDate, p_to_date: toDate,
+    p_department_id: deptId || null,
+  })
+  return data || []
+}
+
+async function fetchLeaves() {
+  var { data } = await supabase.rpc('admin_all_leave_balances')
+  return data || []
+}
+
+async function fetchPunches(employeeIds, fromDate, toDate) {
+  var all = []
+  // Supabase has 1000 row default; batch by employee chunks
+  for (var i = 0; i < employeeIds.length; i += 20) {
+    var batch = employeeIds.slice(i, i + 20)
+    var { data } = await supabase
+      .from('punches')
+      .select('employee_id, attendance_date, punch_type, punched_at, location_name')
+      .in('employee_id', batch)
+      .gte('attendance_date', fromDate)
+      .lte('attendance_date', toDate)
+      .order('attendance_date', { ascending: true })
+      .order('punched_at', { ascending: true })
+      .limit(1000)
+    if (data) all = all.concat(data)
+  }
+  return all
+}
+
+/* ── column definitions per group ──────────────────────── */
+
+function getColumns(selectedKeys) {
+  var cols = []
+
+  // Always include name + code + dept
+  cols.push({ key: 'emp_code', label: 'Code', width: 900, getter: function (r) { return r.emp_code }, left: true })
+  cols.push({ key: 'name', label: 'Name', width: 1600, getter: function (r) { return r.name }, left: true })
+  cols.push({ key: 'dept', label: 'Dept', width: 1200, getter: function (r) { return r.department_name || '—' }, left: true })
+
+  if (selectedKeys.indexOf('attendance') >= 0) {
+    cols.push({ key: 'att_pct', label: 'Att%', width: 650, getter: function (r) { return r.attendance_pct != null ? Math.round(r.attendance_pct) + '%' : '—' }, colorFn: function (r) { return pctColor(r.attendance_pct || 0) } })
+    cols.push({ key: 'present', label: 'Present', width: 650, getter: function (r) { return r.days_present || 0 } })
+    cols.push({ key: 'half', label: 'Half', width: 550, getter: function (r) { return r.days_half || 0 } })
+    cols.push({ key: 'absent', label: 'Absent', width: 600, getter: function (r) { return r.days_absent || 0 }, colorFn: function (r) { return (r.days_absent || 0) > 3 ? 'DC2626' : '334155' } })
+    cols.push({ key: 'incomplete', label: 'Inc', width: 550, getter: function (r) { return r.days_incomplete || 0 } })
+  }
+
+  if (selectedKeys.indexOf('hours') >= 0) {
+    cols.push({ key: 'total_hours', label: 'Total Hrs', width: 750, getter: function (r) { return r.total_hours ? Number(r.total_hours).toFixed(0) + 'h' : '—' } })
+    cols.push({ key: 'avg_daily', label: 'Avg/Day', width: 700, getter: function (r) {
+      var d = (r.days_present || 0) + (r.days_half || 0)
+      return d > 0 ? (r.total_hours / d).toFixed(1) + 'h' : '—'
+    }, colorFn: function (r) {
+      var d = (r.days_present || 0) + (r.days_half || 0)
+      var avg = d > 0 ? r.total_hours / d : 0
+      return hrsColor(avg)
+    }})
+  }
+
+  if (selectedKeys.indexOf('timing') >= 0) {
+    cols.push({ key: 'avg_in', label: 'Avg In', width: 800, getter: function (r) { return secsToTime(r._avg_in_secs) } })
+    cols.push({ key: 'avg_out', label: 'Avg Out', width: 800, getter: function (r) { return secsToTime(r._avg_out_secs) } })
+    cols.push({ key: 'min_hrs', label: 'Min Hrs', width: 650, getter: function (r) { return r._min_hours != null ? Number(r._min_hours).toFixed(1) : '—' } })
+    cols.push({ key: 'max_hrs', label: 'Max Hrs', width: 650, getter: function (r) { return r._max_hours != null ? Number(r._max_hours).toFixed(1) : '—' } })
+  }
+
+  if (selectedKeys.indexOf('dar') >= 0) {
+    cols.push({ key: 'dar_pct', label: 'DAR%', width: 650, getter: function (r) {
+      if (!r._dar_present || r._dar_present === 0) return '—'
+      return Math.round((r._dar_submitted || 0) / r._dar_present * 100) + '%'
+    }, colorFn: function (r) {
+      if (!r._dar_present) return '334155'
+      var p = (r._dar_submitted || 0) / r._dar_present * 100
+      return pctColor(p)
+    }})
+    cols.push({ key: 'dar_submitted', label: 'DAR Sub', width: 650, getter: function (r) { return r._dar_submitted || 0 } })
+    cols.push({ key: 'dar_missing', label: 'DAR Miss', width: 650, getter: function (r) {
+      return Math.max(0, (r._dar_present || 0) - (r._dar_submitted || 0))
+    }, colorFn: function (r) {
+      var m = Math.max(0, (r._dar_present || 0) - (r._dar_submitted || 0))
+      return m > 0 ? 'DC2626' : '334155'
+    }})
+  }
+
+  if (selectedKeys.indexOf('claims') >= 0) {
+    cols.push({ key: 'claims_used', label: 'Claims', width: 600, getter: function (r) {
+      return (r.claims_used || 0) + '/' + (r.claims_limit || 0)
+    }})
+    cols.push({ key: 'claims_over', label: 'Over', width: 500, getter: function (r) { return r.claims_over_limit || 0 }, colorFn: function (r) { return (r.claims_over_limit || 0) > 0 ? 'DC2626' : '334155' } })
+  }
+
+  if (selectedKeys.indexOf('leaves') >= 0) {
+    cols.push({ key: 'leave_used', label: 'Leave Used', width: 750, getter: function (r) { return (r._leave_used || 0) + '/' + (r._leave_total || 0) } })
+    cols.push({ key: 'leave_rem', label: 'Remaining', width: 750, getter: function (r) { return r._leave_remaining || 0 }, colorFn: function (r) {
+      if (!r._leave_total) return '334155'
+      var pct = (r._leave_remaining || 0) / r._leave_total * 100
+      return pctColor(pct)
+    }})
+    cols.push({ key: 'half_bal', label: 'Half Bal', width: 650, getter: function (r) {
+      return (r._half_used || 0) + '/' + (r._half_total || 0)
+    }})
+  }
+
+  return cols
+}
+
+/* ── daily punch detail pages ──────────────────────────── */
+
+function buildDailyPunchPages(employees, punchData, includeLocations) {
+  var pages = []
+  var byEmp = {}
+  punchData.forEach(function (p) {
+    if (!byEmp[p.employee_id]) byEmp[p.employee_id] = []
+    byEmp[p.employee_id].push(p)
+  })
+
+  var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  employees.forEach(function (emp) {
+    var punches = byEmp[emp.employee_id] || []
+    if (punches.length === 0) return
+
+    // Group by date
+    var byDate = {}
+    punches.forEach(function (p) {
+      var d = p.attendance_date
+      if (!byDate[d]) byDate[d] = { inTime: null, outTime: null, inLoc: null, outLoc: null }
+      if (p.punch_type === 'in') {
+        byDate[d].inTime = fmtTime(p.punched_at)
+        byDate[d].inLoc = p.location_name || '—'
+      }
+      if (p.punch_type === 'out') {
+        byDate[d].outTime = fmtTime(p.punched_at)
+        byDate[d].outLoc = p.location_name || '—'
+      }
+    })
+
+    var dates = Object.keys(byDate).sort()
+
+    // Build mini table
+    var detailCols = [
+      { label: 'Date', width: 1000 },
+      { label: 'Day', width: 700 },
+      { label: 'In', width: 900 },
+    ]
+    if (includeLocations) detailCols.push({ label: 'In Location', width: 1800 })
+    detailCols.push({ label: 'Out', width: 900 })
+    if (includeLocations) detailCols.push({ label: 'Out Location', width: 1800 })
+
+    var colWidths = detailCols.map(function (c) { return c.width })
+    var tableW = colWidths.reduce(function (s, w) { return s + w }, 0)
+
+    var headerRow = new TableRow({
+      children: detailCols.map(function (c) { return hdrCell(c.label, c.width) })
+    })
+
+    var rows = [headerRow]
+    dates.forEach(function (dateStr, i) {
+      var d = byDate[dateStr]
+      var dt = new Date(dateStr + 'T00:00:00')
+      var dayName = dayNames[dt.getDay()]
+      var alt = i % 2 === 1
+      var isWeekend = dt.getDay() === 0 || dt.getDay() === 6
+
+      var cells = [
+        dataCell(dateStr.slice(5), colWidths[0], { alt: alt }),
+        dataCell(dayName, colWidths[1], { alt: alt, color: isWeekend ? 'DC2626' : '334155' }),
+        dataCell(d.inTime || '—', colWidths[2], { alt: alt, color: '2563EB' }),
+      ]
+      var ci = 3
+      if (includeLocations) {
+        cells.push(dataCell(d.inLoc === '—' ? '— (no GPS)' : d.inLoc, colWidths[ci], { alt: alt, left: true, color: d.inLoc === '—' ? 'A0AEC0' : '059669' }))
+        ci++
+      }
+      cells.push(dataCell(d.outTime || '—', colWidths[ci], { alt: alt, color: 'DC2626' }))
+      ci++
+      if (includeLocations) {
+        cells.push(dataCell(d.outLoc === '—' ? '— (no GPS)' : d.outLoc, colWidths[ci], { alt: alt, left: true, color: d.outLoc === '—' ? 'A0AEC0' : '059669' }))
+      }
+
+      rows.push(new TableRow({ children: cells }))
+    })
+
+    pages.push(
+      new Paragraph({
+        spacing: { before: 300, after: 80 },
+        children: [
+          new TextRun({ text: emp.name, bold: true, font: 'Arial', size: 22, color: '0F172A' }),
+          new TextRun({ text: '  ' + emp.emp_code + '  •  ' + (emp.department_name || ''), font: 'Arial', size: 18, color: '64748B' }),
+        ]
+      }),
+      new Table({ width: { size: tableW, type: WidthType.DXA }, columnWidths: colWidths, rows: rows })
+    )
+  })
+
+  return pages
+}
+
+/* ── main export function ──────────────────────────────── */
+
+export async function exportMonthlyDocx(selectedKeys, opts) {
+  // opts: { fromDate, toDate, deptId, deptName, employees (array with employee_id, emp_code, name, department_name) }
+
+  // Determine which sources to fetch
+  var needSources = {}
+  FIELD_GROUPS.forEach(function (g) {
+    if (selectedKeys.indexOf(g.key) >= 0) needSources[g.source] = true
+  })
+
+  // Parallel fetch
+  var monthlyP = needSources['monthly_summary_range'] ? fetchMonthly(opts.fromDate, opts.toDate, opts.deptId) : Promise.resolve([])
+  var timingP = needSources['avg_punch_times'] ? fetchTiming(opts.fromDate, opts.toDate, opts.deptId) : Promise.resolve([])
+  var darP = needSources['dar_compliance'] ? fetchDAR(opts.fromDate, opts.toDate, opts.deptId) : Promise.resolve([])
+  var leavesP = needSources['admin_all_leave_balances'] ? fetchLeaves() : Promise.resolve([])
+
+  var needPunches = selectedKeys.indexOf('daily_punches') >= 0 || selectedKeys.indexOf('locations') >= 0
+
+  var results = await Promise.all([monthlyP, timingP, darP, leavesP])
+  var monthlyData = results[0]
+  var timingData = results[1]
+  var darData = results[2]
+  var leavesData = results[3]
+
+  // Build employee_id lookup from monthly (primary)
+  var empMap = {}
+  monthlyData.forEach(function (r) {
+    empMap[r.employee_id] = { ...r }
+  })
+
+  // Merge timing data
+  var timingMap = {}
+  timingData.forEach(function (r) { timingMap[r.employee_id] = r })
+
+  // Merge DAR data
+  var darMap = {}
+  darData.forEach(function (r) { darMap[r.employee_id] = r })
+
+  // Merge leave data
+  var leaveMap = {}
+  leavesData.forEach(function (r) { leaveMap[r.employee_id] = r })
+
+  // Enrich empMap with merged data
+  Object.keys(empMap).forEach(function (eid) {
+    var r = empMap[eid]
+    var t = timingMap[eid] || {}
+    r._avg_in_secs = t.avg_in_secs
+    r._avg_out_secs = t.avg_out_secs
+    r._min_hours = t.min_hours
+    r._max_hours = t.max_hours
+
+    var d = darMap[eid] || {}
+    r._dar_submitted = d.days_submitted
+    r._dar_present = d.days_present
+
+    var l = leaveMap[eid] || {}
+    r._leave_used = l.leaves_used
+    r._leave_total = l.annual_leaves || l.annual_total
+    r._leave_remaining = l.leaves_remaining || l.annual_remaining
+    r._half_used = l.half_days_used
+    r._half_total = l.half_annual_total
+  })
+
+  // If no monthly data but we have other sources, build from timing or DAR
+  if (monthlyData.length === 0) {
+    timingData.forEach(function (r) {
+      if (!empMap[r.employee_id]) {
+        empMap[r.employee_id] = { employee_id: r.employee_id, emp_code: r.emp_code, name: r.name, department_name: r.department_name }
+      }
+    })
+    darData.forEach(function (r) {
+      if (!empMap[r.employee_id]) {
+        empMap[r.employee_id] = { employee_id: r.employee_id, emp_code: r.emp_code, name: r.name, department_name: r.department_name }
+      }
+    })
+  }
+
+  var employees = Object.values(empMap).filter(function (r) { return !r.is_casual })
+  employees.sort(function (a, b) { return (a.emp_code || '').localeCompare(b.emp_code || '') })
+
+  // Fetch punches if needed
+  var punchData = []
+  if (needPunches && employees.length > 0) {
+    var ids = employees.map(function (e) { return e.employee_id })
+    punchData = await fetchPunches(ids, opts.fromDate, opts.toDate)
+  }
+
+  // Build columns
+  var cols = getColumns(selectedKeys)
+  var colWidths = cols.map(function (c) { return c.width })
+  var tableWidth = colWidths.reduce(function (s, w) { return s + w }, 0)
+
+  // Header row
+  var headerRow = new TableRow({
+    tableHeader: true,
+    children: cols.map(function (c) { return hdrCell(c.label, c.width) })
+  })
+
+  // Data rows
+  var dataRows = [headerRow]
+  employees.forEach(function (emp, i) {
+    var alt = i % 2 === 1
+    var cells = cols.map(function (c) {
+      var val = c.getter(emp)
+      var color = c.colorFn ? c.colorFn(emp) : '334155'
+      return dataCell(val, c.width, { alt: alt, color: color, left: c.left })
+    })
+    dataRows.push(new TableRow({ children: cells }))
+  })
+
+  // Summary stats
+  var statLines = []
+  statLines.push(statLine('Employees', employees.length))
+  statLines.push(statLine('Period', opts.fromDate + ' to ' + opts.toDate))
+  if (opts.deptName) statLines.push(statLine('Department', opts.deptName))
+
+  if (selectedKeys.indexOf('attendance') >= 0) {
+    var totalPresent = 0, totalEff = 0, totalHalf = 0
+    employees.forEach(function (r) {
+      totalPresent += (r.days_present || 0)
+      totalHalf += (r.days_half || 0)
+      totalEff += (r.effective_days || 0)
+    })
+    var overallAtt = totalEff > 0 ? ((totalPresent + totalHalf * 0.5) / totalEff * 100).toFixed(1) + '%' : '—'
+    statLines.push(statLine('Overall Attendance', overallAtt))
+  }
+
+  if (selectedKeys.indexOf('hours') >= 0) {
+    var totalHrs = 0, totalWorkers = 0
+    employees.forEach(function (r) {
+      var d = (r.days_present || 0) + (r.days_half || 0)
+      if (d > 0) { totalHrs += r.total_hours / d; totalWorkers++ }
+    })
+    var avgDaily = totalWorkers > 0 ? (totalHrs / totalWorkers).toFixed(1) + 'h' : '—'
+    statLines.push(statLine('Avg Daily Hours', avgDaily))
+  }
+
+  // Sections label
+  var sectionsUsed = selectedKeys.map(function (k) {
+    var g = FIELD_GROUPS.find(function (fg) { return fg.key === k })
+    return g ? g.label : k
+  }).join(', ')
+
+  // Build doc children
+  var docChildren = [
+    new Paragraph({
+      spacing: { after: 100 },
+      children: [new TextRun({ text: 'Ambria Attendance — Monthly Report', bold: true, font: 'Arial', size: 28, color: '0F172A' })]
+    }),
+    new Paragraph({
+      spacing: { after: 40 },
+      children: [new TextRun({ text: opts.fromDate + '  to  ' + opts.toDate + '   •   ' + (opts.deptName || 'All Departments'), font: 'Arial', size: 20, color: '64748B' })]
+    }),
+    new Paragraph({
+      spacing: { after: 200 },
+      children: [new TextRun({ text: 'Sections: ' + sectionsUsed, font: 'Arial', size: 16, color: '94A3B8', italics: true })]
+    }),
+    ...statLines,
+    new Paragraph({ spacing: { after: 120 }, children: [] }),
+    new Table({ width: { size: tableWidth, type: WidthType.DXA }, columnWidths: colWidths, rows: dataRows }),
+  ]
+
+  // Add daily punch detail pages if selected
+  if (needPunches && punchData.length > 0) {
+    var includeLocations = selectedKeys.indexOf('locations') >= 0
+    docChildren.push(
+      new Paragraph({ spacing: { before: 400, after: 100 },
+        children: [new TextRun({ text: 'Daily Punch Detail', bold: true, font: 'Arial', size: 24, color: '0F172A' })]
+      })
+    )
+    var detailPages = buildDailyPunchPages(employees, punchData, includeLocations)
+    docChildren = docChildren.concat(detailPages)
+  }
+
+  // Footer
+  docChildren.push(
+    new Paragraph({ spacing: { before: 200 }, children: [] }),
+    new Paragraph({
+      children: [new TextRun({ text: 'Generated on ' + new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }), font: 'Arial', size: 16, color: '94A3B8', italics: true })]
+    })
+  )
+
+  var doc = new Document({
+    styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 15840, height: 12240, orientation: 'landscape' },
+          margin: { top: 720, right: 720, bottom: 720, left: 720 }
+        }
+      },
+      children: docChildren
+    }]
+  })
+
+  var blob = await Packer.toBlob(doc)
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href = url
+  a.download = 'monthly_report_' + opts.fromDate + '_to_' + opts.toDate + '.docx'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/* ── helpers ───────────────────────────────────────────── */
 
 function statLine(label, value) {
   return new Paragraph({
@@ -69,285 +495,4 @@ function statLine(label, value) {
       new TextRun({ text: String(value), bold: true, font: 'Arial', size: 20, color: '0F172A' }),
     ]
   })
-}
-
-function spacer() { return new Paragraph({ spacing: { after: 200 }, children: [] }) }
-
-/* ── Timing ────────────────────────────────────────────── */
-
-function buildTimingDoc(data, opts) {
-  var avgIn = data.length ? Math.round(data.reduce(function (s, r) { return s + (r.avg_in_secs || 0) }, 0) / data.length) : 0
-  var avgOut = data.length ? Math.round(data.reduce(function (s, r) { return s + (r.avg_out_secs || 0) }, 0) / data.length) : 0
-  var avgHrs = data.length ? (data.reduce(function (s, r) { return s + (r.avg_hours || 0) }, 0) / data.length).toFixed(1) : '0'
-
-  var colW = [1600, 1800, 700, 1000, 1000, 800, 800, 800, 1200]
-  var tableW = colW.reduce(function (s, w) { return s + w }, 0)
-
-  var headerRow = new TableRow({ children: [
-    hdrCell('Name', colW[0]), hdrCell('Dept', colW[1]), hdrCell('Days', colW[2]),
-    hdrCell('Avg In', colW[3]), hdrCell('Avg Out', colW[4]), hdrCell('Avg Hrs', colW[5]),
-    hdrCell('Min', colW[6]), hdrCell('Max', colW[7]), hdrCell('Flag', colW[8]),
-  ] })
-
-  var rows = [headerRow]
-  data.forEach(function (r, i) {
-    var flag = ''
-    if (r.avg_hours < 8) flag = 'Low hours'
-    if (r.avg_hours >= 10) flag = 'Extended'
-    var alt = i % 2 === 1
-
-    rows.push(new TableRow({ children: [
-      dataCell(r.name, colW[0], { alt: alt }),
-      dataCell(r.department_name, colW[1], { alt: alt }),
-      dataCell(r.days_worked, colW[2], { right: true, alt: alt }),
-      dataCell(secsToTime(r.avg_in_secs), colW[3], { alt: alt }),
-      dataCell(secsToTime(r.avg_out_secs), colW[4], { alt: alt }),
-      dataCell(num(r.avg_hours), colW[5], { right: true, alt: alt }),
-      dataCell(num(r.min_hours), colW[6], { right: true, alt: alt }),
-      dataCell(num(r.max_hours), colW[7], { right: true, alt: alt }),
-      dataCell(flag, colW[8], { alt: alt, color: flag ? 'DC2626' : '334155' }),
-    ] }))
-  })
-
-  return makeDoc('Punch Timing Report', opts, [
-    statLine('Employees', data.length),
-    statLine('Avg In', secsToTime(avgIn)),
-    statLine('Avg Out', secsToTime(avgOut)),
-    statLine('Avg Hours', avgHrs + 'h'),
-    spacer(),
-    new Table({ width: { size: tableW, type: WidthType.DXA }, columnWidths: colW, rows: rows }),
-  ])
-}
-
-/* ── Attendance ────────────────────────────────────────── */
-
-function buildAttendanceDoc(data, opts) {
-  var totalPresent = 0, totalHalf = 0, totalAbsent = 0, totalEff = 0
-  data.forEach(function (r) {
-    totalPresent += (r.days_present || 0)
-    totalHalf += (r.days_half || 0)
-    totalAbsent += (r.days_absent || 0)
-    totalEff += (r.effective_days || 0)
-  })
-  var overallPct = totalEff > 0 ? ((totalPresent + totalHalf * 0.5) / totalEff * 100).toFixed(1) + '%' : '—'
-
-  var colW = [1600, 1400, 800, 800, 800, 800, 900, 900]
-  var tableW = colW.reduce(function (s, w) { return s + w }, 0)
-
-  var headerRow = new TableRow({ children: [
-    hdrCell('Name', colW[0]), hdrCell('Dept', colW[1]), hdrCell('Att %', colW[2]),
-    hdrCell('Present', colW[3]), hdrCell('Half', colW[4]), hdrCell('Absent', colW[5]),
-    hdrCell('Incomplete', colW[6]), hdrCell('Hours', colW[7]),
-  ] })
-
-  var rows = [headerRow]
-  data.forEach(function (r, i) {
-    var attPct = r.attendance_pct != null ? r.attendance_pct :
-      (r.effective_days ? ((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days * 100) : 0)
-    var alt = i % 2 === 1
-    rows.push(new TableRow({ children: [
-      dataCell(r.name, colW[0], { alt: alt }),
-      dataCell(r.department_name, colW[1], { alt: alt }),
-      dataCell(pct(attPct), colW[2], { right: true, alt: alt, color: attPct < 50 ? 'DC2626' : attPct < 75 ? 'D97706' : '059669' }),
-      dataCell(r.days_present, colW[3], { right: true, alt: alt }),
-      dataCell(r.days_half || 0, colW[4], { right: true, alt: alt }),
-      dataCell(r.days_absent || 0, colW[5], { right: true, alt: alt, color: r.days_absent > 3 ? 'DC2626' : '334155' }),
-      dataCell(r.days_incomplete || 0, colW[6], { right: true, alt: alt }),
-      dataCell(num(r.total_hours, 0), colW[7], { right: true, alt: alt }),
-    ] }))
-  })
-
-  return makeDoc('Attendance Report', opts, [
-    statLine('Staff', data.length),
-    statLine('Overall Attendance', overallPct),
-    statLine('Total Present Days', totalPresent),
-    statLine('Total Absent Days', totalAbsent),
-    statLine('Total Half Days', totalHalf),
-    spacer(),
-    new Table({ width: { size: tableW, type: WidthType.DXA }, columnWidths: colW, rows: rows }),
-  ])
-}
-
-/* ── Hours ─────────────────────────────────────────────── */
-
-function buildHoursDoc(data, opts) {
-  var below8 = 0, above10 = 0, totalAvg = 0
-  data.forEach(function (r) {
-    var daysWorked = (r.days_present || 0) + (r.days_half || 0)
-    var avg = daysWorked > 0 ? r.total_hours / daysWorked : 0
-    r._avgDaily = avg
-    if (avg < 8 && avg > 0) below8++
-    if (avg >= 10) above10++
-    totalAvg += avg
-  })
-  var overallAvg = data.length ? (totalAvg / data.length).toFixed(1) : '0'
-
-  var colW = [1800, 1600, 1000, 1000, 1000, 1600]
-  var tableW = colW.reduce(function (s, w) { return s + w }, 0)
-
-  var headerRow = new TableRow({ children: [
-    hdrCell('Name', colW[0]), hdrCell('Dept', colW[1]), hdrCell('Avg Daily', colW[2]),
-    hdrCell('Total Hrs', colW[3]), hdrCell('Days', colW[4]), hdrCell('Flag', colW[5]),
-  ] })
-
-  var rows = [headerRow]
-  data.forEach(function (r, i) {
-    var flag = ''
-    if (r._avgDaily < 6) flag = 'Critical — below 6h'
-    else if (r._avgDaily < 8) flag = 'Below 8h'
-    else if (r._avgDaily >= 10) flag = 'Extended shifts'
-    var alt = i % 2 === 1
-    rows.push(new TableRow({ children: [
-      dataCell(r.name, colW[0], { alt: alt }),
-      dataCell(r.department_name, colW[1], { alt: alt }),
-      dataCell(num(r._avgDaily), colW[2], { right: true, alt: alt, color: r._avgDaily < 6 ? 'DC2626' : r._avgDaily < 8 ? 'D97706' : '059669' }),
-      dataCell(num(r.total_hours, 0), colW[3], { right: true, alt: alt }),
-      dataCell((r.days_present || 0) + (r.days_half || 0), colW[4], { right: true, alt: alt }),
-      dataCell(flag, colW[5], { alt: alt, color: flag ? 'DC2626' : '334155' }),
-    ] }))
-  })
-
-  return makeDoc('Hours Report', opts, [
-    statLine('Staff', data.length),
-    statLine('Avg Daily Hours', overallAvg + 'h'),
-    statLine('Below 8h', below8 + ' employees'),
-    statLine('Above 10h', above10 + ' employees'),
-    spacer(),
-    new Table({ width: { size: tableW, type: WidthType.DXA }, columnWidths: colW, rows: rows }),
-  ])
-}
-
-/* ── DAR Compliance ────────────────────────────────────── */
-
-function buildDarDoc(data, opts) {
-  var totalSubmitted = 0, totalRequired = 0
-  data.forEach(function (r) {
-    totalSubmitted += (r.days_submitted || 0)
-    totalRequired += (r.days_present || 0)
-  })
-  var overallPct = totalRequired > 0 ? (totalSubmitted / totalRequired * 100).toFixed(1) + '%' : '—'
-  var high = data.filter(function (r) { return r.days_present > 0 && (r.days_submitted / r.days_present * 100) >= 90 }).length
-  var low = data.filter(function (r) { return r.days_present > 0 && (r.days_submitted / r.days_present * 100) < 50 }).length
-
-  var colW = [1800, 1600, 1200, 1100, 1100, 1200]
-  var tableW = colW.reduce(function (s, w) { return s + w }, 0)
-
-  var headerRow = new TableRow({ children: [
-    hdrCell('Name', colW[0]), hdrCell('Dept', colW[1]), hdrCell('Compliance', colW[2]),
-    hdrCell('Submitted', colW[3]), hdrCell('Present', colW[4]), hdrCell('Missing', colW[5]),
-  ] })
-
-  var rows = [headerRow]
-  data.forEach(function (r, i) {
-    var compPct = r.days_present > 0 ? (r.days_submitted / r.days_present * 100) : 0
-    var missing = Math.max(0, (r.days_present || 0) - (r.days_submitted || 0))
-    var alt = i % 2 === 1
-    rows.push(new TableRow({ children: [
-      dataCell(r.name, colW[0], { alt: alt }),
-      dataCell(r.department_name, colW[1], { alt: alt }),
-      dataCell(pct(compPct), colW[2], { right: true, alt: alt, color: compPct < 50 ? 'DC2626' : compPct < 90 ? 'D97706' : '059669' }),
-      dataCell(r.days_submitted || 0, colW[3], { right: true, alt: alt }),
-      dataCell(r.days_present || 0, colW[4], { right: true, alt: alt }),
-      dataCell(missing, colW[5], { right: true, alt: alt, color: missing > 0 ? 'DC2626' : '334155' }),
-    ] }))
-  })
-
-  return makeDoc('DAR Compliance Report', opts, [
-    statLine('Staff Required', data.length),
-    statLine('Overall Compliance', overallPct),
-    statLine('90%+ Compliant', high + ' employees'),
-    statLine('Below 50%', low + ' employees'),
-    spacer(),
-    new Table({ width: { size: tableW, type: WidthType.DXA }, columnWidths: colW, rows: rows }),
-  ])
-}
-
-/* ── Concerns ──────────────────────────────────────────── */
-
-function buildConcernsDoc(concerns, opts) {
-  var colW = [600, 1800, 1400, 800, 3400]
-  var tableW = colW.reduce(function (s, w) { return s + w }, 0)
-
-  var headerRow = new TableRow({ children: [
-    hdrCell('#', colW[0]), hdrCell('Name', colW[1]), hdrCell('Dept', colW[2]),
-    hdrCell('Score', colW[3]), hdrCell('Concerns', colW[4]),
-  ] })
-
-  var rows = [headerRow]
-  concerns.forEach(function (c, i) {
-    var alt = i % 2 === 1
-    rows.push(new TableRow({ children: [
-      dataCell(i + 1, colW[0], { right: true, alt: alt }),
-      dataCell(c.name, colW[1], { alt: alt }),
-      dataCell(c.dept, colW[2], { alt: alt }),
-      dataCell(c.score, colW[3], { right: true, alt: alt, color: c.score >= 50 ? 'DC2626' : c.score >= 25 ? 'D97706' : '334155' }),
-      dataCell((c.concerns || []).map(function (x) { return x.label || x }).join(', '), colW[4], { alt: alt }),
-    ] }))
-  })
-
-  return makeDoc('Employee Concerns Report', opts, [
-    statLine('Flagged Employees', concerns.length),
-    spacer(),
-    new Table({ width: { size: tableW, type: WidthType.DXA }, columnWidths: colW, rows: rows }),
-    spacer(),
-    new Paragraph({ spacing: { after: 80 },
-      children: [new TextRun({ text: 'Scoring Criteria', bold: true, font: 'Arial', size: 20, color: '0F172A' })]
-    }),
-    new Paragraph({ children: [new TextRun({ text: 'Late arrival (after 12 PM): up to 30 pts  |  Low hours (<6h): 25 pts, (<8h): 10 pts  |  Attendance <50%: 35 pts, <75%: 20 pts  |  3+ incomplete: 15 pts  |  DAR <30%: 25 pts, <70%: 12 pts', font: 'Arial', size: 16, color: '64748B' })] }),
-  ])
-}
-
-/* ── doc wrapper ───────────────────────────────────────── */
-
-function makeDoc(reportTitle, opts, children) {
-  var dateRange = rangeFmt(opts.fromDate, opts.toDate)
-  var deptLabel = opts.deptName ? 'Department: ' + opts.deptName : 'All Departments'
-
-  return new Document({
-    styles: {
-      default: { document: { run: { font: 'Arial', size: 20 } } },
-    },
-    sections: [{
-      properties: {
-        page: {
-          size: { width: 15840, height: 12240, orientation: 'landscape' },
-          margin: { top: 720, right: 720, bottom: 720, left: 720 }
-        }
-      },
-      children: [
-        title('Ambria Attendance — ' + reportTitle),
-        subtitle(dateRange + '   •   ' + deptLabel),
-        spacer(),
-        ...children,
-        spacer(),
-        new Paragraph({
-          children: [new TextRun({ text: 'Generated on ' + new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }), font: 'Arial', size: 16, color: '94A3B8', italics: true })]
-        }),
-      ]
-    }]
-  })
-}
-
-/* ── public API ────────────────────────────────────────── */
-
-export async function exportAnalysisDocx(viewName, data, opts) {
-  var doc
-  switch (viewName) {
-    case 'timing': doc = buildTimingDoc(data, opts); break
-    case 'attendance': doc = buildAttendanceDoc(data, opts); break
-    case 'hours': doc = buildHoursDoc(data, opts); break
-    case 'dar': doc = buildDarDoc(data, opts); break
-    case 'concerns': doc = buildConcernsDoc(data, opts); break
-    default: return
-  }
-
-  var blob = await Packer.toBlob(doc)
-  var url = URL.createObjectURL(blob)
-  var a = document.createElement('a')
-  a.href = url
-  a.download = viewName + '_report_' + opts.fromDate + '_to_' + opts.toDate + '.docx'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, HeadingLevel, WidthType, BorderStyle, ShadingType, PageOrientation } from 'docx'
+import ExportFieldPicker from '../../components/ExportFieldPicker'
+import { exportMonthlyDocx } from '../../lib/exportMonthlyDocx'
 
 var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -26,11 +28,34 @@ export default function MonthlyReport() {
   var [drillEmp, setDrillEmp] = useState(null)
   var [drillData, setDrillData] = useState([])
   var [drillLoading, setDrillLoading] = useState(false)
+  var [showFieldPicker, setShowFieldPicker] = useState(false)
+  var [fieldExportLoading, setFieldExportLoading] = useState(false)
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
     setTimeout(function () { setToast('') }, 2500)
   }, [])
+
+  async function handleFieldExport(selectedKeys) {
+    setFieldExportLoading(true)
+    var fromDate = year + '-' + String(month).padStart(2, '0') + '-01'
+    var lastDay = new Date(year, month, 0).getDate()
+    var toDate = year + '-' + String(month).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0')
+    var deptName = null
+    if (deptFilter) {
+      var match = departments.find(function (d) { return String(d.id) === deptFilter })
+      if (match) deptName = match.name
+    }
+    await exportMonthlyDocx(selectedKeys, {
+      fromDate: fromDate,
+      toDate: toDate,
+      deptId: deptFilter ? Number(deptFilter) : null,
+      deptName: deptName,
+    })
+    setFieldExportLoading(false)
+    setShowFieldPicker(false)
+    showToast('DOCX exported')
+  }
 
   var loadData = useCallback(async function () {
     setLoading(true)
@@ -581,6 +606,13 @@ export default function MonthlyReport() {
           >
             ⬇ Export {selected.length > 0 ? selected.length + ' Selected' : 'DOCX'}
           </button>
+          <button
+            onClick={function () { setShowFieldPicker(true) }}
+            disabled={loading || filtered.length === 0}
+            className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors font-medium"
+          >
+            📄 Custom Report
+          </button>
         </div>
       </div>
       <p className="text-xs text-gray-500 mb-4">Attendance summary for payroll</p>
@@ -838,6 +870,13 @@ export default function MonthlyReport() {
           </div>
         </div>
       )}
+
+      <ExportFieldPicker
+        open={showFieldPicker}
+        onClose={function () { setShowFieldPicker(false) }}
+        onExport={handleFieldExport}
+        loading={fieldExportLoading}
+      />
 
       {toast && (
         <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-xl text-sm shadow-lg z-50">
