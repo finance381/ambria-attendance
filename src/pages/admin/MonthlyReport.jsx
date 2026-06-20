@@ -36,11 +36,10 @@ export default function MonthlyReport() {
     setTimeout(function () { setToast('') }, 2500)
   }, [])
 
-  async function handleFieldExport(selectedKeys) {
+  async function handleFieldExport(selectedKeys, pickerFrom, pickerTo) {
     setFieldExportLoading(true)
-    var fromDate = year + '-' + String(month).padStart(2, '0') + '-01'
-    var lastDay = new Date(year, month, 0).getDate()
-    var toDate = year + '-' + String(month).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0')
+    var fromDate = pickerFrom
+    var toDate = pickerTo
     var deptName = null
     if (deptFilter) {
       var match = departments.find(function (d) { return String(d.id) === deptFilter })
@@ -51,6 +50,7 @@ export default function MonthlyReport() {
       toDate: toDate,
       deptId: deptFilter ? Number(deptFilter) : null,
       deptName: deptName,
+      selectedEmployeeIds: selected.length > 0 ? selected : null,
     })
     setFieldExportLoading(false)
     setShowFieldPicker(false)
@@ -876,6 +876,8 @@ export default function MonthlyReport() {
         onClose={function () { setShowFieldPicker(false) }}
         onExport={handleFieldExport}
         loading={fieldExportLoading}
+        defaultFrom={year + '-' + String(month).padStart(2, '0') + '-01'}
+        defaultTo={year + '-' + String(month).padStart(2, '0') + '-' + String(new Date(year, month, 0).getDate()).padStart(2, '0')}
       />
 
       {toast && (

@@ -357,6 +357,11 @@ export async function exportMonthlyDocx(selectedKeys, opts) {
   }
 
   var employees = Object.values(empMap).filter(function (r) { return !r.is_casual })
+  if (opts.selectedEmployeeIds) {
+    employees = employees.filter(function (r) {
+      return opts.selectedEmployeeIds.indexOf(r.employee_id) >= 0
+    })
+  }
   employees.sort(function (a, b) { return (a.emp_code || '').localeCompare(b.emp_code || '') })
 
   // Fetch punches if needed

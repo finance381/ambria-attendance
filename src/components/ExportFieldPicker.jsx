@@ -65,14 +65,22 @@ var FIELD_GROUPS = [
 
 export { FIELD_GROUPS }
 
-export default function ExportFieldPicker({ open, onClose, onExport, loading }) {
+export default function ExportFieldPicker({ open, onClose, onExport, loading, defaultFrom, defaultTo }) {
   var [selected, setSelected] = useState(function () {
     var init = {}
     FIELD_GROUPS.forEach(function (g) { init[g.key] = g.default })
     return init
   })
+  var [fromDate, setFromDate] = useState(defaultFrom || '')
+  var [toDate, setToDate] = useState(defaultTo || '')
+
+  // Sync defaults when modal opens
+  if (open && defaultFrom && !fromDate) setFromDate(defaultFrom)
+  if (open && defaultTo && !toDate) setToDate(defaultTo)
 
   if (!open) return null
+
+  var dateError = fromDate && toDate && toDate < fromDate
 
   var allSelected = FIELD_GROUPS.every(function (g) { return selected[g.key] })
   var noneSelected = FIELD_GROUPS.every(function (g) { return !selected[g.key] })
@@ -94,7 +102,7 @@ export default function ExportFieldPicker({ open, onClose, onExport, loading }) 
 
   function handleExport() {
     var keys = FIELD_GROUPS.filter(function (g) { return selected[g.key] }).map(function (g) { return g.key })
-    onExport(keys)
+    onExport(keys, fromDate, toDate)
   }
 
   // Dedupe sources needed
@@ -113,6 +121,23 @@ export default function ExportFieldPicker({ open, onClose, onExport, loading }) 
             <p className="text-[10px] text-gray-400 mt-0.5">Select the sections to include</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+        </div>
+
+        {/* Date range */}
+        <div className="px-5 pt-3 pb-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">From</label>
+              <input type="date" value={fromDate} onChange={function (e) { setFromDate(e.target.value) }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">To</label>
+              <input type="date" value={toDate} onChange={function (e) { setToDate(e.target.value) }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+            </div>
+          </div>
+          {dateError && <p className="text-[10px] text-red-500 mt-1">To date must be after From date</p>}
         </div>
 
         {/* Select All */}
@@ -159,7 +184,7 @@ export default function ExportFieldPicker({ open, onClose, onExport, loading }) 
               className="px-4 py-2 text-xs text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium">
               Cancel
             </button>
-            <button onClick={handleExport} disabled={noneSelected || loading}
+            <button onClick={handleExport} disabled={noneSelected || loading || !fromDate || !toDate || dateError}
               className="px-4 py-2 text-xs text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium flex items-center gap-2">
               {loading && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {loading ? 'Generating…' : '📄 Generate DOCX'}
