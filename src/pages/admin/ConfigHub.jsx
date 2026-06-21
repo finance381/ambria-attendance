@@ -2,11 +2,13 @@ import { useState } from 'react'
 import AppConfig from './AppConfig'
 import Departments from './Departments'
 import Venues from './Venues'
+import LeaveOverride from './LeaveOverride'
 
 var TABS = [
   { id: 'config', label: 'Settings', icon: '⚙️' },
   { id: 'departments', label: 'Departments', icon: '🏢' },
-  { id: 'venues', label: 'Venues', icon: '📍' }
+  { id: 'venues', label: 'Venues', icon: '📍' },
+  { id: 'leave_override', label: 'Leave Override', icon: '📋' }
 ]
 
 export default function ConfigHub() {
@@ -34,6 +36,7 @@ export default function ConfigHub() {
       {tab === 'config' && <AppConfig />}
       {tab === 'departments' && <Departments />}
       {tab === 'venues' && <Venues />}
+      {tab === 'leave_override' && <LeaveOverride />}
     </div>
   )
 }
