@@ -35,6 +35,7 @@ var translations = {
     tab_analysis: 'Analysis',
     tab_attendance: 'Attendance',
     tab_settings: 'Settings',
+    tab_leave_override: 'Leave Override',
 
     // ── Home ─────────────────────────────────
     home_greeting: 'Hi',
@@ -253,6 +254,7 @@ var translations = {
     tab_dept: 'मेरा विभाग',
     tab_attendance: 'हाज़िरी',
     tab_settings: 'सेटिंग्स',
+    tab_leave_override: 'छुट्टी ओवरराइड',
 
     // ── Home ─────────────────────────────────
     home_greeting: 'नमस्ते',

@@ -17,6 +17,7 @@ import MyClaims from './pages/mobile/MyClaims'
 import DARWriter from './pages/mobile/DARWriter'
 import AdminAnalysis from './pages/admin/AdminAnalysis'
 import Analysis from './pages/mobile/Analysis'
+import LeaveOverride from './pages/admin/LeaveOverride'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -94,6 +95,7 @@ export default function App() {
           </ProtectedRoute>
         } /> 
         <Route path="settings" element={<Settings />} />
+        <Route path="leave-override" element={<LeaveOverride />} />
       </Route>
 
       {/* Admin Desktop — manager + admin only */}

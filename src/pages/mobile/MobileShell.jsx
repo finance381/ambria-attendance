@@ -12,6 +12,7 @@ var ALL_TABS = [
   { to: '/dept', key: 'tab_dept', icon: '📋', tabId: 'dept' },
   { to: '/dar', key: 'tab_dar', icon: '📝', tabId: 'dar' },
   { to: '/analysis', key: 'tab_analysis', icon: '📊', tabId: 'analysis' },
+  { to: '/leave-override', key: 'tab_leave_override', icon: '📋', tabId: 'leave_override' },
 ]
 
 var DEFAULT_TABS = {

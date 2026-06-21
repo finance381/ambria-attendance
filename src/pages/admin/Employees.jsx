@@ -12,6 +12,7 @@ var TAB_OPTIONS = [
   { id: 'dept', label: 'My Department' },
   { id: 'dar', label: 'DAR Writer' },
   { id: 'analysis', label: 'Analysis' },
+  { id: 'leave_override', label: 'Leave Override' },
 ]
 
 var DEFAULT_TABS = {
