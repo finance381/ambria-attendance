@@ -9,6 +9,8 @@ export default function LeaveOverride() {
   var [overrideEmps, setOverrideEmps] = useState([])
   var [allEmps, setAllEmps] = useState([])
   var [addEmpId, setAddEmpId] = useState('')
+  var [empSearch, setEmpSearch] = useState('')
+  var [empDropOpen, setEmpDropOpen] = useState(false)
   var [empLoading, setEmpLoading] = useState(true)
   var [empSaving, setEmpSaving] = useState(false)
 
@@ -24,6 +26,15 @@ export default function LeaveOverride() {
   var [toast, setToast] = useState('')
 
   function showToast(msg) { setToast(msg); setTimeout(function () { setToast('') }, 3000) }
+
+  // Close dropdown on outside click
+  useEffect(function () {
+    function handleClick(e) {
+      if (empDropOpen && !e.target.closest('.emp-search-wrap')) setEmpDropOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return function () { document.removeEventListener('mousedown', handleClick) }
+  }, [empDropOpen])
 
   // ── Load employees ──
   var loadEmps = useCallback(async function () {
@@ -183,18 +194,47 @@ export default function LeaveOverride() {
 
         {/* Add employee */}
         <div className="flex gap-2 mb-4">
-          <select
-            value={addEmpId}
-            onChange={function (e) { setAddEmpId(e.target.value) }}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
-          >
-            <option value="">Select employee to add…</option>
-            {availableEmps.map(function (e) {
-              return <option key={e.id} value={e.id}>{e.name} ({e.emp_code})</option>
-            })}
-          </select>
+          <div className="flex-1 relative emp-search-wrap">
+            <input
+              type="text"
+              value={empSearch}
+              onChange={function (e) { setEmpSearch(e.target.value); setEmpDropOpen(true); setAddEmpId('') }}
+              onFocus={function () { setEmpDropOpen(true) }}
+              placeholder="Search by name or code…"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+            />
+            {empDropOpen && (function () {
+              var q = empSearch.toLowerCase()
+              var filtered = availableEmps.filter(function (e) {
+                if (!q) return true
+                return e.name.toLowerCase().includes(q) || e.emp_code.toLowerCase().includes(q)
+              })
+              if (filtered.length === 0 && q) return (
+                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-2 px-3">
+                  <p className="text-xs text-gray-400">No matches</p>
+                </div>
+              )
+              if (filtered.length === 0) return null
+              return (
+                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                  {filtered.map(function (e) {
+                    return (
+                      <button
+                        key={e.id}
+                        onClick={function () { setAddEmpId(e.id); setEmpSearch(e.name + ' (' + e.emp_code + ')'); setEmpDropOpen(false) }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center justify-between"
+                      >
+                        <span className="font-medium text-gray-900">{e.name}</span>
+                        <span className="text-xs text-gray-400 font-mono">{e.emp_code}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
           <button
-            onClick={handleAddEmp}
+            onClick={function () { handleAddEmp(); setEmpSearch('') }}
             disabled={!addEmpId || empSaving}
             className="px-4 py-2 bg-slate-800 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 disabled:opacity-40"
           >
