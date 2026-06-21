@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { exportAnalysisDocx } from '../../lib/exportAnalysisDocx'
+import ExportFieldPicker from '../../components/ExportFieldPicker'
+import { exportMonthlyDocx } from '../../lib/exportMonthlyDocx'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, Legend, PieChart, Pie
@@ -63,6 +65,8 @@ export default function AdminAnalysis() {
   var [prevTimingData, setPrevTimingData] = useState([])
   var [prevMonthlyData, setPrevMonthlyData] = useState([])
   var [prevDarData, setPrevDarData] = useState([])
+  var [showFieldPicker, setShowFieldPicker] = useState(false)
+  var [fieldExportLoading, setFieldExportLoading] = useState(false)
 
   var fromParts = fromDate.split('-')
   var year = Number(fromParts[0]), month = Number(fromParts[1])
@@ -171,13 +175,38 @@ export default function AdminAnalysis() {
         <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1">
           {TABS.map(function (t) { return (<button key={t.key} onClick={function () { setView(t.key); setSearch('') }} className={'px-4 py-2 text-xs font-semibold rounded-lg transition-colors ' + (view === t.key ? 'bg-slate-800 text-white' : 'text-gray-600 hover:bg-gray-100')}>{t.icon + ' ' + t.label}</button>) })}
         </div>
-        <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }} placeholder="Search name or code\u2026" className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-slate-700" />
+        <div className="flex items-center gap-2">
+          <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }} placeholder="Search name or code\u2026" className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-slate-700" />
+          <button onClick={function () { setShowFieldPicker(true) }}
+            className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors font-medium whitespace-nowrap">
+            📄 Custom Report
+          </button>
+        </div>
       </div>
 
       {view === 'timing' && <TimingView data={filterBySearch(timingData)} prevData={prevTimingData} loading={timingLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
       {view === 'attendance' && <AttendanceView data={filterBySearch(monthlyData)} prevData={prevMonthlyData} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
       {view === 'hours' && <HoursView data={filterBySearch(monthlyData)} prevData={prevMonthlyData} loading={monthlyLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
       {view === 'dar' && <DARView data={filterBySearch(darData)} prevData={prevDarData} loading={darLoading} month={month} year={year} fromDate={fromDate} toDate={toDate} docxOpts={docxOpts} />}
+
+      <ExportFieldPicker
+        open={showFieldPicker}
+        onClose={function () { setShowFieldPicker(false) }}
+        onExport={async function (selectedKeys, pickerFrom, pickerTo) {
+          setFieldExportLoading(true)
+          await exportMonthlyDocx(selectedKeys, {
+            fromDate: pickerFrom,
+            toDate: pickerTo,
+            deptId: deptFilter ? Number(deptFilter) : null,
+            deptName: deptName,
+          })
+          setFieldExportLoading(false)
+          setShowFieldPicker(false)
+        }}
+        loading={fieldExportLoading}
+        defaultFrom={fromDate}
+        defaultTo={toDate}
+      />
     </div>
   )
 }
