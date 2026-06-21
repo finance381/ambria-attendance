@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
   var fetchEmployee = useCallback(async function (userId) {
     var { data, error } = await supabase
       .from('employees')
-      .select('id, emp_code, name, phone, department_id, role, designation, is_casual, active')
+      .select('id, emp_code, name, phone, department_id, role, designation, is_casual, active, visible_tabs, leave_scheme, monthly_leave_cap, expected_hours')
       .eq('id', userId)
       .eq('active', true)
       .maybeSingle()
