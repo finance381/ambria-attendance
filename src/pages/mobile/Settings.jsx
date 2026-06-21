@@ -177,6 +177,7 @@ function LeaveBalance() {
   )
   if (!data) return null
 
+  var isMonthly = data.leave_scheme === 'monthly_cap'
   var pct = data.annual_leaves > 0
     ? Math.round((data.leaves_remaining / data.annual_leaves) * 100)
     : 0
@@ -189,6 +190,15 @@ function LeaveBalance() {
         <p className="text-sm font-bold text-gray-900">{t('settings_leave_balance')}</p>
         <span className="text-[10px] text-gray-400 font-medium">{t('settings_fy')} {fyLabel}</span>
       </div>
+
+      {isMonthly && (
+        <div className="mb-3 px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <p className="text-[10px] font-semibold text-indigo-600">
+            Monthly Cap: {data.monthly_cap}/month × {data.months_elapsed} months{data.bonus_days > 0 ? ' + ' + data.bonus_days + ' bonus' : ''} = {data.annual_leaves} total
+          </p>
+        </div>
+      )}
+
       <div className="flex items-end justify-between mb-2">
         <div>
           <span className="text-2xl font-bold text-gray-900">{data.leaves_remaining}</span>
@@ -200,7 +210,7 @@ function LeaveBalance() {
         <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: pct + '%' }} />
       </div>
 
-      {data.quarter_label && (
+      {!isMonthly && data.quarter_label && (
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-700">{data.quarter_label} {t('settings_quarterly') || 'Quarterly'}</p>
@@ -226,7 +236,7 @@ function LeaveBalance() {
         </div>
       )}
 
-      {data.half_annual_total > 0 && (
+      {!isMonthly && data.half_annual_total > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-700">{t('settings_halfday_balance') || 'Half Day Balance'}</p>
