@@ -139,7 +139,7 @@ export default function MonthlyReport() {
 
     var { data } = await supabase
       .from('punches')
-      .select('attendance_date, punch_type, punched_at')
+      .select('attendance_date, punch_type, punched_at, location_name')
       .eq('employee_id', emp.employee_id)
       .gte('attendance_date', startDate)
       .lte('attendance_date', endDate)
@@ -149,9 +149,14 @@ export default function MonthlyReport() {
     // Group by date
     var byDate = {}
     ;(data || []).forEach(function (p) {
-      if (!byDate[p.attendance_date]) byDate[p.attendance_date] = { ins: [], outs: [] }
-      if (p.punch_type === 'in') byDate[p.attendance_date].ins.push(p.punched_at)
-      else byDate[p.attendance_date].outs.push(p.punched_at)
+      if (!byDate[p.attendance_date]) byDate[p.attendance_date] = { ins: [], outs: [], inLocs: [], outLocs: [] }
+      if (p.punch_type === 'in') {
+        byDate[p.attendance_date].ins.push(p.punched_at)
+        byDate[p.attendance_date].inLocs.push(p.location_name || null)
+      } else {
+        byDate[p.attendance_date].outs.push(p.punched_at)
+        byDate[p.attendance_date].outLocs.push(p.location_name || null)
+      }
     })
 
     // Build all days
@@ -161,12 +166,14 @@ export default function MonthlyReport() {
       var entry = byDate[dateStr]
       var punchIn = entry && entry.ins.length > 0 ? entry.ins[0] : null
       var punchOut = entry && entry.outs.length > 0 ? entry.outs[entry.outs.length - 1] : null
+      var inLoc = entry && entry.inLocs.length > 0 ? entry.inLocs[0] : null
+      var outLoc = entry && entry.outLocs.length > 0 ? entry.outLocs[entry.outLocs.length - 1] : null
       var hours = null
       if (punchIn && punchOut) {
         hours = Math.round((new Date(punchOut) - new Date(punchIn)) / 36e5 * 10) / 10
       }
       var dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(dateStr).getDay()]
-      rows.push({ date: dateStr, day: dayName, punchIn: punchIn, punchOut: punchOut, hours: hours, hasData: !!entry })
+      rows.push({ date: dateStr, day: dayName, punchIn: punchIn, punchOut: punchOut, inLoc: inLoc, outLoc: outLoc, hours: hours, hasData: !!entry })
     }
 
     setDrillData(rows)
@@ -793,7 +800,7 @@ export default function MonthlyReport() {
 
       {drillEmp && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setDrillEmp(null) }}>
-          <div className="bg-white rounded-xl w-full max-w-lg shadow-xl max-h-[85vh] flex flex-col" onClick={function (e) { e.stopPropagation() }}>
+          <div className="bg-white rounded-xl w-full max-w-3xl shadow-xl max-h-[85vh] flex flex-col" onClick={function (e) { e.stopPropagation() }}>
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-gray-900">{drillEmp.name}</h3>
@@ -811,11 +818,13 @@ export default function MonthlyReport() {
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-gray-50">
                     <tr className="border-b border-gray-200">
-                      <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Date</th>
-                      <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Day</th>
-                      <th className="px-4 py-2 text-center text-[10px] font-bold text-emerald-600 uppercase">In</th>
-                      <th className="px-4 py-2 text-center text-[10px] font-bold text-red-500 uppercase">Out</th>
-                      <th className="px-4 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Hours</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Date</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Day</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-bold text-emerald-600 uppercase">In</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-bold text-emerald-600 uppercase">In Location</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-bold text-red-500 uppercase">Out</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-bold text-red-500 uppercase">Out Location</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Hours</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -824,11 +833,13 @@ export default function MonthlyReport() {
                       var bgClass = isFuture ? ' text-gray-300' : !row.hasData ? ' bg-red-50/50' : ''
                       return (
                         <tr key={row.date} className={'border-b border-gray-100' + bgClass}>
-                          <td className="px-4 py-1.5 text-xs font-mono text-gray-600">{row.date.slice(8)}</td>
-                          <td className="px-4 py-1.5 text-xs text-gray-500">{row.day}</td>
-                          <td className="px-4 py-1.5 text-xs text-center text-emerald-700 font-medium">{isFuture ? '' : fmtTime(row.punchIn)}</td>
-                          <td className="px-4 py-1.5 text-xs text-center text-red-600 font-medium">{isFuture ? '' : fmtTime(row.punchOut)}</td>
-                          <td className="px-4 py-1.5 text-xs text-right font-mono text-gray-700">{isFuture ? '' : (row.hours != null ? row.hours : '—')}</td>
+                          <td className="px-3 py-1.5 text-xs font-mono text-gray-600">{row.date.slice(8)}</td>
+                          <td className="px-3 py-1.5 text-xs text-gray-500">{row.day}</td>
+                          <td className="px-3 py-1.5 text-xs text-center text-emerald-700 font-medium">{isFuture ? '' : fmtTime(row.punchIn)}</td>
+                          <td className="px-3 py-1.5 text-xs text-left text-emerald-600/70 truncate max-w-[140px]" title={row.inLoc || ''}>{isFuture ? '' : (row.inLoc || '—')}</td>
+                          <td className="px-3 py-1.5 text-xs text-center text-red-600 font-medium">{isFuture ? '' : fmtTime(row.punchOut)}</td>
+                          <td className="px-3 py-1.5 text-xs text-left text-red-500/70 truncate max-w-[140px]" title={row.outLoc || ''}>{isFuture ? '' : (row.outLoc || '—')}</td>
+                          <td className="px-3 py-1.5 text-xs text-right font-mono text-gray-700">{isFuture ? '' : (row.hours != null ? row.hours : '—')}</td>
                         </tr>
                       )
                     })}
