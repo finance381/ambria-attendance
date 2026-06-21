@@ -19,7 +19,7 @@ var DEFAULT_TABS = {
   staff: ['home', 'attendance', 'claims'],
   supervisor: ['home', 'attendance', 'claims', 'team'],
   manager: ['home', 'attendance', 'claims', 'team', 'dept', 'analysis'],
-  admin: ['home', 'attendance', 'claims', 'team', 'dept', 'dar', 'analysis'],
+  admin: ['home', 'attendance', 'claims', 'team', 'dept', 'analysis'],
 }
 export default function MobileShell() {
   var { employee } = useAuth()
