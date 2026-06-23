@@ -25,11 +25,14 @@ export default function DeptAttendance() {
   var [detail, setDetail] = useState(null)
   var [detailPunches, setDetailPunches] = useState([])
   var [detailLoading, setDetailLoading] = useState(false)
-  var [view, setView] = useState('daily') // 'daily' | 'dars'
+  var [view, setView] = useState('daily') // 'daily' | 'leaves'
   var [darRecords, setDarRecords] = useState([])
   var [darLoading, setDarLoading] = useState(false)
   var [darSearch, setDarSearch] = useState('')
   var [expandedDar, setExpandedDar] = useState(null)
+  var [leaveData, setLeaveData] = useState(null)
+  var [leaveLoading, setLeaveLoading] = useState(false)
+  var [leaveSearch, setLeaveSearch] = useState('')
   var [depts, setDepts] = useState([])
   var [deptFilter, setDeptFilter] = useState('')
   var [mYear, setMYear] = useState(new Date().getFullYear())
@@ -126,6 +129,24 @@ export default function DeptAttendance() {
   useEffect(function () {
     if (view === 'dars') loadDARs()
   }, [view, loadDARs])
+
+  useEffect(function () {
+    if (view !== 'leaves') return
+    setLeaveLoading(true)
+    supabase.rpc('admin_all_leave_balances').then(function (res) {
+      if (!res.error && res.data && !res.data.error) {
+        var balances = res.data.balances || []
+        if (employee.role !== 'admin') {
+          balances = balances.filter(function (b) { return managerDeptIds.includes(b.department_id) })
+        }
+        if (deptFilter) {
+          balances = balances.filter(function (b) { return b.department_id === Number(deptFilter) })
+        }
+        setLeaveData({ ...res.data, balances: balances })
+      }
+      setLeaveLoading(false)
+    })
+  }, [view, deptFilter, managerDeptIds, employee.role])
 
   var loadMonthly = useCallback(async function () {
     setMLoading(true)
@@ -269,10 +290,10 @@ export default function DeptAttendance() {
             (view === 'monthly' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
           Monthly
         </button>
-        <button onClick={function () { setView('dars') }}
+        <button onClick={function () { setView('leaves') }}
           className={'flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ' +
-            (view === 'dars' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
-          DARs
+            (view === 'leaves' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
+          Leaves
         </button>
       </div>
 
@@ -311,96 +332,76 @@ export default function DeptAttendance() {
         mRecords={mRecords} mLoading={mLoading} mSearch={mSearch} setMSearch={setMSearch} t={t}
         onTapEmployee={openMonthlyDetail}
       />}
-      {view === 'dars' && <>
-        {/* Date nav */}
-        <div className="flex items-center gap-2 mb-3">
-          <button onClick={function () {
-            var d = new Date(date); d.setDate(d.getDate() - 1); setDate(d.toISOString().slice(0, 10))
-          }} className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300">←</button>
-          <input type="date" value={date} onChange={function (e) { setDate(e.target.value) }}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-slate-700" />
-          <button onClick={function () {
-            var d = new Date(date); d.setDate(d.getDate() + 1)
-            if (d <= new Date()) setDate(d.toISOString().slice(0, 10))
-          }} disabled={isToday}
-            className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30">→</button>
-        </div>
+      {view === 'leaves' && <>
+        {leaveData && (
+          <p className="text-[10px] text-gray-400 mb-2">
+            FY {leaveData.fy_start.slice(0, 4)}–{leaveData.fy_end.slice(0, 4)} · {leaveData.quarter_label} ({new Date(leaveData.quarter_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} – {new Date(leaveData.quarter_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})
+          </p>
+        )}
 
-        {/* DAR stats */}
-        <div className="flex gap-3 mb-3">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex-1 text-center">
-            <p className="text-[9px] font-semibold text-emerald-600 uppercase">Submitted</p>
-            <p className="text-lg font-bold text-emerald-700">{darRecords.filter(function (d) { return !d._missing }).length}</p>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex-1 text-center">
-            <p className="text-[9px] font-semibold text-red-500 uppercase">Missing</p>
-            <p className="text-lg font-bold text-red-600">{darRecords.filter(function (d) { return d._missing }).length}</p>
-          </div>
-        </div>
-
-        {/* Search */}
-        <input type="text" value={darSearch} onChange={function (e) { setDarSearch(e.target.value) }}
+        <input type="text" value={leaveSearch} onChange={function (e) { setLeaveSearch(e.target.value) }}
           placeholder="Search name or code…"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-slate-700" />
 
-        {darLoading ? (
+        {leaveLoading ? (
           <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
-        ) : (
-          <div className="space-y-2">
-            {darRecords.filter(function (d) {
-              if (!darSearch) return true
-              var q = darSearch.toLowerCase()
-              return d._name.toLowerCase().includes(q) || d.emp_code.toLowerCase().includes(q)
-            }).map(function (d) {
-              if (d._missing) {
+        ) : !leaveData || leaveData.balances.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No data</p>
+        ) : (function () {
+          var balances = leaveData.balances.filter(function (b) {
+            if (!leaveSearch) return true
+            var q = leaveSearch.toLowerCase()
+            return b.name.toLowerCase().includes(q) || b.emp_code.toLowerCase().includes(q)
+          })
+          balances.sort(function (a, b) { return (a.annual_remaining || 0) - (b.annual_remaining || 0) })
+
+          return (
+            <div className="space-y-2">
+              {balances.map(function (b) {
+                var isMonthly = b.leave_scheme === 'monthly_cap'
+                var pct = b.annual_total > 0 ? Math.round((b.annual_remaining / b.annual_total) * 100) : 0
+                var barColor = pct > 40 ? 'bg-emerald-500' : pct > 15 ? 'bg-amber-500' : 'bg-red-500'
+                var textColor = pct > 40 ? 'text-emerald-600' : pct > 15 ? 'text-amber-600' : 'text-red-600'
+
                 return (
-                  <div key={d.id} className="border border-red-200 bg-red-50 rounded-xl px-4 py-3">
-                    <div className="flex items-center justify-between">
+                  <div key={b.employee_id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+                    <div className="flex items-center justify-between mb-1.5">
                       <div>
-                        <p className="text-sm font-semibold text-red-700">{d._name}</p>
-                        <p className="text-[11px] text-red-400">{d.emp_code}</p>
+                        <p className="text-sm font-semibold text-gray-900">{b.name}</p>
+                        <p className="text-[11px] text-gray-400">
+                          {b.emp_code}
+                          {isMonthly && <span className="ml-1.5 text-[9px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-semibold">{b.monthly_cap}/mo</span>}
+                        </p>
                       </div>
-                      <span className="text-[10px] font-bold text-red-500 uppercase">Not Submitted</span>
+                      <div className="text-right">
+                        <p className={'text-lg font-bold ' + textColor}>{b.annual_remaining}</p>
+                        <p className="text-[9px] text-gray-400">of {b.annual_total} left</p>
+                      </div>
+                    </div>
+
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                      <div className={'h-full rounded-full ' + barColor} style={{ width: Math.max(pct, 2) + '%' }} />
+                    </div>
+
+                    <div className="flex gap-3 text-[11px]">
+                      <span className="text-red-600 font-semibold">{b.annual_used}A</span>
+                      {isMonthly ? (
+                        <span className="text-indigo-500">{b.months_elapsed}mo × {b.monthly_cap}{b.bonus_days > 0 ? ' + ' + b.bonus_days + 'B' : ''}</span>
+                      ) : (
+                        <>
+                          <span className="text-blue-600 font-semibold">{b.quarter_remaining}/{b.quarter_total} {leaveData.quarter_label}</span>
+                          {b.half_annual_total > 0 && (
+                            <span className="text-orange-500 font-semibold">{b.half_remaining}/{b.half_annual_total} half</span>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 )
-              }
-
-              var isExpanded = expandedDar === d.id
-              var bullets = d.tasks ? d.tasks.split('\n').filter(function (l) { return l.trim() }).map(function (l) {
-                var line = l.trim()
-                if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) return '• ' + line.slice(1).trim()
-                return '• ' + line
-              }) : []
-
-              return (
-                <button key={d.id} onClick={function () { setExpandedDar(isExpanded ? null : d.id) }}
-                  className="w-full text-left border border-emerald-200 bg-emerald-50 rounded-xl px-4 py-3 transition-colors active:scale-[0.99]">
-                  <div className="flex items-center justify-between mb-1">
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-800">{d._name}</p>
-                      <p className="text-[11px] text-emerald-500">{d.emp_code}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-bold text-emerald-600 uppercase">Submitted</span>
-                      <p className="text-[10px] text-emerald-400">{fmtTime(d.submitted_at)}</p>
-                    </div>
-                  </div>
-                  {!isExpanded && bullets.length > 0 && (
-                    <p className="text-xs text-emerald-600 truncate mt-1">{bullets[0]} {bullets.length > 1 ? '(+' + (bullets.length - 1) + ')' : ''}</p>
-                  )}
-                  {isExpanded && (
-                    <div className="mt-2 pt-2 border-t border-emerald-200 space-y-1">
-                      {bullets.map(function (b, i) {
-                        return <p key={i} className="text-xs text-emerald-700">{b}</p>
-                      })}
-                    </div>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )}
+              })}
+            </div>
+          )
+        })()}
       </>}
       {view === 'daily' && <>
       {/* Date nav */}
