@@ -64,7 +64,7 @@ export default function AdminShell() {
           {NAV_ITEMS.filter(function (item) {
              if (item.roles && !item.roles.includes(employee.role)) return false
              if (item.empCodes && !item.empCodes.includes(employee.emp_code)) return false
-             if (item.tabKey) {
+             if (item.tabKey && employee.role !== 'admin') {
                var tabs = employee.visible_tabs || DEFAULT_TABS[employee.role] || DEFAULT_TABS.staff
                if (!tabs.includes(item.tabKey)) return false
              }
