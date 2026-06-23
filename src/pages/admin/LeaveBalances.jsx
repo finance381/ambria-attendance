@@ -13,60 +13,17 @@ export default function LeaveBalances() {
 
   var loadData = useCallback(async function () {
     setLoading(true)
-    var [cacheRes, deptRes, configRes] = await Promise.all([
-      supabase.from('leave_balance_cache').select('*'),
-      supabase.from('departments').select('id, name').eq('active', true).order('name'),
-      supabase.from('app_config').select('key, value').in('key', ['annual_leaves', 'annual_half_days'])
+    var [rpcRes, deptRes] = await Promise.all([
+      supabase.rpc('admin_all_leave_balances'),
+      supabase.from('departments').select('id, name').eq('active', true).order('name')
     ])
 
-    if (cacheRes.error) {
-      setError(cacheRes.error.message)
+    if (rpcRes.error) {
+      setError(rpcRes.error.message)
+    } else if (rpcRes.data && rpcRes.data.error) {
+      setError(rpcRes.data.error)
     } else {
-      var deptMap = {}
-      ;(deptRes.data || []).forEach(function (d) { deptMap[d.id] = d.name })
-      var configs = {}
-      ;(configRes.data || []).forEach(function (c) {
-        var v = c.value; if (typeof v === 'string') v = v.replace(/^"|"$/g, '')
-        configs[c.key] = parseInt(v) || 0
-      })
-      var annualTotal = configs['annual_leaves'] || 76
-      var halfTotal = configs['annual_half_days'] || 6
-
-      // Compute FY and quarter from today
-      var today = new Date()
-      var fy_start, fy_end, q_start, q_end, q_label
-      var yr = today.getFullYear(), mo = today.getMonth() + 1
-      if (mo >= 4) { fy_start = yr + '-04-01'; fy_end = (yr + 1) + '-03-31' }
-      else { fy_start = (yr - 1) + '-04-01'; fy_end = yr + '-03-31' }
-      if (mo >= 4 && mo <= 6) { q_start = yr + '-04-01'; q_end = yr + '-06-30'; q_label = 'Q1' }
-      else if (mo >= 7 && mo <= 9) { q_start = yr + '-07-01'; q_end = yr + '-09-30'; q_label = 'Q2' }
-      else if (mo >= 10 && mo <= 12) { q_start = yr + '-10-01'; q_end = yr + '-12-31'; q_label = 'Q3' }
-      else { q_start = yr + '-01-01'; q_end = yr + '-03-31'; q_label = 'Q4' }
-
-      var balances = (cacheRes.data || []).map(function (r) {
-        return {
-          employee_id: r.employee_id,
-          emp_code: r.emp_code,
-          name: r.name,
-          department_id: r.department_id,
-          department_name: deptMap[r.department_id] || '—',
-          annual_total: annualTotal,
-          annual_used: r.leaves_used || 0,
-          annual_remaining: r.annual_remaining || 0,
-          quarter_total: r.quarterly_quota || Math.ceil(annualTotal / 4),
-          quarter_used: r.quarterly_used || 0,
-          quarter_remaining: r.quarterly_remaining || 0,
-          half_annual_total: halfTotal,
-          half_used: r.half_days_used || 0,
-          half_remaining: halfTotal - (r.half_days_used || 0)
-        }
-      })
-
-      setData({
-        fy_start: fy_start, fy_end: fy_end,
-        quarter_start: q_start, quarter_end: q_end, quarter_label: q_label,
-        balances: balances, computed_at: (cacheRes.data[0] || {}).computed_at
-      })
+      setData(rpcRes.data)
     }
     setDepartments(deptRes.data || [])
     setLoading(false)
@@ -119,9 +76,8 @@ export default function LeaveBalances() {
         FY {fyLabel} · Quarter {data ? data.quarter_label : ''} ({data ? formatDate(data.quarter_start) + ' – ' + formatDate(data.quarter_end) : ''})
       </p>
       <div className="flex items-center gap-3 mb-4">
-        {data && data.computed_at && <p className="text-[10px] text-gray-400">Last refreshed: {new Date(data.computed_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
-        <button onClick={async function () { setLoading(true); await supabase.rpc('refresh_leave_balance_cache'); loadData() }}
-          className="text-[10px] font-bold text-blue-600 hover:text-blue-800">↻ Refresh now</button>
+        <button onClick={function () { loadData() }}
+          className="text-[10px] font-bold text-blue-600 hover:text-blue-800">↻ Refresh</button>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-4">
@@ -195,17 +151,35 @@ export default function LeaveBalances() {
             </thead>
             <tbody>
               {filtered.map(function (b) {
+                var isCap = b.leave_scheme === 'monthly_cap'
                 return (
                   <tr key={b.employee_id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-2 text-xs text-gray-400 font-mono">{b.emp_code}</td>
-                    <td className="px-3 py-2 font-medium text-gray-900">{b.name}</td>
+                    <td className="px-3 py-2 font-medium text-gray-900">
+                      {b.name}
+                      {isCap && <span className="ml-1.5 text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{b.monthly_cap}/mo</span>}
+                    </td>
                     <td className="px-3 py-2 text-xs text-gray-500">{b.department_name || '—'}</td>
-                    <td className="px-2 py-2 text-xs text-center text-gray-700">{b.annual_used}<span className="text-gray-400 text-[10px]">/{b.annual_total}</span></td>
+                    <td className="px-2 py-2 text-xs text-center text-gray-700">
+                      {b.annual_used}<span className="text-gray-400 text-[10px]">/{b.annual_total}</span>
+                      {isCap && <div className="text-[9px] text-indigo-500">{b.months_elapsed}mo×{b.monthly_cap}{b.bonus_days > 0 ? '+' + b.bonus_days + 'B' : ''}</div>}
+                    </td>
                     <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.annual_remaining, b.annual_total)}>{b.annual_remaining}</td>
-                    <td className="px-2 py-2 text-xs text-center text-gray-700">{b.quarter_used}<span className="text-gray-400 text-[10px]">/{b.quarter_total}</span></td>
-                    <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.quarter_remaining, b.quarter_total)}>{b.quarter_remaining}</td>
-                    <td className="px-2 py-2 text-xs text-center text-gray-700">{b.half_used}<span className="text-gray-400 text-[10px]">/{b.half_annual_total}</span></td>
-                    <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.half_remaining, b.half_annual_total)}>{b.half_remaining}</td>
+                    {isCap ? (
+                      <>
+                        <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
+                        <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
+                        <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
+                        <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-2 py-2 text-xs text-center text-gray-700">{b.quarter_used}<span className="text-gray-400 text-[10px]">/{b.quarter_total}</span></td>
+                        <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.quarter_remaining, b.quarter_total)}>{b.quarter_remaining}</td>
+                        <td className="px-2 py-2 text-xs text-center text-gray-700">{b.half_used}<span className="text-gray-400 text-[10px]">/{b.half_annual_total}</span></td>
+                        <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.half_remaining, b.half_annual_total)}>{b.half_remaining}</td>
+                      </>
+                    )}
                   </tr>
                 )
               })}
@@ -219,6 +193,7 @@ export default function LeaveBalances() {
 
 function remainingColor(remaining, total) {
   if (total === 0) return 'text-gray-500'
+  if (remaining < 0) return 'text-red-600'
   var pct = remaining / total
   if (pct > 0.4) return 'text-emerald-700'
   if (pct > 0.15) return 'text-amber-600'
