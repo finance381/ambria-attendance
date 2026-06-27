@@ -11,6 +11,8 @@ export default function AnnualReport() {
   var [sortCol, setSortCol] = useState('name')
   var [sortDir, setSortDir] = useState('asc')
   var [schemeFilter, setSchemeFilter] = useState('')
+  var [claimsMap, setClaimsMap] = useState({})
+  var [claimLimit, setClaimLimit] = useState(4)
 
   var loadData = useCallback(async function () {
     setLoading(true)
@@ -25,6 +27,46 @@ export default function AnnualReport() {
       setError(rpcRes.data.error)
     } else {
       setData(rpcRes.data)
+
+      // Fetch claim limit
+      var limitVal = 4
+      var cfgRes = await supabase.from('app_config').select('value').eq('key', 'claim_limit').maybeSingle()
+      if (cfgRes.data && cfgRes.data.value) {
+        try { limitVal = parseInt(String(cfgRes.data.value).replace(/"/g, ''), 10) || 4 } catch (e) {}
+      }
+      setClaimLimit(limitVal)
+
+      // Fetch FY claims
+      var fyStart = rpcRes.data.fy_start
+      var fyEnd = rpcRes.data.fy_end
+      var { data: claims } = await supabase
+        .from('missed_claims')
+        .select('employee_id, created_at, status')
+        .gte('attendance_date', fyStart)
+        .lte('attendance_date', fyEnd)
+        .neq('status', 'rejected')
+
+      // Aggregate: per employee → per month → count, then compute over-limit
+      var map = {}
+      ;(claims || []).forEach(function (c) {
+        if (!map[c.employee_id]) map[c.employee_id] = {}
+        var ist = new Date(c.created_at)
+        var monthKey = ist.getFullYear() + '-' + String(ist.getMonth() + 1).padStart(2, '0')
+        if (!map[c.employee_id][monthKey]) map[c.employee_id][monthKey] = 0
+        map[c.employee_id][monthKey]++
+      })
+
+      var result = {}
+      Object.keys(map).forEach(function (empId) {
+        var months = map[empId]
+        var total = 0, over = 0
+        Object.keys(months).forEach(function (m) {
+          total += months[m]
+          if (months[m] > limitVal) over += (months[m] - limitVal)
+        })
+        result[empId] = { total: total, over: over, penalty: over * 500 }
+      })
+      setClaimsMap(result)
     }
     setDepartments(deptRes.data || [])
     setLoading(false)
@@ -49,6 +91,8 @@ export default function AnnualReport() {
     else { setSortCol(col); setSortDir('asc') }
   }
 
+  function empClaims(b) { return claimsMap[b.employee_id] || { total: 0, over: 0, penalty: 0 } }
+
   filtered.sort(function (a, b) {
     var va, vb
     switch (sortCol) {
@@ -64,6 +108,8 @@ export default function AnnualReport() {
       case 'q4': va = a.q4_used || 0; vb = b.q4_used || 0; break
       case 'half': va = a.half_used || 0; vb = b.half_used || 0; break
       case 'net_ded': va = netDed(a); vb = netDed(b); break
+      case 'claims': va = empClaims(a).total; vb = empClaims(b).total; break
+      case 'claims_penalty': va = empClaims(a).penalty; vb = empClaims(b).penalty; break
       default: va = a.name; vb = b.name
     }
     if (typeof va === 'string') {
@@ -74,12 +120,12 @@ export default function AnnualReport() {
   })
 
   // Summary stats
-  var totDed = 0, totNetDed = 0, overQuarter = 0, overHalf = 0
+  var totDed = 0, totNetDed = 0, overQuarter = 0, totClaimsPenalty = 0
   filtered.forEach(function (b) {
     totDed += b.deductions || 0
     totNetDed += netDed(b)
     if ((b.deductions || 0) > 0) overQuarter++
-    if ((b.half_used || 0) > (b.half_annual_total || 0) && b.leave_scheme !== 'monthly_cap') overHalf++
+    totClaimsPenalty += empClaims(b).penalty
   })
 
   var fyLabel = data ? data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(0, 4) : ''
@@ -89,7 +135,7 @@ export default function AnnualReport() {
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">Annual Report — FY {fyLabel}</h2>
       <p className="text-xs text-gray-500 mb-1">
-        Per-quarter breakdown with deductions · Current: {qLabel}
+        Per-quarter breakdown with deductions · Current: {qLabel} · Claims limit: {claimLimit}/month
       </p>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={function () { loadData() }}
@@ -125,7 +171,7 @@ export default function AnnualReport() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-5 gap-3 mb-4">
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-center">
           <p className="text-[10px] font-semibold text-gray-400 uppercase">Employees</p>
           <p className="text-xl font-bold text-slate-700">{filtered.length}</p>
@@ -142,6 +188,10 @@ export default function AnnualReport() {
           <p className="text-[10px] font-semibold text-amber-400 uppercase">Over Limits</p>
           <p className="text-xl font-bold text-amber-700">{overQuarter}</p>
           <p className="text-[9px] text-gray-400">employees</p>
+        </div>
+        <div className="bg-white border border-purple-200 rounded-xl px-4 py-3 text-center">
+          <p className="text-[10px] font-semibold text-purple-400 uppercase">Claims Penalty</p>
+          <p className="text-xl font-bold text-purple-700">₹{totClaimsPenalty.toLocaleString('en-IN')}</p>
         </div>
       </div>
 
@@ -170,6 +220,8 @@ export default function AnnualReport() {
                 <SortTh col="annual_used" label="Annual" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} color="text-emerald-600" />
                 <SortTh col="annual_remaining" label="Left" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} color="text-emerald-600" />
                 <SortTh col="half" label="½ Day" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} color="text-orange-600" />
+                <SortTh col="claims" label="Claims" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} color="text-purple-600" />
+                <SortTh col="claims_penalty" label="₹ Penalty" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} color="text-purple-600" />
                 <SortTh col="deductions" label="Ded" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} color="text-pink-600" />
                 <SortTh col="net_ded" label="Net" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} color="text-red-600" />
               </tr>
@@ -180,6 +232,7 @@ export default function AnnualReport() {
                 var isNew = b.leave_scheme === 'new_joiner'
                 var ded = b.deductions || 0
                 var nd = netDed(b)
+                var cl = empClaims(b)
 
                 return (
                   <tr key={b.employee_id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -228,6 +281,16 @@ export default function AnnualReport() {
                       </td>
                     )}
 
+                    {/* Claims */}
+                    <td className={'px-2 py-2 text-xs text-center ' + (cl.over > 0 ? 'text-red-600 font-bold bg-red-50' : cl.total > 0 ? 'text-purple-600 font-semibold' : 'text-gray-300')}>
+                      {cl.total > 0 ? (
+                        cl.over > 0 ? cl.total + ' (' + cl.over + '⬆)' : cl.total
+                      ) : '—'}
+                    </td>
+                    <td className={'px-2 py-2 text-xs text-center font-semibold ' + (cl.penalty > 0 ? 'text-purple-700 bg-purple-50' : 'text-gray-300')}>
+                      {cl.penalty > 0 ? '₹' + cl.penalty.toLocaleString('en-IN') : '—'}
+                    </td>
+
                     {/* Deductions */}
                     <td className={'px-2 py-2 text-xs text-center font-semibold ' + (ded > 0 ? 'text-pink-700 bg-pink-50' : 'text-gray-300')}>
                       {ded > 0 ? ded : '—'}
@@ -246,9 +309,7 @@ export default function AnnualReport() {
                 <td colSpan={3} className="px-3 py-2 text-xs text-gray-600">Total ({filtered.length})</td>
                 {[1,2,3,4].map(function (q) {
                   var totalUsed = 0
-                  filtered.forEach(function (b) {
-                    totalUsed += (b['q' + q + '_used'] || 0)
-                  })
+                  filtered.forEach(function (b) { totalUsed += (b['q' + q + '_used'] || 0) })
                   return <td key={q} className="px-2 py-2 text-xs text-center text-gray-700">{totalUsed}</td>
                 })}
                 <td className="px-2 py-2 text-xs text-center text-gray-700">
@@ -260,6 +321,12 @@ export default function AnnualReport() {
                 <td className="px-2 py-2 text-xs text-center text-gray-700">
                   {filtered.reduce(function (s, b) { return s + (b.half_used || 0) }, 0)}
                 </td>
+                <td className="px-2 py-2 text-xs text-center text-purple-700 font-bold">
+                  {filtered.reduce(function (s, b) { return s + empClaims(b).total }, 0)}
+                </td>
+                <td className="px-2 py-2 text-xs text-center text-purple-700 font-bold">
+                  ₹{totClaimsPenalty.toLocaleString('en-IN')}
+                </td>
                 <td className="px-2 py-2 text-xs text-center text-pink-700 font-bold">{totDed}</td>
                 <td className="px-2 py-2 text-xs text-center text-red-700 font-bold">{totNetDed}</td>
               </tr>
@@ -270,9 +337,10 @@ export default function AnnualReport() {
 
       {/* Legend */}
       <div className="mt-3 flex flex-wrap gap-4 text-[10px] text-gray-400">
-        <span><span className="inline-block w-2 h-2 rounded-full bg-pink-500 mr-1" />Ded = Gross FY deductions (quarterly over-limit + half-day excess)</span>
-        <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />Net = Ded offset by annual surplus (year-end projection)</span>
-        <span><span className="text-red-600 font-bold mr-1">Red cells</span>= over quarterly limit</span>
+        <span><span className="inline-block w-2 h-2 rounded-full bg-pink-500 mr-1" />Ded = Gross FY leave deductions</span>
+        <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />Net = Ded offset by annual surplus</span>
+        <span><span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1" />Claims = FY total (⬆ = over {claimLimit}/mo limit) · ₹500/over-claim</span>
+        <span><span className="text-red-600 font-bold mr-1">Red Q cells</span>= over quarterly limit</span>
       </div>
     </div>
   )
@@ -308,7 +376,6 @@ function SortTh({ col, label, sortCol, sortDir, onClick, align, color }) {
 function QCell({ used, total }) {
   var u = used || 0
   if (total === null) {
-    // monthly_cap: just show used count, no limit
     return (
       <td className="px-2 py-2 text-xs text-center text-gray-500">
         {u > 0 ? u : <span className="text-gray-300">—</span>}
