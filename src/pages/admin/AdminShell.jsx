@@ -5,7 +5,6 @@ import { useAuth } from '../../lib/useAuth'
 var NAV_ITEMS = [
   { to: '/admin', label: 'Overview', icon: '📊', tabKey: 'home' },
   { to: '/admin/attendance', label: 'Attendance', icon: '📋', tabKey: 'attendance' },
-  { to: '/admin/annual', label: 'Annual', icon: '📅', tabKey: 'attendance' },
   { to: '/admin/people', label: 'People', icon: '👥', tabKey: 'team' },
   { to: '/admin/requests', label: 'Requests', icon: '📝', tabKey: 'claims' },
   { to: '/admin/config', label: 'Config', icon: '⚙️', roles: ['admin'] },
