@@ -307,26 +307,6 @@ export default function DeptAttendance() {
         </select>
       )}
 
-      {employee.role === 'manager' && managerDeptIds.length > 1 && (
-        <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
-          <option value="">All My Departments</option>
-          {managerDeptIds.map(function (id) {
-            return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option>
-          })}
-        </select>
-      )}
-
-      {employee.role === 'manager' && managerDeptIds.length > 1 && (
-        <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
-          <option value="">All My Departments</option>
-          {managerDeptIds.map(function (id) {
-            return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option>
-          })}
-        </select>
-      )}
-
       {view === 'monthly' && <MonthlyView
         mYear={mYear} setMYear={setMYear} mMonth={mMonth} setMMonth={setMMonth}
         mRecords={mRecords} mLoading={mLoading} mSearch={mSearch} setMSearch={setMSearch} t={t}
@@ -371,6 +351,7 @@ export default function DeptAttendance() {
                         <p className="text-[11px] text-gray-400">
                           {b.emp_code}
                           {isMonthly && <span className="ml-1.5 text-[9px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-semibold">{b.monthly_cap}/mo</span>}
+                          {b.leave_scheme === 'new_joiner' && <span className="ml-1.5 text-[9px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded font-semibold">New</span>}
                         </p>
                       </div>
                       <div className="text-right">
@@ -394,6 +375,9 @@ export default function DeptAttendance() {
                             <span className="text-orange-500 font-semibold">{b.half_remaining}/{b.half_annual_total} half</span>
                           )}
                         </>
+                      )}
+                      {(b.deductions || 0) > 0 && (
+                        <span className="text-pink-700 font-bold bg-pink-50 px-1.5 rounded">Ded: {b.deductions}</span>
                       )}
                     </div>
                   </div>

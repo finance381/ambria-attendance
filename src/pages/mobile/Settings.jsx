@@ -266,6 +266,18 @@ function LeaveBalance() {
         </div>
       )}
 
+      {!isMonthly && data.deductions > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-700">{t('settings_deductions') || 'Salary Deductions'}</p>
+            <span className="px-2 py-0.5 text-xs font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-full">
+              {data.deductions} day{data.deductions !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">FY-to-date excess beyond quarterly + half-day limits</p>
+        </div>
+      )}
+
     </div>
     
   )
