@@ -178,8 +178,9 @@ function LeaveBalance() {
   if (!data) return null
 
   var isMonthly = data.leave_scheme === 'monthly_cap'
+  var isNewJoiner = data.leave_scheme === 'new_joiner'
   var pct = data.annual_leaves > 0
-    ? Math.round((data.leaves_remaining / data.annual_leaves) * 100)
+    ? Math.max(0, Math.round((data.leaves_remaining / data.annual_leaves) * 100))
     : 0
   var barColor = pct > 40 ? 'bg-emerald-500' : pct > 15 ? 'bg-amber-500' : 'bg-red-500'
   var fyLabel = data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(0, 4)
@@ -199,6 +200,14 @@ function LeaveBalance() {
         </div>
       )}
 
+      {isNewJoiner && (
+        <div className="mb-3 px-2.5 py-1.5 bg-teal-50 border border-teal-200 rounded-lg">
+          <p className="text-[10px] font-semibold text-teal-600">
+            Prorated (joined {new Date(data.date_of_joining).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}) · {data.annual_leaves} leaves this year
+          </p>
+        </div>
+      )}
+
       <div className="flex items-end justify-between mb-2">
         <div>
           <span className="text-2xl font-bold text-gray-900">{data.leaves_remaining}</span>
@@ -210,7 +219,7 @@ function LeaveBalance() {
         <div className={'h-full rounded-full transition-all ' + barColor} style={{ width: pct + '%' }} />
       </div>
 
-      {!isMonthly && data.quarter_label && (
+      {!isMonthly && data.quarter_label && data.quarter_total > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-700">{data.quarter_label} {t('settings_quarterly') || 'Quarterly'}</p>

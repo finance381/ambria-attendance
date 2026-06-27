@@ -152,17 +152,20 @@ export default function LeaveBalances() {
             <tbody>
               {filtered.map(function (b) {
                 var isCap = b.leave_scheme === 'monthly_cap'
+                var isNewJoiner = b.leave_scheme === 'new_joiner'
                 return (
                   <tr key={b.employee_id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-2 text-xs text-gray-400 font-mono">{b.emp_code}</td>
                     <td className="px-3 py-2 font-medium text-gray-900">
                       {b.name}
                       {isCap && <span className="ml-1.5 text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{b.monthly_cap}/mo</span>}
+                      {isNewJoiner && <span className="ml-1.5 text-[9px] font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">New</span>}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500">{b.department_name || '—'}</td>
                     <td className="px-2 py-2 text-xs text-center text-gray-700">
                       {b.annual_used}<span className="text-gray-400 text-[10px]">/{b.annual_total}</span>
                       {isCap && <div className="text-[9px] text-indigo-500">{b.months_elapsed}mo×{b.monthly_cap}{b.bonus_days > 0 ? '+' + b.bonus_days + 'B' : ''}</div>}
+                      {isNewJoiner && <div className="text-[9px] text-teal-500">DOJ {b.date_of_joining}</div>}
                     </td>
                     <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.annual_remaining, b.annual_total)}>{b.annual_remaining}</td>
                     {isCap ? (
