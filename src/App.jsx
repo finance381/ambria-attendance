@@ -126,11 +126,6 @@ export default function App() {
             <ConfigHub />
           </ProtectedRoute>
         } />
-        <Route path="annual" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <AnnualReport />
-          </ProtectedRoute>
-        } />
       </Route>
       
 
