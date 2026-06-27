@@ -18,6 +18,7 @@ import DARWriter from './pages/mobile/DARWriter'
 import AdminAnalysis from './pages/admin/AdminAnalysis'
 import Analysis from './pages/mobile/Analysis'
 import LeaveOverride from './pages/admin/LeaveOverride'
+import AnnualReport from './pages/admin/AnnualReport'
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -123,6 +124,11 @@ export default function App() {
         <Route path="config" element={
           <ProtectedRoute roles={['admin']}>
             <ConfigHub />
+          </ProtectedRoute>
+        } />
+        <Route path="annual" element={
+          <ProtectedRoute roles={['admin', 'manager']}>
+            <AnnualReport />
           </ProtectedRoute>
         } />
       </Route>
