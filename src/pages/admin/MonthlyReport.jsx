@@ -34,7 +34,7 @@ export default function MonthlyReport() {
 
   var loadData = useCallback(async function () {
     setLoading(true)
-    var [summaryRes, deptRes] = await Promise.all([
+    var [summaryRes, deptRes, leaveRes] = await Promise.all([
       (function () {
         var s = year + '-' + String(month).padStart(2, '0') + '-01'
         var ed = new Date(year, month, 0).getDate()
@@ -44,10 +44,20 @@ export default function MonthlyReport() {
           p_department_id: deptFilter ? Number(deptFilter) : null
         })
       })(),
-      supabase.from('departments').select('id, name').eq('active', true).order('name')
+      supabase.from('departments').select('id, name').eq('active', true).order('name'),
+      supabase.rpc('admin_all_leave_balances')
     ])
 
-    setRecords(summaryRes.data || [])
+    // Merge deductions from leave balance into records
+    var leaveMap = {}
+    if (leaveRes.data && leaveRes.data.balances) {
+      leaveRes.data.balances.forEach(function (b) { leaveMap[b.employee_id] = b })
+    }
+    var recs = (summaryRes.data || []).map(function (r) {
+      var lb = leaveMap[r.employee_id]
+      return Object.assign({}, r, { deductions: lb ? (lb.deductions || 0) : 0 })
+    })
+    setRecords(recs)
     setDepartments(deptRes.data || [])
     setSelected([])
     setLoading(false)
@@ -78,6 +88,7 @@ export default function MonthlyReport() {
       case 'days_incomplete': va = a.days_incomplete || 0; vb = b.days_incomplete || 0; break
       case 'total_hours': va = a.total_hours || 0; vb = b.total_hours || 0; break
       case 'claims_used': va = a.claims_used || 0; vb = b.claims_used || 0; break
+      case 'deductions': va = a.deductions || 0; vb = b.deductions || 0; break
       default: va = a.name; vb = b.name
     }
     if (typeof va === 'string') {
@@ -663,7 +674,8 @@ export default function MonthlyReport() {
                   { key: 'days_absent', label: 'A', align: 'text-center', color: 'text-red-600' },
                   { key: 'days_incomplete', label: 'Inc', align: 'text-center', color: 'text-amber-600' },
                   { key: 'total_hours', label: 'Hours', align: 'text-right', color: 'text-gray-500' },
-                  { key: 'claims_used', label: 'Claims', align: 'text-center', color: 'text-purple-600' }
+                  { key: 'claims_used', label: 'Claims', align: 'text-center', color: 'text-purple-600' },
+                  { key: 'deductions', label: 'Ded', align: 'text-center', color: 'text-pink-600' }
                 ].map(function (col) {
                   var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
                   return (
@@ -679,7 +691,7 @@ export default function MonthlyReport() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
+                  <td colSpan={12} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
                 </tr>
               ) : (
                 <>
@@ -718,6 +730,9 @@ export default function MonthlyReport() {
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
+                        <td className={'px-3 py-2 text-xs text-center font-bold ' + (r.deductions > 0 ? 'text-pink-600' : 'text-gray-400')}>
+                          {r.deductions > 0 ? r.deductions : '—'}
+                        </td>
                       </tr>
                     )
                   })}
@@ -731,6 +746,7 @@ export default function MonthlyReport() {
                     <td className="px-3 py-2.5 text-xs text-center text-amber-600">{totals.incomplete}</td>
                     <td className="px-3 py-2.5 text-xs text-right font-mono text-gray-700">{Math.round(totals.hours * 10) / 10}</td>
                     <td className="px-3 py-2.5 text-xs text-center text-purple-600">{totals.claims}</td>
+                    <td className="px-3 py-2.5 text-xs text-center text-pink-600">{filtered.reduce(function (sum, r) { return sum + (r.deductions || 0) }, 0) || '—'}</td>
                   </tr>
                 </>
               )}

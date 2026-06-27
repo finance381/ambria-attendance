@@ -128,6 +128,7 @@ export default function LeaveBalances() {
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider" colSpan={2}>Annual Leave</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-blue-600 uppercase tracking-wider" colSpan={2}>Quarterly</th>
                 <th className="text-center px-3 py-2.5 text-[10px] font-bold text-orange-600 uppercase tracking-wider" colSpan={2}>Half Days</th>
+                <th className="text-center px-3 py-2.5 text-[10px] font-bold text-pink-600 uppercase tracking-wider">Ded</th>
               </tr>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th colSpan={3}></th>
@@ -137,7 +138,8 @@ export default function LeaveBalances() {
                   { key: 'quarter_used', label: 'Used' },
                   { key: 'quarter_remaining', label: 'Left' },
                   { key: 'half_used', label: 'Used' },
-                  { key: 'half_remaining', label: 'Left' }
+                  { key: 'half_remaining', label: 'Left' },
+                  { key: 'deductions', label: 'Ded' }
                 ].map(function (col) {
                   var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
                   return (
@@ -174,6 +176,7 @@ export default function LeaveBalances() {
                         <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
                         <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
                         <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
+                        <td className="px-2 py-2 text-xs text-center text-gray-300">—</td>
                       </>
                     ) : (
                       <>
@@ -181,6 +184,7 @@ export default function LeaveBalances() {
                         <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.quarter_remaining, b.quarter_total)}>{b.quarter_remaining}</td>
                         <td className="px-2 py-2 text-xs text-center text-gray-700">{b.half_used}<span className="text-gray-400 text-[10px]">/{b.half_annual_total}</span></td>
                         <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.half_remaining, b.half_annual_total)}>{b.half_remaining}</td>
+                        <td className={'px-2 py-2 text-xs text-center font-bold ' + (b.deductions > 0 ? 'text-pink-600' : 'text-gray-300')}>{b.deductions > 0 ? b.deductions : '—'}</td>
                       </>
                     )}
                   </tr>
