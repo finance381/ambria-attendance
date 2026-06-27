@@ -4,11 +4,13 @@ import DailyAttendance from './DailyAttendance'
 import MonthlyReport from './MonthlyReport'
 import AdminDARs from './AdminDARs'
 import AdminAnalysis from './AdminAnalysis'
+import AnnualReport from './AnnualReport'
 
 var ALL_TABS = [
   { id: 'daily', label: 'Daily', icon: '📋' },
   { id: 'monthly', label: 'Monthly', icon: '📊' },
   { id: 'analysis', label: 'Analysis', icon: '📈' },
+  { id: 'annual', label: 'Annual', icon: '📅' },
 ]
 
 export default function AttendanceHub() {
@@ -36,6 +38,7 @@ export default function AttendanceHub() {
       {tab === 'monthly' && <MonthlyReport />}
       {tab === 'dars' && <AdminDARs />}
       {tab === 'analysis' && <AdminAnalysis />}
+      {tab === 'annual' && <AnnualReport />}
     </div>
   )
 }
