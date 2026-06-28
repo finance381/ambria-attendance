@@ -332,6 +332,17 @@ export default function MonthlyReport() {
     var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, wkdays: 0, hrs: 0, claims: 0, ded: 0, overClaims: 0 }
     var serial = 1
 
+    // Fetch FY deductions from leave balances (one-time)
+    var dedMap = {}
+    try {
+      var { data: lbData } = await supabase.rpc('admin_all_leave_balances')
+      if (lbData && lbData.balances) {
+        lbData.balances.forEach(function (b) {
+          dedMap[b.employee_id] = b.deductions || 0
+        })
+      }
+    } catch (e) {}
+
     for (var i = 0; i < months.length; i++) {
       var m = months[i]
       var ms = m.year + '-' + String(m.month).padStart(2, '0') + '-01'
@@ -365,7 +376,7 @@ export default function MonthlyReport() {
         grandTotals.incomplete += incomplete
         grandTotals.wkdays += wkdays
         grandTotals.hrs += hrs
-        var ded = r.deductions || 0
+        var ded = dedMap[r.employee_id] || 0
         var overClaims = Math.max(0, claimsUsed - claimsLimit)
         grandTotals.claims += claimsUsed
         grandTotals.ded += ded
