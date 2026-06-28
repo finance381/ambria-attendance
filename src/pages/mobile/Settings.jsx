@@ -231,7 +231,7 @@ function LeaveBalance() {
           </div>
           <div className="flex items-end justify-between mb-2">
             <div>
-              <span className="text-lg font-bold text-gray-900">{data.quarter_remaining}</span>
+              <span className={'text-lg font-bold ' + (data.quarter_remaining < 0 ? 'text-red-600' : 'text-gray-900')}>{data.quarter_remaining}</span>
               <span className="text-xs text-gray-400 ml-1">/ {data.quarter_total}</span>
             </div>
             <span className="text-[10px] text-gray-500">{data.quarter_used} {t('settings_used')}</span>
@@ -240,7 +240,7 @@ function LeaveBalance() {
             <div className={'h-full rounded-full transition-all ' + (
               data.quarter_remaining / data.quarter_total > 0.4 ? 'bg-blue-500' :
               data.quarter_remaining / data.quarter_total > 0.15 ? 'bg-amber-500' : 'bg-red-500'
-            )} style={{ width: Math.round((data.quarter_remaining / data.quarter_total) * 100) + '%' }} />
+            )} style={{ width: Math.max(0, Math.round((data.quarter_remaining / data.quarter_total) * 100)) + '%' }} />
           </div>
         </div>
       )}
@@ -252,7 +252,7 @@ function LeaveBalance() {
           </div>
           <div className="flex items-end justify-between mb-2">
             <div>
-              <span className="text-lg font-bold text-gray-900">{data.half_days_remaining}</span>
+              <span className={'text-lg font-bold ' + (data.half_days_remaining < 0 ? 'text-red-600' : 'text-gray-900')}>{data.half_days_remaining}</span>
               <span className="text-xs text-gray-400 ml-1">/ {data.half_annual_total}</span>
             </div>
             <span className="text-[10px] text-gray-500">{data.half_days_used} {t('settings_used')}</span>
@@ -261,7 +261,7 @@ function LeaveBalance() {
             <div className={'h-full rounded-full transition-all ' + (
               data.half_days_remaining / data.half_annual_total > 0.4 ? 'bg-orange-400' :
               data.half_days_remaining / data.half_annual_total > 0.15 ? 'bg-amber-500' : 'bg-red-500'
-            )} style={{ width: Math.round((data.half_days_remaining / data.half_annual_total) * 100) + '%' }} />
+            )} style={{ width: Math.max(0, Math.round((data.half_days_remaining / data.half_annual_total) * 100)) + '%' }} />
           </div>
         </div>
       )}

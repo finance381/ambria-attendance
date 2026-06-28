@@ -61,6 +61,13 @@ var FIELD_GROUPS = [
     default: false,
     source: 'admin_all_leave_balances',
   },
+  {
+    key: 'deductions',
+    label: 'Deductions & Penalties',
+    desc: 'FY leave deductions + over-claim count + ₹500/over-claim penalty',
+    default: false,
+    source: 'admin_all_leave_balances',
+  },
 ]
 
 export { FIELD_GROUPS }

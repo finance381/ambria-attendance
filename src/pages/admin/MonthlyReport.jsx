@@ -329,7 +329,7 @@ export default function MonthlyReport() {
 
     // Collect all rows
     var allRows = []
-    var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, wkdays: 0, hrs: 0, claims: 0 }
+    var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, wkdays: 0, hrs: 0, claims: 0, ded: 0, overClaims: 0 }
     var serial = 1
 
     for (var i = 0; i < months.length; i++) {
@@ -365,7 +365,11 @@ export default function MonthlyReport() {
         grandTotals.incomplete += incomplete
         grandTotals.wkdays += wkdays
         grandTotals.hrs += hrs
+        var ded = r.deductions || 0
+        var overClaims = Math.max(0, claimsUsed - claimsLimit)
         grandTotals.claims += claimsUsed
+        grandTotals.ded += ded
+        grandTotals.overClaims += overClaims
 
         allRows.push({
           serial: serial++,
@@ -382,7 +386,10 @@ export default function MonthlyReport() {
           hrsPct: hrsPct + '%',
           attPct: attPct + '%',
           avgD: avgD,
-          claims: claimsUsed + '/' + claimsLimit
+          claims: claimsUsed + '/' + claimsLimit,
+          ded: ded,
+          overClaims: overClaims,
+          claimPenalty: overClaims * 500
         })
       })
     }
@@ -436,17 +443,17 @@ export default function MonthlyReport() {
     }
 
     // Column widths (DXA) — landscape letter with 0.75" margins = 13680 content width
-    var colW = { sno: 550, name: 1900, dept: 1500, wk: 750, p: 700, h: 600, a: 700, inc: 600, hrs: 850, exp: 850, hpct: 700, apct: 700, avg: 750, cl: 730 }
+    var colW = { sno: 500, name: 1700, dept: 1300, wk: 700, p: 650, h: 550, a: 650, inc: 550, hrs: 800, exp: 800, hpct: 650, apct: 650, avg: 700, cl: 680, ded: 600, clp: 750 }
     var colWMonth = 900
     // Adjust name width for multi-month to fit month column
     var colWidths = isSingleMonth
-      ? [colW.sno, colW.name, colW.dept, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl]
-      : [colW.sno, colWMonth, colW.name - 200, colW.dept - 200, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl]
+      ? [colW.sno, colW.name, colW.dept, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl, colW.ded, colW.clp]
+      : [colW.sno, colWMonth, colW.name - 200, colW.dept - 200, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl, colW.ded, colW.clp]
 
     // Build header row
     var colHeaders = isSingleMonth
-      ? ['S.No', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims']
-      : ['S.No', 'Month', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims']
+      ? ['S.No', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims', 'Ded', '₹ Penalty']
+      : ['S.No', 'Month', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims', 'Ded', '₹ Penalty']
 
     var tableRows = [
       new TableRow({ children: colHeaders.map(function (h, i) { return headerCell(h, colWidths[i]) }), tableHeader: true })
@@ -472,7 +479,9 @@ export default function MonthlyReport() {
         dataCell(r.hrsPct, { shaded: shaded }),
         dataCell(r.attPct, { shaded: shaded }),
         dataCell(r.avgD, { shaded: shaded }),
-        dataCell(r.claims, { shaded: shaded, color: '7C3AED' })
+        dataCell(r.claims, { shaded: shaded, color: '7C3AED' }),
+        dataCell(r.ded || '—', { shaded: shaded, color: r.ded > 0 ? 'DC2626' : '999999' }),
+        dataCell(r.claimPenalty > 0 ? '₹' + r.claimPenalty : '—', { shaded: shaded, color: r.claimPenalty > 0 ? '7C3AED' : '999999' })
       ]
       if (!isSingleMonth) {
         dataCells.splice(1, 0, dataCell(r.month, { w: colWidths[1], shaded: shaded }))
@@ -513,7 +522,9 @@ export default function MonthlyReport() {
       totCell(gHrsPct),
       totCell(gAttPct),
       totCell(gAvgD),
-      totCell(grandTotals.claims)
+      totCell(grandTotals.claims),
+      totCell(grandTotals.ded),
+      totCell('₹' + (grandTotals.overClaims * 500))
     ]
     if (!isSingleMonth) {
       totCells.splice(1, 0, totCell(''))

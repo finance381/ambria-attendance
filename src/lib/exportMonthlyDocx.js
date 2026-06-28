@@ -90,6 +90,44 @@ async function fetchLeaves() {
   return data || []
 }
 
+async function fetchClaimsPenalty(fyStart, fyEnd, claimLimit) {
+  var { data: claims } = await supabase
+    .from('missed_claims')
+    .select('employee_id, created_at, status')
+    .gte('attendance_date', fyStart)
+    .lte('attendance_date', fyEnd)
+    .neq('status', 'rejected')
+
+  var byEmp = {}
+  ;(claims || []).forEach(function (c) {
+    if (!byEmp[c.employee_id]) byEmp[c.employee_id] = {}
+    var ist = new Date(c.created_at)
+    var mk = ist.getFullYear() + '-' + String(ist.getMonth() + 1).padStart(2, '0')
+    if (!byEmp[c.employee_id][mk]) byEmp[c.employee_id][mk] = 0
+    byEmp[c.employee_id][mk]++
+  })
+
+  var result = {}
+  Object.keys(byEmp).forEach(function (eid) {
+    var months = byEmp[eid]
+    var total = 0, over = 0
+    Object.keys(months).forEach(function (m) {
+      total += months[m]
+      if (months[m] > claimLimit) over += (months[m] - claimLimit)
+    })
+    result[eid] = { total: total, over: over, penalty: over * 500 }
+  })
+  return result
+}
+
+async function fetchClaimLimit() {
+  var { data } = await supabase.from('app_config').select('value').eq('key', 'claim_limit').maybeSingle()
+  if (data && data.value) {
+    try { return parseInt(String(data.value).replace(/"/g, ''), 10) || 4 } catch (e) {}
+  }
+  return 4
+}
+
 async function fetchPunches(employeeIds, fromDate, toDate) {
   var all = []
   // Supabase has 1000 row default; batch by employee chunks
@@ -181,6 +219,15 @@ function getColumns(selectedKeys) {
     cols.push({ key: 'half_bal', label: 'Half Bal', width: 650, getter: function (r) {
       return (r._half_used || 0) + '/' + (r._half_total || 0)
     }})
+  }
+
+  if (selectedKeys.indexOf('deductions') >= 0) {
+    cols.push({ key: 'leave_ded', label: 'Leave Ded', width: 700, getter: function (r) { return r._leave_deductions || 0 }, colorFn: function (r) { return (r._leave_deductions || 0) > 0 ? 'DC2626' : '334155' } })
+    cols.push({ key: 'claims_over_fy', label: 'Claims Over', width: 750, getter: function (r) { return r._claims_over || 0 }, colorFn: function (r) { return (r._claims_over || 0) > 0 ? 'DC2626' : '334155' } })
+    cols.push({ key: 'claim_penalty', label: '₹ Penalty', width: 750, getter: function (r) {
+      var p = r._claims_penalty || 0
+      return p > 0 ? '₹' + p.toLocaleString('en-IN') : '—'
+    }, colorFn: function (r) { return (r._claims_penalty || 0) > 0 ? '7C3AED' : '334155' } })
   }
 
   return cols
@@ -293,7 +340,7 @@ export async function exportMonthlyDocx(selectedKeys, opts) {
   var monthlyP = needSources['monthly_summary_range'] ? fetchMonthly(opts.fromDate, opts.toDate, opts.deptId) : Promise.resolve([])
   var timingP = needSources['avg_punch_times'] ? fetchTiming(opts.fromDate, opts.toDate, opts.deptId) : Promise.resolve([])
   var darP = needSources['dar_compliance'] ? fetchDAR(opts.fromDate, opts.toDate, opts.deptId) : Promise.resolve([])
-  var leavesP = needSources['admin_all_leave_balances'] ? fetchLeaves() : Promise.resolve([])
+  var leavesP = needSources['admin_all_leave_balances'] ? fetchLeaves() : Promise.resolve({})
 
   var needPunches = selectedKeys.indexOf('daily_punches') >= 0 || selectedKeys.indexOf('locations') >= 0
 
@@ -301,7 +348,17 @@ export async function exportMonthlyDocx(selectedKeys, opts) {
   var monthlyData = results[0]
   var timingData = results[1]
   var darData = results[2]
-  var leavesData = results[3]
+  var leavesRaw = results[3]
+  var leavesData = (leavesRaw && leavesRaw.balances) || []
+  var fyStart = (leavesRaw && leavesRaw.fy_start) || null
+  var fyEnd = (leavesRaw && leavesRaw.fy_end) || null
+
+  // Fetch claims penalty data if deductions selected
+  var claimsPenaltyMap = {}
+  if (selectedKeys.indexOf('deductions') >= 0 && fyStart && fyEnd) {
+    var claimLimit = await fetchClaimLimit()
+    claimsPenaltyMap = await fetchClaimsPenalty(fyStart, fyEnd, claimLimit)
+  }
 
   // Build employee_id lookup from monthly (primary)
   var empMap = {}
@@ -335,11 +392,16 @@ export async function exportMonthlyDocx(selectedKeys, opts) {
     r._dar_present = d.days_present
 
     var l = leaveMap[eid] || {}
-    r._leave_used = l.leaves_used
-    r._leave_total = l.annual_leaves || l.annual_total
-    r._leave_remaining = l.leaves_remaining || l.annual_remaining
-    r._half_used = l.half_days_used
+    r._leave_used = l.annual_used
+    r._leave_total = l.annual_total
+    r._leave_remaining = l.annual_remaining
+    r._half_used = l.half_used
     r._half_total = l.half_annual_total
+    r._leave_deductions = l.deductions || 0
+
+    var cp = claimsPenaltyMap[eid] || {}
+    r._claims_over = cp.over || 0
+    r._claims_penalty = cp.penalty || 0
   })
 
   // If no monthly data but we have other sources, build from timing or DAR
@@ -419,6 +481,18 @@ export async function exportMonthlyDocx(selectedKeys, opts) {
     })
     var avgDaily = totalWorkers > 0 ? (totalHrs / totalWorkers).toFixed(1) + 'h' : '—'
     statLines.push(statLine('Avg Daily Hours', avgDaily))
+  }
+
+  if (selectedKeys.indexOf('deductions') >= 0) {
+    var totLeaveDed = 0, totClaimsOver = 0, totClaimPenalty = 0
+    employees.forEach(function (r) {
+      totLeaveDed += (r._leave_deductions || 0)
+      totClaimsOver += (r._claims_over || 0)
+      totClaimPenalty += (r._claims_penalty || 0)
+    })
+    statLines.push(statLine('FY Leave Deductions', totLeaveDed + ' days'))
+    statLines.push(statLine('FY Over-Limit Claims', totClaimsOver))
+    statLines.push(statLine('Total Claims Penalty', '₹' + totClaimPenalty.toLocaleString('en-IN')))
   }
 
   // Sections label
