@@ -176,7 +176,7 @@ var translations = {
     settings_notif_also: "You'll also get notified when your claims are approved or rejected.",
     settings_leave_error: 'Leave balance error',
     settings_quarterly: 'Quarterly',
-    settings_halfday_balance: 'Half Day Balance',
+    settings_halfday_balance: 'Annual Half Day Balance',
     
 
     // ── Install Prompt ───────────────────────
