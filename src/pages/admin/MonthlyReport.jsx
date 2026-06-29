@@ -332,13 +332,19 @@ export default function MonthlyReport() {
     var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, wkdays: 0, hrs: 0, claims: 0, ded: 0, overClaims: 0 }
     var serial = 1
 
-    // Fetch FY deductions from leave balances (one-time)
+    // Fetch per-quarter deductions from leave balances (one-time)
     var dedMap = {}
     try {
       var { data: lbData } = await supabase.rpc('admin_all_leave_balances')
       if (lbData && lbData.balances) {
         lbData.balances.forEach(function (b) {
-          dedMap[b.employee_id] = b.deductions || 0
+          dedMap[b.employee_id] = {
+            q1: Math.max(0, (b.q1_used || 0) - (b.q1_total || 19)),
+            q2: Math.max(0, (b.q2_used || 0) - (b.q2_total || 19)),
+            q3: Math.max(0, (b.q3_used || 0) - (b.q3_total || 19)),
+            q4: Math.max(0, (b.q4_used || 0) - (b.q4_total || 19)),
+            half_excess: Math.max(0, Math.floor(Math.max((b.half_used || 0) - (b.half_annual_total || 6), 0) / 2))
+          }
         })
       }
     } catch (e) {}
@@ -376,7 +382,13 @@ export default function MonthlyReport() {
         grandTotals.incomplete += incomplete
         grandTotals.wkdays += wkdays
         grandTotals.hrs += hrs
-        var ded = dedMap[r.employee_id] || 0
+        var empDed = dedMap[r.employee_id] || {}
+        var ded = 0
+        if (m.month === 6) ded = empDed.q1 || 0
+        else if (m.month === 9) ded = empDed.q2 || 0
+        else if (m.month === 12) ded = empDed.q3 || 0
+        else if (m.month === 3) ded = (empDed.q4 || 0) + (empDed.half_excess || 0)
+        var isQuarterEnd = [3, 6, 9, 12].indexOf(m.month) >= 0
         var overClaims = Math.max(0, claimsUsed - claimsLimit)
         grandTotals.claims += claimsUsed
         grandTotals.ded += ded
@@ -398,7 +410,7 @@ export default function MonthlyReport() {
           attPct: attPct + '%',
           avgD: avgD,
           claims: claimsUsed + '/' + claimsLimit,
-          ded: ded,
+          ded: isQuarterEnd ? ded : null,
           overClaims: overClaims,
           claimPenalty: overClaims * 500
         })
