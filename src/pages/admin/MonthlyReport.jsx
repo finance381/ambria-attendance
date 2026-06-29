@@ -314,6 +314,7 @@ export default function MonthlyReport() {
     if (months.length === 0) { setExporting(false); return }
 
     var isSingleMonth = months.length === 1
+    var hasQuarterEnd = months.some(function (m) { return [3, 6, 9, 12].indexOf(m.month) >= 0 })
     var searchLower = search.trim().toLowerCase()
 
     var exportSelected = selected.length > 0 ? selected.slice() : null
@@ -470,13 +471,13 @@ export default function MonthlyReport() {
     var colWMonth = 900
     // Adjust name width for multi-month to fit month column
     var colWidths = isSingleMonth
-      ? [colW.sno, colW.name, colW.dept, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl, colW.ded, colW.clp]
-      : [colW.sno, colWMonth, colW.name - 200, colW.dept - 200, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl, colW.ded, colW.clp]
+      ? [colW.sno, colW.name, colW.dept, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl].concat(hasQuarterEnd ? [colW.ded] : []).concat([colW.clp])
+      : [colW.sno, colWMonth, colW.name - 200, colW.dept - 200, colW.wk, colW.p, colW.h, colW.a, colW.inc, colW.hrs, colW.exp, colW.hpct, colW.apct, colW.avg, colW.cl].concat(hasQuarterEnd ? [colW.ded] : []).concat([colW.clp])
 
     // Build header row
     var colHeaders = isSingleMonth
-      ? ['S.No', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims', 'Ded', '₹ Penalty']
-      : ['S.No', 'Month', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims', 'Ded', '₹ Penalty']
+      ? ['S.No', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims'].concat(hasQuarterEnd ? ['Ded'] : []).concat(['₹ Penalty'])
+      : ['S.No', 'Month', 'Name', 'Dept', 'WkDays', 'Present', 'Half', 'Absent', 'Inc', 'Hrs', 'Expected', 'Hrs%', 'Att%', 'Avg/D', 'Claims'].concat(hasQuarterEnd ? ['Ded'] : []).concat(['₹ Penalty'])
 
     var tableRows = [
       new TableRow({ children: colHeaders.map(function (h, i) { return headerCell(h, colWidths[i]) }), tableHeader: true })
@@ -503,9 +504,11 @@ export default function MonthlyReport() {
         dataCell(r.attPct, { shaded: shaded }),
         dataCell(r.avgD, { shaded: shaded }),
         dataCell(r.claims, { shaded: shaded, color: '7C3AED' }),
-        dataCell(r.ded || '—', { shaded: shaded, color: r.ded > 0 ? 'DC2626' : '999999' }),
+      ].concat(hasQuarterEnd ? [
+        dataCell(r.ded || '—', { shaded: shaded, color: r.ded > 0 ? 'DC2626' : '999999' })
+      ] : []).concat([
         dataCell(r.claimPenalty > 0 ? '₹' + r.claimPenalty : '—', { shaded: shaded, color: r.claimPenalty > 0 ? '7C3AED' : '999999' })
-      ]
+      ])
       if (!isSingleMonth) {
         dataCells.splice(1, 0, dataCell(r.month, { w: colWidths[1], shaded: shaded }))
       }
@@ -546,9 +549,9 @@ export default function MonthlyReport() {
       totCell(gAttPct),
       totCell(gAvgD),
       totCell(grandTotals.claims),
-      totCell(grandTotals.ded),
+    ].concat(hasQuarterEnd ? [totCell(grandTotals.ded)] : []).concat([
       totCell('₹' + (grandTotals.overClaims * 500))
-    ]
+    ])
     if (!isSingleMonth) {
       totCells.splice(1, 0, totCell(''))
     }
