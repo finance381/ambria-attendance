@@ -248,7 +248,7 @@ function LeaveBalance() {
       {!isMonthly && data.half_annual_total > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-700">{t('settings_halfday_balance') || 'Half Day Balance'}</p>
+            <p className="text-xs font-semibold text-gray-700">{t('settings_halfday_balance') || 'Annual Half Day Balance'}</p>
           </div>
           <div className="flex items-end justify-between mb-2">
             <div>

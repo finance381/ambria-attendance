@@ -131,8 +131,11 @@ export default function Analysis() {
 
   var loadTiming = useCallback(async function () {
     setTimingLoading(true)
+    var fromDate = year + '-' + String(month).padStart(2, '0') + '-01'
+    var lastDay = new Date(year, month, 0).getDate()
+    var toDate = year + '-' + String(month).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0')
     var { data } = await supabase.rpc('avg_punch_times', {
-      p_year: year, p_month: month,
+      p_from_date: fromDate, p_to_date: toDate,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
     var filtered = data || []
@@ -162,8 +165,11 @@ export default function Analysis() {
 
   var loadDAR = useCallback(async function () {
     setDarLoading(true)
+    var fromDate = year + '-' + String(month).padStart(2, '0') + '-01'
+    var lastDay = new Date(year, month, 0).getDate()
+    var toDate = year + '-' + String(month).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0')
     var { data } = await supabase.rpc('dar_compliance', {
-      p_year: year, p_month: month,
+      p_from_date: fromDate, p_to_date: toDate,
       p_department_id: deptFilter ? Number(deptFilter) : null
     })
     var filtered = data || []
