@@ -193,9 +193,8 @@ export default function MyClaims() {
                   var now = new Date()
                   var ist = new Date(now.getTime() + (330 * 60000))
                   var day = ist.getUTCDate()
-                  var hour = ist.getUTCHours()
                   var y, m
-                  if (day === 1 && hour < 15) {
+                  if (day <= 2) {
                     y = ist.getUTCFullYear()
                     m = ist.getUTCMonth()
                     if (m === 0) { m = 12; y-- }
