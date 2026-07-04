@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, HeadingLevel, WidthType, BorderStyle, ShadingType, PageOrientation } from 'docx'
+import * as XLSX from 'xlsx'
 
 
 var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -21,6 +22,7 @@ export default function MonthlyReport() {
   var [exportToYear, setExportToYear] = useState(now.getFullYear())
   var [exportToMonth, setExportToMonth] = useState(now.getMonth() + 1)
   var [exporting, setExporting] = useState(false)
+  var [exportFormat, setExportFormat] = useState('docx')
   var [sortCol, setSortCol] = useState('name')
   var [sortDir, setSortDir] = useState('asc')
   var [selected, setSelected] = useState([])
@@ -612,6 +614,182 @@ export default function MonthlyReport() {
     showToast('DOCX exported — ' + allRows.length + ' row' + (allRows.length !== 1 ? 's' : ''))
   }
 
+  // Export Excel
+  async function exportXLSX() {
+    setExporting(true)
+
+    var months = []
+    var fy = exportFromYear, fm = exportFromMonth
+    var ty = exportToYear, tm = exportToMonth
+    var cy = fy, cm = fm
+    while (cy < ty || (cy === ty && cm <= tm)) {
+      months.push({ year: cy, month: cm })
+      cm++
+      if (cm > 12) { cm = 1; cy++ }
+    }
+    if (months.length === 0) { setExporting(false); return }
+
+    var isSingleMonth = months.length === 1
+    var searchLower = search.trim().toLowerCase()
+    var exportSelected = selected.length > 0 ? selected.slice() : null
+
+    function applyFilters(rows) {
+      return rows.filter(function (r) {
+        if (exportSelected && !exportSelected.includes(r.employee_id)) return false
+        if (!searchLower) return true
+        return (r.name && r.name.toLowerCase().includes(searchLower)) ||
+               (r.emp_code && r.emp_code.toLowerCase().includes(searchLower))
+      })
+    }
+
+    var allRows = []
+    var grandTotals = { present: 0, absent: 0, half: 0, incomplete: 0, wkdays: 0, hrs: 0, claims: 0 }
+    var serial = 1
+
+    for (var i = 0; i < months.length; i++) {
+      var m = months[i]
+      var ms = m.year + '-' + String(m.month).padStart(2, '0') + '-01'
+      var med = new Date(m.year, m.month, 0).getDate()
+      var me = m.year + '-' + String(m.month).padStart(2, '0') + '-' + String(med).padStart(2, '0')
+      var { data: mData } = await supabase.rpc('monthly_summary_range', {
+        p_from_date: ms, p_to_date: me,
+        p_department_id: deptFilter ? Number(deptFilter) : null
+      })
+
+      var rows = applyFilters(mData || [])
+      var monthLabel = MONTHS[m.month - 1] + ' ' + m.year
+
+      rows.forEach(function (r) {
+        var present = r.days_present || 0
+        var absent = r.days_absent || 0
+        var half = r.days_half || 0
+        var incomplete = r.days_incomplete || 0
+        var wkdays = r.effective_days || 0
+        var hrs = r.total_hours || 0
+        var expected = wkdays * 9
+        var hrsPct = expected > 0 ? Math.round(hrs / expected * 100) : 0
+        var attPct = wkdays > 0 ? Math.round(present / wkdays * 100) : 0
+        var avgD = present > 0 ? Math.round(hrs / present * 10) / 10 : 0
+        var claimsUsed = r.claims_used || 0
+        var claimsLimit = r.claims_limit || 0
+
+        grandTotals.present += present
+        grandTotals.absent += absent
+        grandTotals.half += half
+        grandTotals.incomplete += incomplete
+        grandTotals.wkdays += wkdays
+        grandTotals.hrs += hrs
+        grandTotals.claims += claimsUsed
+
+        var row = { 'S.No': serial++ }
+        if (!isSingleMonth) row['Month'] = monthLabel
+        row['Name'] = r.name
+        row['Emp Code'] = r.emp_code
+        row['Department'] = r.department_name || '—'
+        row['Work Days'] = wkdays
+        row['Present'] = present
+        row['Half Day'] = half
+        row['Absent'] = absent
+        row['Incomplete'] = incomplete
+        row['Hours'] = hrs
+        row['Expected'] = expected
+        row['Hours %'] = hrsPct
+        row['Att %'] = attPct
+        row['Avg/Day'] = avgD
+        row['Claims'] = claimsUsed + '/' + claimsLimit
+        allRows.push(row)
+      })
+    }
+
+    if (allRows.length === 0) {
+      setExporting(false)
+      showToast('No employees match current filters')
+      return
+    }
+
+    // Period label
+    var periodLabel
+    if (isSingleMonth) {
+      var daysInMonth = new Date(fy, fm, 0).getDate()
+      periodLabel = '01 ' + MONTHS[fm - 1] + ' – ' + daysInMonth + ' ' + MONTHS[fm - 1] + ' ' + fy
+    } else {
+      var lastDay = new Date(ty, tm, 0).getDate()
+      periodLabel = '01 ' + MONTHS[fm - 1] + ' ' + fy + ' – ' + lastDay + ' ' + MONTHS[tm - 1] + ' ' + ty
+    }
+
+    // Totals row
+    var gExpected = grandTotals.wkdays * 9
+    var gHrsPct = gExpected > 0 ? Math.round(grandTotals.hrs / gExpected * 100) : '—'
+    var gAttPct = grandTotals.wkdays > 0 ? Math.round(grandTotals.present / grandTotals.wkdays * 100) : '—'
+    var gAvgD = grandTotals.present > 0 ? Math.round(grandTotals.hrs / grandTotals.present * 10) / 10 : '—'
+
+    var totRow = { 'S.No': '' }
+    if (!isSingleMonth) totRow['Month'] = ''
+    totRow['Name'] = 'TOTAL'
+    totRow['Emp Code'] = ''
+    totRow['Department'] = ''
+    totRow['Work Days'] = grandTotals.wkdays
+    totRow['Present'] = grandTotals.present
+    totRow['Half Day'] = grandTotals.half
+    totRow['Absent'] = grandTotals.absent
+    totRow['Incomplete'] = grandTotals.incomplete
+    totRow['Hours'] = Math.round(grandTotals.hrs * 10) / 10
+    totRow['Expected'] = gExpected
+    totRow['Hours %'] = gHrsPct
+    totRow['Att %'] = gAttPct
+    totRow['Avg/Day'] = gAvgD
+    totRow['Claims'] = grandTotals.claims
+    allRows.push(totRow)
+
+    // Build title rows
+    var titleRows = [
+      ['GET YOUR VENUE EVENTS PVT LTD'],
+      ['Attendance Report'],
+      ['Period: ' + periodLabel + '  |  Employees: ' + (allRows.length - 1)],
+      []
+    ]
+
+    // Create worksheet
+    var ws = XLSX.utils.aoa_to_sheet(titleRows)
+    XLSX.utils.sheet_add_json(ws, allRows, { origin: 'A5' })
+
+    // Column widths
+    var colWidths = [{ wch: 5 }]
+    if (!isSingleMonth) colWidths.push({ wch: 14 })
+    colWidths = colWidths.concat([
+      { wch: 22 }, { wch: 10 }, { wch: 16 },
+      { wch: 10 }, { wch: 8 }, { wch: 9 }, { wch: 8 }, { wch: 10 },
+      { wch: 8 }, { wch: 9 }, { wch: 9 }, { wch: 8 }, { wch: 9 }, { wch: 9 }
+    ])
+    ws['!cols'] = colWidths
+
+    // Merge title rows
+    var totalCols = isSingleMonth ? 15 : 16
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } }
+    ]
+
+    var wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Attendance')
+
+    var wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+    var blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+    var a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    var filterSuffix = searchLower ? '_' + searchLower.replace(/[^a-z0-9]/g, '') : ''
+    a.download = isSingleMonth
+      ? 'attendance_' + MONTHS[fm - 1] + '_' + fy + filterSuffix + '.xlsx'
+      : 'attendance_' + MONTHS[fm - 1] + fy + '_to_' + MONTHS[tm - 1] + ty + filterSuffix + '.xlsx'
+    a.click()
+
+    setExporting(false)
+    setShowExport(false)
+    showToast('Excel exported — ' + (allRows.length - 1) + ' row' + ((allRows.length - 1) !== 1 ? 's' : ''))
+  }
+
   // Year options
   var yearOptions = []
   for (var y = now.getFullYear(); y >= now.getFullYear() - 2; y--) {
@@ -634,7 +812,7 @@ export default function MonthlyReport() {
             disabled={loading || filtered.length === 0}
             className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
           >
-            ⬇ Export {selected.length > 0 ? selected.length + ' Selected' : 'DOCX'}
+            ⬇ Export {selected.length > 0 ? selected.length + ' Selected' : 'Report'}
           </button>
           
         </div>
@@ -796,8 +974,8 @@ export default function MonthlyReport() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { if (!exporting) setShowExport(false) }}>
           <div className="bg-white rounded-xl w-full max-w-sm shadow-xl" onClick={function (e) { e.stopPropagation() }}>
             <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-900">Export CSV</h3>
-              <p className="text-xs text-gray-500">Select month range for export</p>
+              <h3 className="text-sm font-bold text-gray-900">Export Report</h3>
+              <p className="text-xs text-gray-500">Choose format and month range</p>
             </div>
             <div className="px-5 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -837,13 +1015,27 @@ export default function MonthlyReport() {
                 <p className="text-xs text-red-600">To month must be same or after From month</p>
               )}
 
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Format</label>
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                  <button onClick={function () { setExportFormat('docx') }}
+                    className={'flex-1 py-2 text-xs font-medium transition-colors ' + (exportFormat === 'docx' ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+                    📄 Word (.docx)
+                  </button>
+                  <button onClick={function () { setExportFormat('xlsx') }}
+                    className={'flex-1 py-2 text-xs font-medium transition-colors ' + (exportFormat === 'xlsx' ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+                    📊 Excel (.xlsx)
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-1">
                 <button onClick={function () { setShowExport(false) }} disabled={exporting}
                   className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40">Cancel</button>
-                <button onClick={exportCSV}
+                <button onClick={exportFormat === 'xlsx' ? exportXLSX : exportCSV}
                   disabled={exporting || exportToYear < exportFromYear || (exportToYear === exportFromYear && exportToMonth < exportFromMonth)}
                   className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
-                  {exporting ? 'Exporting…' : '⬇ Export'}
+                  {exporting ? 'Exporting…' : (exportFormat === 'xlsx' ? '⬇ Export Excel' : '⬇ Export Word')}
                 </button>
               </div>
             </div>
