@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
@@ -14,6 +14,7 @@ export default function Home() {
   var [pendingCount, setPendingCount] = useState(0)
   var [syncing, setSyncing] = useState(false)
   var [syncError, setSyncError] = useState('')
+  var syncingRef = useRef(false)
 
   var loadStatus = useCallback(async function () {
     var [statusRes, punchesRes] = await Promise.all([
@@ -31,54 +32,76 @@ export default function Home() {
   }, [loadStatus])
 
   var syncOfflinePunches = useCallback(async function () {
-    var pending = await getPendingPunches()
-    setPendingCount(pending.length)
-    if (pending.length === 0 || syncing) return
+    // Atomic guard — prevents concurrent runs even across re-renders
+    if (syncingRef.current) return
+    syncingRef.current = true
 
-    setSyncing(true)
-    for (var i = 0; i < pending.length; i++) {
-      var p = pending[i]
-      try {
-        // Upload selfie
-        var { data: { user } } = await supabase.auth.getUser()
-        if (!user) break
-
-        var filePath = user.id + '/' + p.clientTimestamp.slice(0, 10) + '_' + p.punchType + '_' + Date.now() + '.jpg'
-        var { error: upErr } = await supabase.storage
-          .from('selfies')
-          .upload(filePath, p.selfieBlob, { contentType: 'image/jpeg', upsert: false })
-
-        if (upErr) continue
-
-        // Call punch RPC with client timestamp
-        var { data: result, error: rpcErr } = await supabase.rpc('punch', {
-          p_punch_type: p.punchType,
-          p_selfie_path: filePath,
-          p_latitude: p.latitude,
-          p_longitude: p.longitude,
-          p_gps_accuracy: p.gpsAccuracy,
-          p_device_info: p.deviceInfo,
-          p_client_timestamp: p.clientTimestamp,
-          p_client_punch_id: p.clientPunchId
-        })
-
-        if (!rpcErr && (!result || !result.error)) {
-          await removePunch(p.id)
-        }
-      } catch (e) {
-        // Skip this punch, retry next time
+    try {
+      var pending = await getPendingPunches()
+      setPendingCount(pending.length)
+      if (pending.length === 0) {
+        return
       }
+
+      setSyncing(true)
+      setSyncError('')
+
+      for (var i = 0; i < pending.length; i++) {
+        var p = pending[i]
+        try {
+          var { data: { user } } = await supabase.auth.getUser()
+          if (!user) break
+
+          var filePath = user.id + '/' + p.clientTimestamp.slice(0, 10) + '_' + p.punchType + '_' + Date.now() + '.jpg'
+          var { error: upErr } = await supabase.storage
+            .from('selfies')
+            .upload(filePath, p.selfieBlob, { contentType: 'image/jpeg', upsert: false })
+
+          if (upErr) {
+            // Storage upload failed — could be network. Skip, retry next cycle.
+            continue
+          }
+
+          var { data: result, error: rpcErr } = await supabase.rpc('punch', {
+            p_punch_type: p.punchType,
+            p_selfie_path: filePath,
+            p_latitude: p.latitude,
+            p_longitude: p.longitude,
+            p_gps_accuracy: p.gpsAccuracy,
+            p_device_info: p.deviceInfo,
+            p_client_timestamp: p.clientTimestamp,
+            p_client_punch_id: p.clientPunchId
+          })
+
+          if (rpcErr) {
+            // Network / infrastructure error — keep in queue for retry
+            console.warn('Offline punch RPC network error, will retry:', rpcErr)
+            continue
+          }
+
+          // Success OR server-side rejection (duplicate / already punched / stale)
+          // Either way, remove — retrying will not fix a server rejection
+          if (result && result.error) {
+            console.warn('Offline punch rejected by server, removing from queue:', result.error)
+          }
+          await removePunch(p.id)
+        } catch (e) {
+          console.warn('Offline punch sync exception, will retry:', e)
+        }
+      }
+
+      var remaining = await getPendingPunches()
+      setPendingCount(remaining.length)
+      if (remaining.length === 0) {
+        loadStatus()
+      } else if (navigator.onLine) {
+        setSyncError(remaining.length + ' punch' + (remaining.length > 1 ? 'es' : '') + ' failed to sync — check network and retry')
+      }
+    } finally {
+      syncingRef.current = false
+      setSyncing(false)
     }
-    setSyncing(false)
-    var remaining = await getPendingPunches()
-    setPendingCount(remaining.length)
-    if (remaining.length === 0) {
-      loadStatus()
-    } else if (navigator.onLine) {
-      // Some punches failed to sync even though we're online — likely duplicates or expired
-      setSyncError(remaining.length + ' punch' + (remaining.length > 1 ? 'es' : '') + ' failed to sync — may be duplicates')
-    }
-  }, [syncing, loadStatus])
+  }, [loadStatus])
   var { t } = useLanguage()
   // Sync on mount + when coming back online
   useEffect(function () {
