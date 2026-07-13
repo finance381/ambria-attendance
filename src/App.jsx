@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/useAuth'
+import { preloadFaceModels } from './lib/camera'
 import Login from './pages/Login'
 import MobileShell from './pages/mobile/MobileShell'
 import Home from './pages/mobile/Home'
@@ -48,6 +50,11 @@ function ProtectedRoute({ children, roles }) {
 
 export default function App() {
   var { session, loading } = useAuth()
+
+  // Preload face-detection models right after login so the punch camera opens instantly
+  useEffect(function () {
+    if (session) preloadFaceModels()
+  }, [session])
 
   if (loading) {
     return (

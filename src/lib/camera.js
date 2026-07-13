@@ -6,7 +6,7 @@ var modelLoading = false
 async function loadModels() {
   if (modelsLoaded) return
   if (modelLoading) {
-    while (!modelsLoaded) await new Promise(function (r) { setTimeout(r, 100) })
+    while (!modelsLoaded && modelLoading) await new Promise(function (r) { setTimeout(r, 100) })
     return
   }
   modelLoading = true
@@ -16,8 +16,14 @@ async function loadModels() {
     modelsLoaded = true
   } catch (e) {
     console.warn('face-api model load failed, using fallback:', e)
+  } finally {
     modelLoading = false
   }
+}
+
+// Preload — call from App after login so the camera opens instantly first time
+export function preloadFaceModels() {
+  loadModels().catch(function () {})
 }
 
 export function capturePhoto() {
@@ -65,6 +71,7 @@ export function capturePhoto() {
     var faceDetected = false
     var positionHistory = []
     var motionConfirmed = false
+    var lowLightMode = false
 
     function cleanup() {
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
@@ -78,10 +85,13 @@ export function capturePhoto() {
 
     function setFaceFound(found) {
       faceDetected = found
+      // Fill light — warm bright overlay in low light reflects onto face
+      var shadowColor = lowLightMode ? '255,245,220' : '255,255,255'
+      var shadowOp = lowLightMode ? (found ? 0.78 : 0.72) : (found ? 0.55 : 0.25)
+      guideRing.style.boxShadow = '0 0 0 9999px rgba(' + shadowColor + ',' + shadowOp + ')'
       if (found) {
         guideRing.style.borderColor = '#22c55e'
         guideRing.style.borderStyle = 'solid'
-        guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.55)'
         faceStatus.textContent = motionConfirmed ? '✓ Face detected' : '↔ Hold still — detecting motion...'
         faceStatus.style.background = 'rgba(22,163,74,0.7)'
         captureBtn.disabled = false
@@ -89,19 +99,44 @@ export function capturePhoto() {
       } else {
         guideRing.style.borderColor = 'rgba(255,255,255,0.5)'
         guideRing.style.borderStyle = 'dashed'
-        guideRing.style.boxShadow = '0 0 0 9999px rgba(255,255,255,0.25)'
-        faceStatus.textContent = 'Position your face in the oval'
+        faceStatus.textContent = lowLightMode ? '💡 Low light — screen used as fill' : 'Position your face in the oval'
         faceStatus.style.background = 'rgba(0,0,0,0.5)'
       }
     }
 
     function startFaceApiDetection() {
       faceStatus.textContent = 'Position your face in the oval'
-      var options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })
+      // Adaptive detector configs — low-light uses looser confidence
+      var optsNormal = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.3 })
+      var optsLowLight = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.2 })
+
+      // Small canvas for cheap per-tick luminance sampling (~1ms)
+      var lumCanvas = document.createElement('canvas')
+      lumCanvas.width = 60
+      lumCanvas.height = 45
+      var lumCtx = lumCanvas.getContext('2d', { willReadFrequently: true })
+
       faceDetectInterval = setInterval(async function () {
         if (video.readyState < 2) return
+
+        // ── Luminance sampling → toggle low-light fill light ──
         try {
-          var result = await faceapi.detectSingleFace(video, options)
+          lumCtx.drawImage(video, 0, 0, 60, 45)
+          var d = lumCtx.getImageData(0, 0, 60, 45).data
+          var lumSum = 0
+          for (var li = 0; li < d.length; li += 4) {
+            lumSum += d[li] * 0.299 + d[li + 1] * 0.587 + d[li + 2] * 0.114
+          }
+          var meanLum = lumSum / (d.length / 4)
+          var newLowLight = meanLum < 65
+          if (newLowLight !== lowLightMode) {
+            lowLightMode = newLowLight
+            setFaceFound(faceDetected)  // refresh overlay
+          }
+        } catch (e) { /* ignore */ }
+
+        try {
+          var result = await faceapi.detectSingleFace(video, lowLightMode ? optsLowLight : optsNormal)
           if (result) {
             var box = result.box
             var vw = video.videoWidth || 640
@@ -114,13 +149,14 @@ export function capturePhoto() {
             if (positionOk) {
               positionHistory.push({ cx: cx, cy: cy, t: Date.now() })
               if (positionHistory.length > 6) positionHistory.shift()
-              if (positionHistory.length >= 4) {
+              // Softened motion gate: any minor drift over 2 samples (500ms) confirms life
+              if (positionHistory.length >= 2) {
                 var dxSum = 0
                 for (var k = 1; k < positionHistory.length; k++) {
                   dxSum += Math.abs(positionHistory[k].cx - positionHistory[k - 1].cx)
                        + Math.abs(positionHistory[k].cy - positionHistory[k - 1].cy)
                 }
-                motionConfirmed = dxSum > 0.015
+                motionConfirmed = dxSum > 0.008
               }
             } else {
               positionHistory = []
@@ -133,7 +169,7 @@ export function capturePhoto() {
         } catch (e) {
           // transient error, ignore
         }
-      }, 600)
+      }, 250)
     }
 
     function startHeuristicDetection() {

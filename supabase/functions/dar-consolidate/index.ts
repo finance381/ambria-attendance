@@ -162,10 +162,10 @@ serve(async (req) => {
   const istNow = new Date(now.getTime() + istOffset)
   const reportDate = new Date(istNow.getTime() - 1 * 86400000).toISOString().slice(0, 10)
 
-  // Load groups
+  // Load groups (with routing info for per-dept report destinations)
   const { data: groups } = await supabase
     .from('dar_groups')
-    .select('whatsapp_group_id, group_name')
+    .select('whatsapp_group_id, group_name, department, receive_dept_report')
     .eq('active', true)
 
   // Load phone map (supports multiple phones per emp_code for alt numbers)
@@ -348,29 +348,118 @@ serve(async (req) => {
     return { name: e ? e.name : code, dept: e?.departments?.name || 'Other' }
   }
 
-  let report = `📋 *DAR Report — ${reportDate}*\n`
-  report += `✅ Submitted: ${todaySubmittedActive.size}/${allEmpCodes.size}\n`
-  report += `─────────────────\n`
+  // Group missing DARs by dept
+  const missingByDept: Record<string, string[]> = {}
+  for (const code of todayMissing) {
+    const info = empInfo(code)
+    if (!missingByDept[info.dept]) missingByDept[info.dept] = []
+    missingByDept[info.dept].push(info.name)
+  }
 
-  if (todayMissing.length > 0) {
-    const missingByDept: Record<string, string[]> = {}
-    for (const code of todayMissing) {
-      const info = empInfo(code)
-      if (!missingByDept[info.dept]) missingByDept[info.dept] = []
-      missingByDept[info.dept].push(info.name)
-    }
-
-    report += `\n*❌ Missing Today:*\n`
-    for (const dept of Object.keys(missingByDept).sort()) {
-      report += `\n*${dept}*\n`
-      for (const name of missingByDept[dept].sort()) {
-        report += `• ${name}\n`
-      }
+  // Attendance: absent + incomplete by dept
+  const incompleteEmps: typeof allEmps = []
+  for (const e of (allEmps || [])) {
+    const p = empPunches[e.id]
+    if (p && p.ins.length > 0 && p.outs.length === 0) {
+      incompleteEmps.push(e)
     }
   }
 
-  // Send via Whapi
-  let sentTo: string[] = []
+  const absentByDept: Record<string, string[]> = {}
+  for (const e of absentEmps) {
+    const dept = e.departments?.name || 'Other'
+    if (!absentByDept[dept]) absentByDept[dept] = []
+    absentByDept[dept].push(e.name)
+  }
+
+  const incByDept: Record<string, string[]> = {}
+  for (const e of incompleteEmps) {
+    const dept = e.departments?.name || 'Other'
+    if (!incByDept[dept]) incByDept[dept] = []
+    incByDept[dept].push(e.name)
+  }
+
+  // Per-dept DAR stats (for slice headers)
+  const perDeptStats: Record<string, { total: number, submitted: number }> = {}
+  for (const e of activeEmps) {
+    const dept = e.departments?.name || 'Other'
+    if (!perDeptStats[dept]) perDeptStats[dept] = { total: 0, submitted: 0 }
+    perDeptStats[dept].total++
+    if (todaySubmitted.has(e.emp_code)) perDeptStats[dept].submitted++
+  }
+
+  // Report builders — take a set of depts to include
+  function buildDarReport(depts: string[], totalCount: number, submittedCount: number): string {
+    let r = `📋 *DAR Report — ${reportDate}*\n`
+    r += `✅ Submitted: ${submittedCount}/${totalCount}\n`
+    r += `─────────────────\n`
+    const missingDepts = depts.filter(d => (missingByDept[d] || []).length > 0)
+    if (missingDepts.length > 0) {
+      r += `\n*❌ Missing Today:*\n`
+      for (const dept of missingDepts.sort()) {
+        r += `\n*${dept}*\n`
+        for (const name of missingByDept[dept].sort()) {
+          r += `• ${name}\n`
+        }
+      }
+    }
+    return r
+  }
+
+  function buildAttendanceReport(depts: string[]): string {
+    const deptSet = new Set(depts)
+    const filteredAbsent: Record<string, string[]> = {}
+    for (const [d, names] of Object.entries(absentByDept)) {
+      if (deptSet.has(d)) filteredAbsent[d] = names
+    }
+    const filteredInc: Record<string, string[]> = {}
+    for (const [d, names] of Object.entries(incByDept)) {
+      if (deptSet.has(d)) filteredInc[d] = names
+    }
+    const totalAbsent = Object.values(filteredAbsent).reduce((s, arr) => s + arr.length, 0)
+    const totalInc = Object.values(filteredInc).reduce((s, arr) => s + arr.length, 0)
+
+    let r = `🏠 *Attendance Report — ${reportDate}*\n`
+    r += `─────────────────\n`
+    r += `\n*Absent/Leave: ${totalAbsent}*\n`
+    for (const dept of Object.keys(filteredAbsent).sort()) {
+      r += `\n*${dept}*\n`
+      for (const name of filteredAbsent[dept].sort()) r += `• ${name}\n`
+    }
+    r += `\n*Incomplete Punch: ${totalInc}*\n`
+    for (const dept of Object.keys(filteredInc).sort()) {
+      r += `\n*${dept}*\n`
+      for (const name of filteredInc[dept].sort()) r += `• ${name}\n`
+    }
+    return r
+  }
+
+  async function sendWhapi(to: string, body: string): Promise<boolean> {
+    try {
+      await fetch('https://gate.whapi.cloud/messages/text', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${WHAPI_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: to.includes('@') ? to : to + '@s.whatsapp.net',
+          body,
+        }),
+      })
+      await new Promise(r => setTimeout(r, 1000))
+      return true
+    } catch (err) {
+      console.error(`Failed to send to ${to}:`, err)
+      return false
+    }
+  }
+
+  // Determine routed depts (groups with receive_dept_report=true)
+  const routedGroups = (groups || []).filter((g: any) => g.receive_dept_report && g.department)
+  const routedDepts = new Set(routedGroups.map((g: any) => g.department as string))
+
+  // Load main recipients
   const recipientsRow = await supabase
     .from('app_config')
     .select('value')
@@ -380,98 +469,43 @@ serve(async (req) => {
   let recipients: string[] = []
   try {
     const raw = recipientsRow.data?.value
-    if (Array.isArray(raw)) {
-      recipients = raw
-    } else if (typeof raw === 'string') {
-      recipients = JSON.parse(raw.replace(/^"|"$/g, ''))
-    }
+    if (Array.isArray(raw)) recipients = raw
+    else if (typeof raw === 'string') recipients = JSON.parse(raw.replace(/^"|"$/g, ''))
   } catch { recipients = [] }
 
+  // Collect all dept names present in employee set
+  const allDepts = new Set<string>()
+  for (const e of (allEmps || [])) allDepts.add(e.departments?.name || 'Other')
+
+  // Main depts = everything EXCEPT routed depts
+  const mainDepts = [...allDepts].filter(d => !routedDepts.has(d))
+
+  const sentTo: string[] = []
+
+  // 1. Send routed slices — one dept per group
+  for (const g of routedGroups) {
+    const dept = g.department as string
+    const stats = perDeptStats[dept] || { total: 0, submitted: 0 }
+    const darSlice = buildDarReport([dept], stats.total, stats.submitted)
+    const attSlice = buildAttendanceReport([dept])
+    const ok1 = await sendWhapi(g.whatsapp_group_id, darSlice)
+    const ok2 = await sendWhapi(g.whatsapp_group_id, attSlice)
+    if (ok1 && ok2) sentTo.push(`${g.whatsapp_group_id} (${dept})`)
+    console.log(`Routed slice to ${dept} → ${g.whatsapp_group_id}`)
+  }
+
+  // 2. Send main report (excluding routed depts) to main recipients
+  const totalMain = mainDepts.reduce((s, d) => s + (perDeptStats[d]?.total || 0), 0)
+  const submittedMain = mainDepts.reduce((s, d) => s + (perDeptStats[d]?.submitted || 0), 0)
+  const report = buildDarReport(mainDepts, totalMain, submittedMain)
+  const report2 = buildAttendanceReport(mainDepts)
+
   for (const phone of recipients) {
-    try {
-      await fetch('https://gate.whapi.cloud/messages/text', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${WHAPI_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: phone.includes('@') ? phone : phone + '@s.whatsapp.net',
-          body: report,
-        }),
-      })
-      sentTo.push(phone)
-      await new Promise(r => setTimeout(r, 1000))
-    } catch (err) {
-      console.error(`Failed to send to ${phone}:`, err)
-    }
+    const ok = await sendWhapi(phone, report)
+    if (ok) sentTo.push(phone)
   }
-
-  // Build Message 2: Attendance Report (absent + incomplete)
-  // Incomplete = employees who punched IN but have no OUT punch
-  const incompleteEmps: typeof allEmps = []
-  for (const e of (allEmps || [])) {
-    const p = empPunches[e.id]
-    if (p && p.ins.length > 0 && p.outs.length === 0) {
-      incompleteEmps.push(e)
-    }
-  }
-
-  let report2 = `🏠 *Attendance Report — ${reportDate}*\n`
-  report2 += `─────────────────\n`
-
-  // Absent section
-  report2 += `\n*Absent/Leave: ${absentEmps.length}*\n`
-  if (absentEmps.length > 0) {
-    const absentByDept: Record<string, string[]> = {}
-    for (const e of absentEmps) {
-      const dept = e.departments?.name || 'Other'
-      if (!absentByDept[dept]) absentByDept[dept] = []
-      absentByDept[dept].push(e.name)
-    }
-    for (const dept of Object.keys(absentByDept).sort()) {
-      report2 += `\n*${dept}*\n`
-      for (const name of absentByDept[dept].sort()) {
-        report2 += `• ${name}\n`
-      }
-    }
-  }
-
-  // Incomplete section
-  report2 += `\n*Incomplete Punch: ${incompleteEmps.length}*\n`
-  if (incompleteEmps.length > 0) {
-    const incByDept: Record<string, string[]> = {}
-    for (const e of incompleteEmps) {
-      const dept = e.departments?.name || 'Other'
-      if (!incByDept[dept]) incByDept[dept] = []
-      incByDept[dept].push(e.name)
-    }
-    for (const dept of Object.keys(incByDept).sort()) {
-      report2 += `\n*${dept}*\n`
-      for (const name of incByDept[dept].sort()) {
-        report2 += `• ${name}\n`
-      }
-    }
-  }
-
-  // Send Message 2 to all recipients
   for (const phone of recipients) {
-    try {
-      await fetch('https://gate.whapi.cloud/messages/text', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${WHAPI_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: phone.includes('@') ? phone : phone + '@s.whatsapp.net',
-          body: report2,
-        }),
-      })
-      await new Promise(r => setTimeout(r, 1000))
-    } catch (err) {
-      console.error(`Failed to send report2 to ${phone}:`, err)
-    }
+    await sendWhapi(phone, report2)
   }
 
   console.log(report2)
