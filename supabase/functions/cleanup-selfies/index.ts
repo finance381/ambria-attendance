@@ -7,7 +7,6 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization')
     const cronSecret = Deno.env.get('CRON_SECRET')
 
-    // Allow either: valid cron secret OR authenticated admin
     let isAuthorized = false
 
     const srkAuth = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!

@@ -46,7 +46,7 @@ export default function Employees() {
   var [sortDir, setSortDir] = useState('asc')
 
   var [form, setForm] = useState({
-    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [], expected_hours: ''
+    name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [], expected_hours: '', continue_enabled: false
   })
   var [formError, setFormError] = useState('')
   var [mgrDepts, setMgrDepts] = useState([])
@@ -200,7 +200,7 @@ export default function Employees() {
   }
 
   function resetForm() {
-    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [], expected_hours: '' })
+    setForm({ name: '', phone: '', department_id: '', role: 'staff', designation: '', date_of_joining: '', dar_required: false, visible_tabs: [], expected_hours: '', continue_enabled: false })
     setFormError('')
   }
 
@@ -220,7 +220,8 @@ export default function Employees() {
       date_of_joining: emp.date_of_joining || '',
       dar_required: !!emp.dar_required,
       visible_tabs: emp.visible_tabs || DEFAULT_TABS[emp.role] || DEFAULT_TABS.staff,
-      expected_hours: emp.expected_hours != null ? String(emp.expected_hours) : ''
+      expected_hours: emp.expected_hours != null ? String(emp.expected_hours) : '',
+      continue_enabled: !!emp.continue_enabled
     })
     setFormError('')
     setEditId(emp.id)
@@ -300,7 +301,8 @@ export default function Employees() {
       date_of_joining: form.date_of_joining || null,
       dar_required: form.dar_required,
       visible_tabs: form.visible_tabs,
-      expected_hours: form.expected_hours ? Number(form.expected_hours) : null
+      expected_hours: form.expected_hours ? Number(form.expected_hours) : null,
+      continue_enabled: form.continue_enabled
     }
 
     var { error } = await supabase
@@ -626,6 +628,14 @@ export default function Employees() {
                   className="rounded border-gray-300 text-slate-800 focus:ring-slate-700" />
                 <span className="text-xs font-medium text-gray-700">DAR Required</span>
                 <span className="text-[10px] text-gray-400">— included in daily DAR report</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.continue_enabled}
+                  onChange={function (e) { setForm({ ...form, continue_enabled: e.target.checked }) }}
+                  className="rounded border-gray-300 text-emerald-700 focus:ring-emerald-600" />
+                <span className="text-xs font-medium text-gray-700">Continue</span>
+                <span className="text-[10px] text-gray-400">— +1 leave day when session &gt;16h</span>
               </label>
 
               {editId && form.role === 'manager' && (
