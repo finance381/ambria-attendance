@@ -388,7 +388,7 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
     if (lag === 0) return r
     var adjPresent = Math.max(0, (r.days_present || 0) - lag)
     var adjSubmitted = Math.min(r.days_submitted || 0, adjPresent)
-    var adjPct = adjPresent > 0 ? Math.round(adjSubmitted / adjPresent * 100) : 100
+    var adjPct = adjPresent > 0 ? Math.round(adjSubmitted / adjPresent * 100) : 0
     return { ...r, compliance_pct: Math.min(adjPct, 100), _adj_missing: Math.max(0, adjPresent - adjSubmitted) }
   })
   filtered.sort(function (a, b) { return a.compliance_pct - b.compliance_pct })
