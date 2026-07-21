@@ -6,6 +6,7 @@ export default function LeaveBalances() {
   var [departments, setDepartments] = useState([])
   var [deptFilter, setDeptFilter] = useState('')
   var [search, setSearch] = useState('')
+  var [quarterFilter, setQuarterFilter] = useState('')
   var [loading, setLoading] = useState(true)
   var [error, setError] = useState('')
   var [sortCol, setSortCol] = useState('name')
@@ -54,8 +55,8 @@ export default function LeaveBalances() {
       case 'department_name': va = a.department_name || ''; vb = b.department_name || ''; break
       case 'annual_used': va = a.annual_used; vb = b.annual_used; break
       case 'annual_remaining': va = a.annual_remaining; vb = b.annual_remaining; break
-      case 'quarter_used': va = a.quarter_used; vb = b.quarter_used; break
-      case 'quarter_remaining': va = a.quarter_remaining; vb = b.quarter_remaining; break
+      case 'quarter_used': va = resolveQuarter(a, quarterFilter).used; vb = resolveQuarter(b, quarterFilter).used; break
+      case 'quarter_remaining': va = resolveQuarter(a, quarterFilter).remaining; vb = resolveQuarter(b, quarterFilter).remaining; break
       case 'half_used': va = a.half_used; vb = b.half_used; break
       case 'half_remaining': va = a.half_remaining; vb = b.half_remaining; break
       default: va = a.name; vb = b.name
@@ -73,7 +74,9 @@ export default function LeaveBalances() {
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">Leave Balances</h2>
       <p className="text-xs text-gray-500 mb-1">
-        FY {fyLabel} · Quarter {data ? data.quarter_label : ''} ({data ? formatDate(data.quarter_start) + ' – ' + formatDate(data.quarter_end) : ''})
+        FY {fyLabel} · {quarterFilter
+          ? 'Viewing ' + quarterLabel(data && data.fy_start, quarterFilter)
+          : 'Current Quarter ' + (data ? data.quarter_label : '') + ' (' + (data ? formatDate(data.quarter_start) + ' – ' + formatDate(data.quarter_end) : '') + ')'}
       </p>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={function () { loadData() }}
@@ -87,6 +90,17 @@ export default function LeaveBalances() {
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
             <option value="">All</option>
             {departments.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Quarter</label>
+          <select value={quarterFilter} onChange={function (e) { setQuarterFilter(e.target.value) }}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+            <option value="">Current</option>
+            <option value="q1">Q1 (Apr–Jun)</option>
+            <option value="q2">Q2 (Jul–Sep)</option>
+            <option value="q3">Q3 (Oct–Dec)</option>
+            <option value="q4">Q4 (Jan–Mar)</option>
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
@@ -155,6 +169,7 @@ export default function LeaveBalances() {
               {filtered.map(function (b) {
                 var isCap = b.leave_scheme === 'monthly_cap'
                 var isNewJoiner = b.leave_scheme === 'new_joiner'
+                var q = resolveQuarter(b, quarterFilter)
                 return (
                   <tr key={b.employee_id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-2 text-xs text-gray-400 font-mono">{b.emp_code}</td>
@@ -180,8 +195,8 @@ export default function LeaveBalances() {
                       </>
                     ) : (
                       <>
-                        <td className="px-2 py-2 text-xs text-center text-gray-700">{b.quarter_used}<span className="text-gray-400 text-[10px]">/{b.quarter_total}</span></td>
-                        <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.quarter_remaining, b.quarter_total)}>{b.quarter_remaining}</td>
+                        <td className="px-2 py-2 text-xs text-center text-gray-700">{q.used}<span className="text-gray-400 text-[10px]">/{q.total}</span></td>
+                        <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(q.remaining, q.total)}>{q.remaining}</td>
                         <td className="px-2 py-2 text-xs text-center text-gray-700">{b.half_used}<span className="text-gray-400 text-[10px]">/{b.half_annual_total}</span></td>
                         <td className={'px-2 py-2 text-xs text-center font-semibold ' + remainingColor(b.half_remaining, b.half_annual_total)}>{b.half_remaining}</td>
                         <td className={'px-2 py-2 text-xs text-center font-bold ' + (b.deductions > 0 ? 'text-pink-600' : 'text-gray-300')}>{b.deductions > 0 ? b.deductions : '—'}</td>
@@ -196,6 +211,27 @@ export default function LeaveBalances() {
       )}
     </div>
   )
+}
+
+function resolveQuarter(b, qKey) {
+  if (!qKey) return { used: b.quarter_used, total: b.quarter_total, remaining: b.quarter_remaining }
+  var used = b[qKey + '_used'] || 0
+  var total = b[qKey + '_total'] || 0
+  return { used: used, total: total, remaining: total - used }
+}
+
+function quarterLabel(fyStart, qKey) {
+  if (!qKey || !fyStart) return ''
+  var y = parseInt(fyStart.slice(0, 4), 10)
+  var ranges = {
+    q1: [new Date(y, 3, 1), new Date(y, 5, 30)],
+    q2: [new Date(y, 6, 1), new Date(y, 8, 30)],
+    q3: [new Date(y, 9, 1), new Date(y, 11, 31)],
+    q4: [new Date(y + 1, 0, 1), new Date(y + 1, 2, 31)]
+  }
+  var r = ranges[qKey]
+  var fmt = function (d) { return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }
+  return qKey.toUpperCase() + ' (' + fmt(r[0]) + ' – ' + fmt(r[1]) + ')'
 }
 
 function remainingColor(remaining, total) {
