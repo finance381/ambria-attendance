@@ -31,13 +31,13 @@ export function capturePhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:65dvh;object-fit:cover;z-index:9998;background:#000;transform:scaleX(-1)'
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000;transform:scaleX(-1)'
 
     var overlay = document.createElement('div')
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top,20px) 0 env(safe-area-inset-bottom,20px);background:linear-gradient(180deg,transparent 0%,transparent 62%,#0f172a 68%,#0f172a 100%)'
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
 
     var guideRing = document.createElement('div')
-    guideRing.style.cssText = 'width:200px;height:260px;border:3px dashed rgba(255,255,255,0.7);border-radius:50%;margin-top:20px;transition:border-color 0.3s;box-shadow:0 0 0 9999px rgba(0,0,0,0.3)'
+    guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:40px;transition:border-color 0.3s;box-shadow:0 0 0 9999px rgba(255,255,255,0.25)'
 
     var faceStatus = document.createElement('div')
     faceStatus.style.cssText = 'color:#fff;font-size:14px;font-weight:600;text-align:center;padding:6px 16px;border-radius:20px;background:rgba(0,0,0,0.5);margin-top:12px'
@@ -273,7 +273,7 @@ export function capturePhoto() {
     }
 
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 640 }, aspectRatio: { ideal: 0.75 } },
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     }).then(function (s) {
       stream = s
@@ -334,10 +334,10 @@ export function captureProxyPhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:65dvh;object-fit:cover;z-index:9998;background:#000'
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000'
 
     var overlay = document.createElement('div')
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top,20px) 0 env(safe-area-inset-bottom,20px);background:linear-gradient(180deg,transparent 0%,transparent 62%,#0f172a 68%,#0f172a 100%)'
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
 
     var label = document.createElement('div')
     label.style.cssText = 'color:#fff;font-size:14px;font-weight:600;text-align:center;padding:8px 20px;border-radius:20px;background:rgba(0,0,0,0.5);margin-top:60px'
