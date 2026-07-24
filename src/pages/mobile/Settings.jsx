@@ -290,6 +290,7 @@ function NotificationSettings({ employeeId }) {
   var [supported, setSupported] = useState(false)
   var [subscribed, setSubscribed] = useState(false)
   var [loading, setLoading] = useState(true)
+  var [iosNeedsInstall, setIosNeedsInstall] = useState(false)
   var [saving, setSaving] = useState(false)
   var [punchInTime, setPunchInTime] = useState('')
   var [punchOutTime, setPunchOutTime] = useState('')
@@ -304,6 +305,12 @@ function NotificationSettings({ employeeId }) {
   useEffect(function () {
     var isSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
     setSupported(isSupported)
+
+    var ua = navigator.userAgent || ''
+    var isIos = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document)
+    var isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true
+    if (isIos && !isStandalone) setIosNeedsInstall(true)
 
     if (!isSupported) { setLoading(false); return }
 
@@ -355,6 +362,10 @@ function NotificationSettings({ employeeId }) {
   }, [employeeId])
 
   async function handleSubscribe() {
+    if (iosNeedsInstall) {
+      showToast('Install to Home Screen first (see instructions above)')
+      return
+    }
     setSaving(true)
     try {
       var permission = await Notification.requestPermission()
@@ -446,12 +457,23 @@ function NotificationSettings({ employeeId }) {
               {saving ? t('saving') : t('settings_notif_off')}
             </button>
           ) : (
-            <button onClick={handleSubscribe} disabled={saving}
+            <button onClick={handleSubscribe} disabled={saving || iosNeedsInstall}
               className="px-3 py-1.5 text-[11px] font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors disabled:opacity-40">
               {saving ? t('saving') : t('settings_notif_enable')}
             </button>
           )}
         </div>
+        {iosNeedsInstall && (
+          <div className="mt-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-[11px] font-bold text-blue-900 mb-1">📱 iOS setup required</p>
+            <ol className="text-[10px] text-blue-800 space-y-0.5 list-decimal list-inside">
+              <li>Tap the Share icon at the bottom of Safari</li>
+              <li>Scroll down and tap "Add to Home Screen"</li>
+              <li>Open the app from the home screen icon</li>
+              <li>Return here and tap Enable</li>
+            </ol>
+          </div>
+        )}
       </div>
 
       {subscribed && (
