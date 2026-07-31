@@ -654,8 +654,9 @@ export default function Analysis() {
         filtered.sort(function (a, b) { return a.compliance_pct - b.compliance_pct })
 
         var totalPresent = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
-        var totalSubmitted = filtered.reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
-        var overallPct = totalPresent > 0 ? Math.min(100, Math.round((totalSubmitted / totalPresent) * 100)) : 0
+        var totalOnTime = filtered.reduce(function (s, r) { return s + (r.days_submitted_on_time || 0) }, 0)
+        var totalLate = filtered.reduce(function (s, r) { return s + (r.days_late || 0) }, 0)
+        var overallPct = totalPresent > 0 ? Math.min(100, Math.round((totalOnTime / totalPresent) * 100)) : 0
         var perfect = filtered.filter(function (r) { return r.compliance_pct >= 100 }).length
         var zero = filtered.filter(function (r) { return r.compliance_pct === 0 }).length
         var isRecent = year === now.getFullYear() && month === now.getMonth() + 1
@@ -672,7 +673,7 @@ export default function Analysis() {
                 <p className="text-[10px] text-slate-500 font-medium">📅 DAR data through <strong className="text-slate-700">{filtered[0].dar_cutoff}</strong></p>
               </div>
             )}
-            <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="grid grid-cols-4 gap-2 mb-3">
               <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 px-3 py-3 flex items-center gap-2"
                 style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <DonutChart pct={overallPct} size={38} color={pctColor(overallPct)} stroke={3.5} />
@@ -682,6 +683,7 @@ export default function Analysis() {
                 </div>
               </div>
               <StatCard label="100% ✓" value={perfect} color="#059669" />
+              <StatCard label="Late" value={totalLate} color="#d97706" />
               <StatCard label="0% ✕" value={zero} color="#dc2626" />
             </div>
 
@@ -699,7 +701,8 @@ export default function Analysis() {
                         </div>
                         <p className="text-[10px] text-slate-400 font-medium">{r.emp_code} · {r.department_name || ''}</p>
                         <div className="flex gap-3 mt-1 text-[10px] font-medium">
-                          <span className="text-emerald-600">{r.days_submitted} submitted</span>
+                          <span className="text-emerald-600">{r.days_submitted_on_time || 0} on-time</span>
+                          {(r.days_late || 0) > 0 && <span className="text-amber-600">{r.days_late} late</span>}
                           <span className="text-slate-400">{r.days_present} present</span>
                         </div>
                       </div>

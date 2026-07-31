@@ -384,52 +384,52 @@ function DARView({ data, prevData, loading, month, year, fromDate, toDate, docxO
   if (loading) return <Loader />
   var lag = 0
   var isRecent = toDate >= new Date().toISOString().slice(0, 10)
-  var filtered = data.map(function (r) {
-    if (lag === 0) return r
-    var adjPresent = Math.max(0, (r.days_present || 0) - lag)
-    var adjSubmitted = Math.min(r.days_submitted || 0, adjPresent)
-    var adjPct = adjPresent > 0 ? Math.round(adjSubmitted / adjPresent * 100) : 0
-    return { ...r, compliance_pct: Math.min(adjPct, 100), _adj_missing: Math.max(0, adjPresent - adjSubmitted) }
-  })
+  var filtered = data.map(function (r) { return r })
   filtered.sort(function (a, b) { return a.compliance_pct - b.compliance_pct })
   var totalP = filtered.reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
-  var totalS = filtered.reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
-  var overallPct = totalP > 0 ? Math.min(100, Math.round((totalS / totalP) * 100)) : 0
+  var totalOnTime = filtered.reduce(function (s, r) { return s + (r.days_submitted_on_time || 0) }, 0)
+  var totalLate = filtered.reduce(function (s, r) { return s + (r.days_late || 0) }, 0)
+  var overallPct = totalP > 0 ? Math.min(100, Math.round((totalOnTime / totalP) * 100)) : 0
   var full = filtered.filter(function (r) { return r.compliance_pct >= 90 }).length
   var low = filtered.filter(function (r) { return r.compliance_pct < 50 }).length
   var prevP = (prevData || []).reduce(function (s, r) { return s + (r.days_present || 0) }, 0)
-  var prevS = (prevData || []).reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0)
-  var prevPct = prevP > 0 ? Math.round((prevS / prevP) * 100) : null
+  var prevOnTime = (prevData || []).reduce(function (s, r) { return s + (r.days_submitted_on_time || 0) }, 0)
+  var prevPct = prevP > 0 ? Math.round((prevOnTime / prevP) * 100) : null
 
-  var darConcerns = filtered.filter(function (r) { return r.compliance_pct < 30 }).slice(0, 3).map(function (r) { return { name: r.name, code: r.emp_code, detail: r.compliance_pct + '% (' + (r.days_submitted || 0) + '/' + (r.days_present || 0) + ')', color: 'red' } })
+  var darConcerns = filtered.filter(function (r) { return r.compliance_pct < 30 }).slice(0, 3).map(function (r) { return { name: r.name, code: r.emp_code, detail: r.compliance_pct + '% (' + (r.days_submitted_on_time || 0) + '/' + (r.days_present || 0) + ')', color: 'red' } })
   var darWarnings = filtered.filter(function (r) { return r.compliance_pct >= 30 && r.compliance_pct < 70 }).slice(0, 2).map(function (r) { return { name: r.name, code: r.emp_code, detail: r.compliance_pct + '% compliance', color: 'amber' } })
 
   var darChart = filtered.map(function (r) { return { name: r.name.length > 15 ? r.name.slice(0, 15) + '\u2026' : r.name, pct: r.compliance_pct, fill: pctToColor(r.compliance_pct) } })
-  var KEYS = ['name', 'department_name', 'compliance_pct', 'days_submitted', 'days_present', '_missing']
-  var wm = filtered.map(function (r) { return { ...r, _missing: lag > 0 ? (r._adj_missing || 0) : Math.max(0, (r.days_present || 0) - (r.days_submitted || 0)) } })
+  var KEYS = ['name', 'department_name', 'compliance_pct', 'days_submitted_on_time', 'days_late', 'days_present', '_missing']
+  var wm = filtered.map(function (r) { return { ...r, _missing: Math.max(0, (r.days_present || 0) - (r.days_submitted || 0)) } })
   var sortedDar = sortCol !== null ? wm.slice().sort(function (a, b) { var key = KEYS[sortCol]; var va = a[key], vb = b[key]; if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase() }; return (sortDir === 'desc' ? -1 : 1) * (va < vb ? -1 : va > vb ? 1 : 0) }) : wm
-  var tableRows = sortedDar.map(function (r) { var pc = r.compliance_pct >= 90 ? 'text-emerald-600 font-semibold' : r.compliance_pct >= 50 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'; return [{ text: r.name, sub: r.emp_code }, r.department_name || '\u2014', { text: r.compliance_pct + '%', className: pc }, r.days_submitted || 0, r.days_present || 0, r._missing > 0 ? { text: String(r._missing), className: 'text-red-600 font-semibold' } : '0'] })
+  var tableRows = sortedDar.map(function (r) {
+    var pc = r.compliance_pct >= 90 ? 'text-emerald-600 font-semibold' : r.compliance_pct >= 50 ? 'text-amber-600 font-semibold' : 'text-red-600 font-semibold'
+    var lateCell = (r.days_late || 0) > 0 ? { text: String(r.days_late), className: 'text-amber-600 font-semibold' } : '0'
+    return [{ text: r.name, sub: r.emp_code }, r.department_name || '\u2014', { text: r.compliance_pct + '%', className: pc }, r.days_submitted_on_time || 0, lateCell, r.days_present || 0, r._missing > 0 ? { text: String(r._missing), className: 'text-red-600 font-semibold' } : '0']
+  })
 
   return (<>
     <ConcernBanner items={darConcerns.concat(darWarnings)} label="Low DAR compliance" />
     {isRecent && <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">{'\u{1F551}'} DARs from today may not be reflected yet (nightly consolidation runs at 11:20 PM)</p>}
     {filtered.length > 0 && filtered[0].dar_cutoff && <p className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3">{'\u{1F4C5}'} DAR data through <strong>{filtered[0].dar_cutoff}</strong></p>}
-    <div className="flex items-center justify-end mb-2"><ExportGroup onCSV={function () { downloadCSV('dar_' + MONTHS[month - 1] + year + '.csv', ['Employee', 'Code', 'Dept', 'Compliance%', 'Submitted', 'Present', 'Missing'], filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.compliance_pct, r.days_submitted, r.days_present, Math.max(0, (r.days_present || 0) - (r.days_submitted || 0))] })) }} onDocx={function () { exportAnalysisDocx('dar', filtered, docxOpts) }} /></div>
-    <div className="grid grid-cols-5 gap-4 mb-5">
+    <div className="flex items-center justify-end mb-2"><ExportGroup onCSV={function () { downloadCSV('dar_' + MONTHS[month - 1] + year + '.csv', ['Employee', 'Code', 'Dept', 'Compliance%', 'On-Time', 'Late', 'Present', 'Missing'], filtered.map(function (r) { return [r.name, r.emp_code, r.department_name, r.compliance_pct, r.days_submitted_on_time || 0, r.days_late || 0, r.days_present, Math.max(0, (r.days_present || 0) - (r.days_submitted || 0))] })) }} onDocx={function () { exportAnalysisDocx('dar', filtered, docxOpts) }} /></div>
+    <div className="grid grid-cols-6 gap-4 mb-5">
       <StatCard label="DAR Required" value={filtered.length} />
       <StatCard label="Overall Compliance" value={overallPct + '%'} color={overallPct >= 90 ? 'text-emerald-600' : overallPct >= 75 ? 'text-amber-600' : 'text-red-600'} delta={calcDelta(overallPct, prevPct)} />
-      <StatCard label="Total Submitted" value={totalS} color="text-emerald-600" />
+      <StatCard label="On-Time Submitted" value={totalOnTime} color="text-emerald-600" />
+      <StatCard label="Late" value={totalLate} color="text-amber-600" />
       <StatCard label="90%+ Compliance" value={full} color="text-blue-600" />
       <StatCard label="Below 50%" value={low} color="text-red-600" />
     </div>
-    <DataTable headers={['Employee', 'Dept', 'Compliance', 'Submitted', 'Days Present', lag > 0 ? 'Pending' : 'Missing']} rows={tableRows} sortCol={sortCol} sortDir={sortDir} onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }} />
+    <DataTable headers={['Employee', 'Dept', 'Compliance', 'On-Time', 'Late', 'Days Present', 'Missing']} rows={tableRows} sortCol={sortCol} sortDir={sortDir} onSort={function (i) { if (sortCol === i) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc') } else { setSortCol(i); setSortDir('asc') } }} />
     <div className="bg-white border border-gray-200 rounded-xl p-5 mt-5">
       <h3 className="text-sm font-bold text-gray-700 mb-4">DAR submission rate by employee (lowest first)</h3>
       <ResponsiveContainer width="100%" height={Math.max(filtered.length * 28, 200)}>
         <BarChart data={darChart} layout="vertical" margin={{ left: 110, right: 30, top: 5, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={function (v) { return v + '%' }} /><YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} /><Tooltip formatter={function (v) { return [v + '%', 'Compliance'] }} /><Bar dataKey="pct" barSize={14} radius={[0, 4, 4, 0]}>{darChart.map(function (d, i) { return <Cell key={i} fill={d.fill} /> })}</Bar></BarChart>
       </ResponsiveContainer>
     </div>
-    <DeptAggregation data={filtered} label="DAR compliance by department" getValue={function (list) { var s = list.reduce(function (s, r) { return s + (r.days_submitted || 0) }, 0); var p = list.reduce(function (s, r) { return s + (r.days_present || 0) }, 0); return p > 0 ? Math.round(s / p * 100) : 0 }} colorFn={pctToColor} suffix="%" domain={[0, 100]} />
+    <DeptAggregation data={filtered} label="DAR compliance by department" getValue={function (list) { var s = list.reduce(function (s, r) { return s + (r.days_submitted_on_time || 0) }, 0); var p = list.reduce(function (s, r) { return s + (r.days_present || 0) }, 0); return p > 0 ? Math.round(s / p * 100) : 0 }} colorFn={pctToColor} suffix="%" domain={[0, 100]} />
   </>)
 }
 
