@@ -234,8 +234,8 @@ serve(async (req) => {
   // Fetch messages from each group (last 72h window)
   const cutoffEpoch = Math.floor((now.getTime() - 72 * 60 * 60 * 1000) / 1000)
 
-  const submittedByDate: Record<string, Set<string>> = {}
-  submittedByDate[reportDate] = new Set()
+  const submittedByDate: Record<string, Map<string, number>> = {}
+  submittedByDate[reportDate] = new Map()
 
   let unknownPhones: string[] = []
 
@@ -297,8 +297,12 @@ serve(async (req) => {
 
         const darDate = parseDate(text, msg.timestamp || String(Math.floor(now.getTime() / 1000)))
 
-        if (!submittedByDate[darDate]) submittedByDate[darDate] = new Set()
-        submittedByDate[darDate].add(employee.emp_code)
+        if (!submittedByDate[darDate]) submittedByDate[darDate] = new Map()
+        const msgTs = parseInt(msg.timestamp || '0')
+        const prev = submittedByDate[darDate].get(employee.emp_code)
+        if (prev === undefined || msgTs < prev) {
+          submittedByDate[darDate].set(employee.emp_code, msgTs)
+        }
       }
 
       await new Promise(r => setTimeout(r, 1000))
@@ -313,12 +317,13 @@ serve(async (req) => {
   const { count: beforeCount } = await supabase
     .from('daily_reports')
     .select('*', { count: 'exact', head: true })
-  for (const [darDate, empCodes] of Object.entries(submittedByDate)) {
-    const rows = [...empCodes].map(code => ({
+  for (const [darDate, empMap] of Object.entries(submittedByDate)) {
+    const rows = [...empMap.entries()].map(([code, ts]) => ({
       emp_code: code,
       report_date: darDate,
       tasks: 'WhatsApp DAR (auto-logged)',
-      submitted_at: new Date().toISOString()
+      submitted_at: new Date().toISOString(),
+      message_sent_at: ts > 0 ? new Date(ts * 1000).toISOString() : null
     }))
     if (rows.length > 0) {
       const { error } = await supabase
@@ -339,8 +344,8 @@ serve(async (req) => {
   }
 
   // Build report
-  const todaySubmitted = submittedByDate[reportDate] || new Set()
-  const todaySubmittedActive = new Set([...todaySubmitted].filter(c => allEmpCodes.has(c)))
+  const todaySubmitted = submittedByDate[reportDate] || new Map()
+  const todaySubmittedActive = new Set([...todaySubmitted.keys()].filter(c => allEmpCodes.has(c)))
   const todayMissing = [...allEmpCodes].filter(c => !todaySubmitted.has(c))
 
   function empInfo(code: string): { name: string, dept: string } {
