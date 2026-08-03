@@ -179,8 +179,9 @@ function LeaveBalance() {
 
   var isMonthly = data.leave_scheme === 'monthly_cap'
   var isNewJoiner = data.leave_scheme === 'new_joiner'
-  var pct = data.annual_leaves > 0
-    ? Math.max(0, Math.round((data.leaves_remaining / data.annual_leaves) * 100))
+  var effectiveTotal = data.annual_leaves + (data.continue_credits_earned || 0)
+  var pct = effectiveTotal > 0
+    ? Math.max(0, Math.round((data.leaves_remaining / effectiveTotal) * 100))
     : 0
   var barColor = pct > 40 ? 'bg-emerald-500' : pct > 15 ? 'bg-amber-500' : 'bg-red-500'
   var fyLabel = data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(0, 4)
@@ -208,10 +209,21 @@ function LeaveBalance() {
         </div>
       )}
 
+      {(data.continue_credits_earned || 0) > 0 && (
+        <div className="mb-3 px-2.5 py-1.5 bg-teal-50 border border-teal-200 rounded-lg flex items-center justify-between">
+          <p className="text-[10px] font-semibold text-teal-700">
+            🎁 Continue Credits: +{data.continue_credits_earned}
+          </p>
+          <p className="text-[10px] text-teal-600">
+            Base {data.annual_leaves} + {data.continue_credits_earned} = {data.annual_leaves + data.continue_credits_earned}
+          </p>
+        </div>
+      )}
+
       <div className="flex items-end justify-between mb-2">
         <div>
           <span className="text-2xl font-bold text-gray-900">{data.leaves_remaining}</span>
-          <span className="text-sm text-gray-400 ml-1">/ {data.annual_leaves}</span>
+          <span className="text-sm text-gray-400 ml-1">/ {data.annual_leaves + (data.continue_credits_earned || 0)}</span>
         </div>
         <span className="text-xs text-gray-500">{data.leaves_used} {t('settings_used')}</span>
       </div>
