@@ -62,6 +62,8 @@ serve(async (req) => {
     department_name: string
     days_present: number
     days_submitted: number
+    days_submitted_on_time: number
+    days_late: number
     dar_cutoff: string
     compliance_pct: number
   }
@@ -73,8 +75,10 @@ serve(async (req) => {
 
   const totalEmployees = results.length
   const totalPresent = results.reduce((s, r) => s + r.days_present, 0)
-  const totalSubmitted = results.reduce((s, r) => s + r.days_submitted, 0)
-  const overallPct = totalPresent > 0 ? Math.min(100, Math.round((totalSubmitted / totalPresent) * 100)) : 0
+  const totalOnTime = results.reduce((s, r) => s + (r.days_submitted_on_time || 0), 0)
+  const totalLate = results.reduce((s, r) => s + (r.days_late || 0), 0)
+  const totalWeighted = totalOnTime + totalLate * 0.5
+  const overallPct = totalPresent > 0 ? Math.min(100, Math.round((totalWeighted / totalPresent) * 100)) : 0
   const perfect = results.filter(r => r.compliance_pct >= 100).length
   const below50 = results.filter(r => r.compliance_pct < 50).length
   const zero = results.filter(r => r.compliance_pct === 0 && r.days_present > 0).length
@@ -82,6 +86,7 @@ serve(async (req) => {
   // Build report message
   let report = `📊 *Bi-Weekly DAR Compliance Report*\n`
   report += `📅 *${periodLabel}*\n`
+  report += `_(Late DARs count as half. On-time is best.)_\n`
   report += `─────────────────\n`
   report += `👥 Staff: ${totalEmployees}\n`
   report += `✅ Overall: ${overallPct}%\n`
@@ -101,13 +106,13 @@ serve(async (req) => {
   for (const dept of Object.keys(byDept).sort()) {
     const deptEmps = byDept[dept]
     const deptPresent = deptEmps.reduce((s, r) => s + r.days_present, 0)
-    const deptSubmitted = deptEmps.reduce((s, r) => s + r.days_submitted, 0)
-    const deptPct = deptPresent > 0 ? Math.min(100, Math.round((deptSubmitted / deptPresent) * 100)) : 0
+    const deptWeighted = deptEmps.reduce((s, r) => s + (r.days_submitted_on_time || 0) + (r.days_late || 0) * 0.5, 0)
+    const deptPct = deptPresent > 0 ? Math.min(100, Math.round((deptWeighted / deptPresent) * 100)) : 0
 
     report += `\n*${dept}* (${deptPct}%)\n`
     for (const r of deptEmps) {
       const icon = r.compliance_pct >= 90 ? '✅' : r.compliance_pct >= 50 ? '⚠️' : '❌'
-      report += `${icon} ${r.name}: ${r.compliance_pct}% (${r.days_submitted}/${r.days_present})\n`
+      report += `${icon} ${r.name}: ${r.compliance_pct}%\n`
     }
   }
 
