@@ -948,15 +948,17 @@ export default function MonthlyReport() {
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
+                        <td className={'px-3 py-2 text-xs text-center font-bold ' + (r.deductions > 0 ? 'text-pink-600' : 'text-gray-400')}>
+                          {r.deductions > 0 ? r.deductions : '—'}
+                        </td>
                         <td className="px-3 py-2 text-xs text-center" title="Continue credits added">
                           {r.continue_credits > 0 ? (
                             <span className="font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">+{r.continue_credits}</span>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
-                        </td>                        <td className={'px-3 py-2 text-xs text-center font-bold ' + (r.deductions > 0 ? 'text-pink-600' : 'text-gray-400')}>
-                          {r.deductions > 0 ? r.deductions : '—'}
-                        </td>
+                        </td>                        
+                        
                       </tr>
                     )
                   })}
