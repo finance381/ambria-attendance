@@ -93,7 +93,7 @@ export default function AdminDashboard() {
           <div className="space-y-2">
             {data.pending_claims > 0 && (
               <button
-                onClick={function () { navigate('/admin/claims') }}
+                onClick={function () { navigate('/admin/requests') }}
                 className="w-full flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 hover:bg-amber-100 transition-colors text-left"
               >
                 <div className="flex items-center gap-3">
