@@ -106,6 +106,22 @@ export default function DailyAttendance() {
     setDetailPunchLoading(false)
   }
 
+  async function handleDeletePunch(punch) {
+    var reason = window.prompt('Reason for deleting this ' + punch.punch_type.toUpperCase() + ' punch at ' + fmtTime(punch.punched_at) + '?')
+    if (!reason || !reason.trim()) return
+    var { data, error } = await supabase.rpc('delete_punch', {
+      p_punch_id: punch.id,
+      p_reason: reason.trim()
+    })
+    if (error || (data && data.error)) {
+      window.alert('Delete failed: ' + ((data && data.error) || error.message))
+      return
+    }
+    showToast('Punch deleted')
+    setDetailPunches(function (prev) { return prev.filter(function (x) { return x.id !== punch.id }) })
+    loadData()
+  }
+
   // Stats
   var stats = { total: filtered.length, Present: 0, Absent: 0, Incomplete: 0, 'Half Day': 0 }
   filtered.forEach(function (r) {
@@ -345,6 +361,13 @@ export default function DailyAttendance() {
                           {p.gps_accuracy_meters && p.gps_accuracy_meters > 100 && (
                             <span className="text-[9px] text-amber-500">{Math.round(p.gps_accuracy_meters)}m</span>
                           )}
+                          <button
+                            onClick={function () { handleDeletePunch(p) }}
+                            className="text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded"
+                            title="Delete punch"
+                          >
+                            🗑
+                          </button>
                         </div>
                       </div>
                     )
