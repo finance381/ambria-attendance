@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Navigate } from 'react-router-dom'
+
 import { supabase } from '../../lib/supabase'
 import { formatDate, formatTime12, formatDisplayDate, formatBullets } from '../../lib/formatters'
 import { useAuth } from '../../lib/useAuth'
@@ -53,10 +53,6 @@ export default function AdminDARs() {
 
   useEffect(function () { loadEmployees() }, [loadEmployees])
   useEffect(function () { loadDARs() }, [loadDARs])
-
-  if (employee.emp_code !== 'AMB001') {
-    return <Navigate to="/admin" replace />
-  }
 
   function getEmpName(empCode) {
     var emp = employees.find(function (e) { return e.emp_code === empCode })
