@@ -15,6 +15,12 @@ export default function AdminDARs() {
   var [dars, setDars] = useState([])
   var [loading, setLoading] = useState(true)
   var [expandedId, setExpandedId] = useState(null)
+  var [showMark, setShowMark] = useState(false)
+  var [markEmp, setMarkEmp] = useState('')
+  var [markDate, setMarkDate] = useState(today)
+  var [markTime, setMarkTime] = useState('')
+  var [markReason, setMarkReason] = useState('')
+  var [markBusy, setMarkBusy] = useState(false)
 
   var loadEmployees = useCallback(async function () {
     var { data } = await supabase
@@ -57,9 +63,85 @@ export default function AdminDARs() {
     return emp ? emp.name : empCode
   }
 
+  async function submitMark() {
+    if (!markEmp || !markDate) { window.alert('Employee and date required'); return }
+    setMarkBusy(true)
+    var msgTs = null
+    if (markTime) {
+      msgTs = new Date(markDate + 'T' + markTime + ':00+05:30').toISOString()
+    }
+    var { data, error } = await supabase.rpc('mark_dar_submitted', {
+      p_emp_code: markEmp,
+      p_report_date: markDate,
+      p_message_sent_at: msgTs,
+      p_reason: markReason || null
+    })
+    setMarkBusy(false)
+    if (error || (data && data.error)) {
+      window.alert('Failed: ' + ((data && data.error) || error.message))
+      return
+    }
+    window.alert('DAR marked submitted')
+    setShowMark(false)
+    setMarkEmp(''); setMarkTime(''); setMarkReason('')
+    loadDARs()
+  }
+
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-slate-800">Daily Activity Reports</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-slate-800">Daily Activity Reports</h2>
+        <button
+          onClick={function () { setShowMark(true) }}
+          className="text-xs font-medium bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700"
+        >
+          + Mark DAR submitted
+        </button>
+      </div>
+
+      {showMark && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setShowMark(false) }}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-md space-y-3" onClick={function (e) { e.stopPropagation() }}>
+            <h3 className="font-bold text-slate-800">Mark DAR as submitted</h3>
+            <p className="text-[11px] text-gray-500">Use when a DAR was sent on WhatsApp but not picked up by the auto-consolidator.</p>
+            <div>
+              <label className="text-xs text-slate-600 block mb-1">Employee</label>
+              <select value={markEmp} onChange={function (e) { setMarkEmp(e.target.value) }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">Select…</option>
+                {employees.map(function (emp) {
+                  return <option key={emp.emp_code} value={emp.emp_code}>{emp.name} ({emp.emp_code})</option>
+                })}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 block mb-1">Report date</label>
+              <input type="date" value={markDate} onChange={function (e) { setMarkDate(e.target.value) }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 block mb-1">Actual message time (IST, optional)</label>
+              <input type="time" value={markTime} onChange={function (e) { setMarkTime(e.target.value) }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <p className="text-[10px] text-gray-400 mt-1">Affects compliance %. Leave blank to use now.</p>
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 block mb-1">Reason (optional)</label>
+              <input type="text" value={markReason} onChange={function (e) { setMarkReason(e.target.value) }}
+                placeholder="e.g. Whapi missed the message"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button onClick={function () { setShowMark(false) }}
+                className="flex-1 border border-gray-300 rounded-lg py-2 text-sm">Cancel</button>
+              <button onClick={submitMark} disabled={markBusy}
+                className="flex-1 bg-slate-800 text-white rounded-lg py-2 text-sm disabled:opacity-50">
+                {markBusy ? 'Saving…' : 'Mark submitted'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-end">
