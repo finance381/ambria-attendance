@@ -7,6 +7,7 @@ var NAV_ITEMS = [
   { to: '/admin/attendance', label: 'Attendance', icon: '📋', tabKey: 'attendance' },
   { to: '/admin/people', label: 'People', icon: '👥', tabKey: 'team' },
   { to: '/admin/requests', label: 'Requests', icon: '📝', tabKey: 'claims' },
+  { to: '/admin/dars', label: 'DARs', icon: '📄', tabKey: 'dar' },
   { to: '/admin/config', label: 'Config', icon: '⚙️', roles: ['admin'] },
 ]
 
