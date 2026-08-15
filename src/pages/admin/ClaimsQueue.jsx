@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 
 var STATUS_COLORS = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -8,7 +9,9 @@ var STATUS_COLORS = {
 }
 
 export default function ClaimsQueue() {
+  var { employee } = useAuth()
   var [claims, setClaims] = useState([])
+  var [selfClaimNotice, setSelfClaimNotice] = useState(null)
   var [departments, setDepartments] = useState([])
   var [deptFilter, setDeptFilter] = useState('')
   var [statusFilter, setStatusFilter] = useState('')
@@ -292,21 +295,30 @@ export default function ClaimsQueue() {
 
                 {/* Action buttons only for pending */}
                 {isPending && (
-                  <div className="flex gap-2">
+                  employee && c.employee_id === employee.id ? (
                     <button
-                      onClick={function () { handleApprove(c) }}
-                      disabled={saving}
-                      className="flex-1 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                      onClick={function () { setSelfClaimNotice(c) }}
+                      className="w-full py-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
                     >
-                      Approve
+                      🚫 Your own claim — cannot review
                     </button>
-                    <button
-                      onClick={function () { setRejectTarget(c); setRejectReason('') }}
-                      className="flex-1 py-2 text-xs font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={function () { handleApprove(c) }}
+                        disabled={saving}
+                        className="flex-1 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={function () { setRejectTarget(c); setRejectReason('') }}
+                        className="flex-1 py-2 text-xs font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )
                 )}
               </div>
             )
@@ -314,7 +326,29 @@ export default function ClaimsQueue() {
         </div>
       )}
 
-      {/* Reject modal */}
+      {/* Self-claim notice modal */}
+      {selfClaimNotice && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setSelfClaimNotice(null) }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center space-y-3" onClick={function (e) { e.stopPropagation() }}>
+            <div className="text-5xl">🚫</div>
+            <h3 className="font-bold text-slate-800 text-base">Cannot review your own claim</h3>
+            <p className="text-sm text-gray-600">
+              This claim was submitted by you. To keep things fair, only another admin or manager can approve or reject your claim.
+            </p>
+            <p className="text-xs text-gray-400">
+              Claim for {selfClaimNotice.attendance_date}
+            </p>
+            <button
+              onClick={function () { setSelfClaimNotice(null) }}
+              className="w-full bg-slate-800 text-white rounded-lg py-2 text-sm font-semibold mt-2"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reject reason modal */}
       {rejectTarget && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setRejectTarget(null) }}>
           <div className="bg-white rounded-xl w-full max-w-sm shadow-xl" onClick={function (e) { e.stopPropagation() }}>
