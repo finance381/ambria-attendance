@@ -107,8 +107,9 @@ export function capturePhoto() {
     function startFaceApiDetection() {
       faceStatus.textContent = 'Position your face in the oval'
       // Adaptive detector configs — low-light uses looser confidence
-      var optsNormal = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.3 })
-      var optsLowLight = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.2 })
+      var optsNormal = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.2 })
+      var optsLowLight = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 })
+      var detectionStart = Date.now()
 
       // Small canvas for cheap per-tick luminance sampling (~1ms)
       var lumCanvas = document.createElement('canvas')
@@ -118,6 +119,14 @@ export function capturePhoto() {
 
       faceDetectInterval = setInterval(async function () {
         if (video.readyState < 2) return
+
+        // Fallback: after 8s of no detection, enable capture anyway
+        if (Date.now() - detectionStart > 8000 && !faceDetected) {
+          motionConfirmed = true
+          setFaceFound(true)
+          faceStatus.textContent = '✓ Ready — tap Capture'
+          return
+        }
 
         // ── Luminance sampling → toggle low-light fill light ──
         try {
@@ -144,8 +153,8 @@ export function capturePhoto() {
             var cx = (box.x + box.width / 2) / vw
             var cy = (box.y + box.height / 2) / vh
             var faceW = box.width / vw
-            // Face center must be: horizontally centered (25-75%), upper half (5-55%), large enough (>12% of frame)
-            var positionOk = cx > 0.25 && cx < 0.75 && cy > 0.05 && cy < 0.55 && faceW > 0.12
+            // Face center must be: horizontally centered (20-80%), upper 70%, large enough (>9% of frame)
+            var positionOk = cx > 0.20 && cx < 0.80 && cy > 0.05 && cy < 0.70 && faceW > 0.09
             if (positionOk) {
               positionHistory.push({ cx: cx, cy: cy, t: Date.now() })
               if (positionHistory.length > 6) positionHistory.shift()
