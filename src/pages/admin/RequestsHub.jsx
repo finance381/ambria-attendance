@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ClaimsQueue from './ClaimsQueue'
 import LeaveBalances from './LeaveBalances'
+import { useAuth } from '../../lib/useAuth'
 
 var TABS = [
   { id: 'claims', label: 'Claims', icon: '📝' },

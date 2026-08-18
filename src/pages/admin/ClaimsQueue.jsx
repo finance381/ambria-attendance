@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../lib/auth'
+import { useAuth } from '../../lib/useAuth'
 
 var STATUS_COLORS = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
