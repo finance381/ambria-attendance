@@ -118,11 +118,21 @@ export default function MyClaims() {
     }
     if (outTime) rpcParams.p_claimed_out_time = outTime
 
-    var { data, error } = await supabase.rpc('submit_claim', rpcParams)
+    var data, error
+    try {
+      var res = await supabase.rpc('submit_claim', rpcParams)
+      data = res.data
+      error = res.error
+    } catch (netErr) {
+      setSaving(false)
+      setFormError('Network issue. Refreshing list to check — if your claim is missing, try again.')
+      loadClaims()
+      return
+    }
 
     if (error || (data && data.error)) {
       setSaving(false)
-      setFormError((data && data.error) || error.message)
+      setFormError((data && data.error) || (error && error.message) || 'Submit failed')
       return
     }
 
