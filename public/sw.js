@@ -1,4 +1,4 @@
-var CACHE_NAME = 'ambria-v5'
+var CACHE_NAME = 'ambria-v6'
 var SHELL_URLS = ['/ambria-attendance/', '/ambria-attendance/index.html']
 
 // Install — cache shell

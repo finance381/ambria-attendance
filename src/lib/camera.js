@@ -31,7 +31,7 @@ export function capturePhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000;transform:scaleX(-1)'
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:contain;z-index:9998;background:#000;transform:scaleX(-1)'
 
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
@@ -282,7 +282,7 @@ export function capturePhoto() {
     }
 
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 640 } },
       audio: false
     }).then(function (s) {
       stream = s
@@ -343,7 +343,7 @@ export function captureProxyPhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000'
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:contain;z-index:9998;background:#000'
 
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
@@ -379,7 +379,7 @@ export function captureProxyPhoto() {
     }
 
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 }, height: { ideal: 480 } },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 720 }, height: { ideal: 1280 } },
       audio: false
     }).then(function (s) {
       stream = s
