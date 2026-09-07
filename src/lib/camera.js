@@ -31,7 +31,7 @@ export function capturePhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:contain;z-index:9998;background:#000;transform:scaleX(-1)'
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000;transform:scaleX(-1)'
 
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
@@ -282,7 +282,7 @@ export function capturePhoto() {
     }
 
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 640 } },
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     }).then(function (s) {
       stream = s
@@ -316,11 +316,23 @@ export function capturePhoto() {
       flash.style.opacity = '1'
 
       setTimeout(function () {
+        var vw = video.videoWidth
+        var vh = video.videoHeight
+        var targetAspect = 3 / 4
+        var srcW, srcH, srcX, srcY
+        if (vw / vh > targetAspect) {
+          srcH = vh; srcW = Math.round(vh * targetAspect)
+          srcX = Math.round((vw - srcW) / 2); srcY = 0
+        } else {
+          srcW = vw; srcH = Math.round(vw / targetAspect)
+          srcX = 0; srcY = Math.round((vh - srcH) / 2)
+        }
+        var outW = Math.min(srcW, 480)
+        var outH = Math.round(outW / targetAspect)
         var canvas = document.createElement('canvas')
-        canvas.width = Math.min(video.videoWidth, 640)
-        canvas.height = Math.round(canvas.width * (video.videoHeight / video.videoWidth))
+        canvas.width = outW; canvas.height = outH
         var ctx = canvas.getContext('2d')
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH)
 
         canvas.toBlob(function (blob) {
           var dataUrl = canvas.toDataURL('image/jpeg', 0.6)
@@ -343,7 +355,7 @@ export function captureProxyPhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:contain;z-index:9998;background:#000'
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000'
 
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
@@ -379,7 +391,7 @@ export function captureProxyPhoto() {
     }
 
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 720 }, height: { ideal: 1280 } },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     }).then(function (s) {
       stream = s
@@ -407,11 +419,23 @@ export function captureProxyPhoto() {
       flash.style.opacity = '1'
 
       setTimeout(function () {
+        var vw = video.videoWidth
+        var vh = video.videoHeight
+        var targetAspect = 3 / 4
+        var srcW, srcH, srcX, srcY
+        if (vw / vh > targetAspect) {
+          srcH = vh; srcW = Math.round(vh * targetAspect)
+          srcX = Math.round((vw - srcW) / 2); srcY = 0
+        } else {
+          srcW = vw; srcH = Math.round(vw / targetAspect)
+          srcX = 0; srcY = Math.round((vh - srcH) / 2)
+        }
+        var outW = Math.min(srcW, 480)
+        var outH = Math.round(outW / targetAspect)
         var canvas = document.createElement('canvas')
-        canvas.width = Math.min(video.videoWidth, 640)
-        canvas.height = Math.round(canvas.width * (video.videoHeight / video.videoWidth))
+        canvas.width = outW; canvas.height = outH
         var ctx = canvas.getContext('2d')
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH)
 
         canvas.toBlob(function (blob) {
           var dataUrl = canvas.toDataURL('image/jpeg', 0.6)
