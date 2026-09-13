@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../lib/useAuth'
 import { refreshPushSubscription } from '../../lib/pushRefresh'
 import { useLanguage, LanguageToggle } from '../../lib/i18n'
+import PullToRefresh from '../../components/PullToRefresh'
 
 var ALL_TABS = [
   { to: '/', key: 'tab_home', icon: '🏠', tabId: 'home' },
@@ -76,7 +77,9 @@ export default function MobileShell() {
 
       {/* Page content */}
       <main className="px-4 py-4">
-        <Outlet />
+        <PullToRefresh>
+          <Outlet />
+        </PullToRefresh>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
