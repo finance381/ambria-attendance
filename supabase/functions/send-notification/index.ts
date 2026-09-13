@@ -6,6 +6,7 @@ const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@ambria.local"
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+const AUTH_KEY = Deno.env.get("SRK_AUTH")!
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://finance381.github.io',
@@ -21,7 +22,7 @@ serve(async (req) => {
     // Verify caller is internal (pg_cron RPCs send service_role_key as Bearer)
     const authHeader = req.headers.get('Authorization') || ''
     const token = authHeader.replace('Bearer ', '')
-    if (token !== SUPABASE_SERVICE_ROLE_KEY) {
+    if (token !== AUTH_KEY) {
       return new Response(JSON.stringify({ 
         error: 'Unauthorized'
       }), {
