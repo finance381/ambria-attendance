@@ -402,6 +402,8 @@ function NotificationSettings({ employeeId }) {
         auth: subJson.keys.auth
       }, { onConflict: 'employee_id,endpoint' })
 
+      localStorage.setItem('push_last_refresh_' + employeeId, String(Date.now()))
+
       setSubscribed(true)
       showToast('Notifications enabled')
     } catch (err) {
@@ -423,6 +425,7 @@ function NotificationSettings({ employeeId }) {
           .eq('employee_id', employeeId)
           .eq('endpoint', sub.endpoint)
       }
+      localStorage.removeItem('push_last_refresh_' + employeeId)
       setSubscribed(false)
       showToast('Notifications disabled')
     } catch (err) {

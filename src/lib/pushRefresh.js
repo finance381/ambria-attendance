@@ -11,6 +11,8 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray
 }
 
+var REFRESH_INTERVAL_MS = 14 * 24 * 60 * 60 * 1000
+
 export async function refreshPushSubscription(employeeId) {
   if (!employeeId) return
   if (!('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window)) return
@@ -20,12 +22,26 @@ export async function refreshPushSubscription(employeeId) {
     var reg = await navigator.serviceWorker.ready
     var sub = await reg.pushManager.getSubscription()
 
+    // A subscription can silently die server-side (push service expiry,
+    // token rotation) with no client-visible signal, so periodically force
+    // a fresh one instead of trusting an existing one forever.
+    var lastRefreshKey = 'push_last_refresh_' + employeeId
+    var lastRefresh = Number(localStorage.getItem(lastRefreshKey) || 0)
+    var isStale = Date.now() - lastRefresh > REFRESH_INTERVAL_MS
+
+    if (sub && isStale) {
+      await sub.unsubscribe()
+      sub = null
+    }
+
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY)
       })
     }
+
+    localStorage.setItem(lastRefreshKey, String(Date.now()))
 
     var subJson = sub.toJSON()
 
