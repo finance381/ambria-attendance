@@ -156,22 +156,36 @@ serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const WHAPI_TOKEN = Deno.env.get('WHAPI_API_TOKEN')!
 
-  // Report on yesterday (IST)
+  // Optional overrides for manual/backfill runs: { "date": "YYYY-MM-DD", "dryRun": true }
+  let body: { date?: string; dryRun?: boolean } = {}
+  try {
+    body = await req.json()
+  } catch {
+    body = {}
+  }
+  const dryRun = body.dryRun === true
+  if (dryRun) console.log('DRY RUN: WhatsApp sends will be skipped')
+
+  // Report on yesterday (IST), unless overridden
   const now = new Date()
   const istOffset = 5.5 * 60 * 60 * 1000
   const istNow = new Date(now.getTime() + istOffset)
-  const reportDate = new Date(istNow.getTime() - 1 * 86400000).toISOString().slice(0, 10)
+  const dateOverride = body.date && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : undefined
+  const reportDate = dateOverride || new Date(istNow.getTime() - 1 * 86400000).toISOString().slice(0, 10)
+  if (dateOverride) console.log(`DATE OVERRIDE: reportDate=${reportDate}`)
 
   // Load groups (with routing info for per-dept report destinations)
-  const { data: groups } = await supabase
+  const { data: groups, error: groupsError } = await supabase
     .from('dar_groups')
     .select('whatsapp_group_id, group_name, department, receive_dept_report')
     .eq('active', true)
+  console.log(`Loaded ${groups?.length ?? 0} groups`, groupsError ? `ERROR: ${groupsError.message}` : '')
 
   // Load phone map (supports multiple phones per emp_code for alt numbers)
-  const { data: phoneMap } = await supabase
+  const { data: phoneMap, error: phoneMapError } = await supabase
     .from('dar_phone_map')
     .select('phone, emp_code, name')
+  console.log(`Loaded ${phoneMap?.length ?? 0} phone map rows`, phoneMapError ? `ERROR: ${phoneMapError.message}` : '')
 
   const phoneLookup: Record<string, { emp_code: string, name: string }> = {}
   for (const p of (phoneMap || [])) {
@@ -183,17 +197,19 @@ serve(async (req) => {
   }
 
   // Load all active employees who must submit DARs, with department
-  const { data: allEmps } = await supabase
+  const { data: allEmps, error: allEmpsError } = await supabase
     .from('employees')
     .select('id, emp_code, name, departments(name)')
     .eq('active', true)
     .eq('dar_required', true)
+  console.log(`Loaded ${allEmps?.length ?? 0} active DAR-required employees`, allEmpsError ? `ERROR: ${allEmpsError.message}` : '')
 
   // Exclude employees who are absent: zero punches OR total hours < 4 (absent threshold)
-  const { data: punchData } = await supabase
+  const { data: punchData, error: punchDataError } = await supabase
     .from('punches')
     .select('employee_id, punch_type, punched_at')
     .eq('attendance_date', reportDate)
+  console.log(`Loaded ${punchData?.length ?? 0} punches for ${reportDate}`, punchDataError ? `ERROR: ${punchDataError.message}` : '')
 
   // Calculate hours worked per employee
   const empPunches: Record<string, { ins: number[], outs: number[] }> = {}
@@ -440,6 +456,10 @@ serve(async (req) => {
   }
 
   async function sendWhapi(to: string, body: string): Promise<boolean> {
+    if (dryRun) {
+      console.log(`DRY RUN: would send to ${to}:\n${body}`)
+      return true
+    }
     try {
       await fetch('https://gate.whapi.cloud/messages/text', {
         method: 'POST',

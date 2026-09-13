@@ -8,6 +8,7 @@ var TAB_OPTIONS = [
   { id: 'home', label: 'Home' },
   { id: 'attendance', label: 'My Attendance' },
   { id: 'claims', label: 'Claims' },
+  { id: 'claims_approve', label: 'Approve Claims (mobile)' },
   { id: 'team', label: 'Team Punch' },
   { id: 'dept', label: 'My Department' },
   { id: 'dar', label: 'DAR Writer' },

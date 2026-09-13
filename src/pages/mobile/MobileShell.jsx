@@ -8,6 +8,7 @@ var ALL_TABS = [
   { to: '/', key: 'tab_home', icon: '🏠', tabId: 'home' },
   { to: '/attendance', key: 'tab_attendance', icon: '📅', tabId: 'attendance' },
   { to: '/claims', key: 'tab_claims', icon: '📝', tabId: 'claims' },
+  { to: '/claims-approval', key: 'tab_claims_approve', icon: '✅', tabId: 'claims_approve' },
   { to: '/team', key: 'tab_team', icon: '👥', tabId: 'team' },
   { to: '/dept', key: 'tab_dept', icon: '📋', tabId: 'dept' },
   { to: '/dar', key: 'tab_dar', icon: '📝', tabId: 'dar' },

@@ -16,6 +16,7 @@ import ConfigHub from './pages/admin/ConfigHub'
 import PunchForTeam from './pages/mobile/PunchForTeam'
 import DeptAttendance from './pages/mobile/DeptAttendance'
 import MyClaims from './pages/mobile/MyClaims'
+import ClaimsApproval from './pages/mobile/ClaimsApproval'
 import DARWriter from './pages/mobile/DARWriter'
 import AdminAnalysis from './pages/admin/AdminAnalysis'
 import Analysis from './pages/mobile/Analysis'
@@ -92,6 +93,11 @@ export default function App() {
         } />
         <Route path="attendance" element={<MyAttendance />} />
         <Route path="claims" element={<MyClaims />} />
+        <Route path="claims-approval" element={
+          <ProtectedRoute roles={['manager', 'admin']}>
+            <ClaimsApproval />
+          </ProtectedRoute>
+        } />
         <Route path="dar" element={
            <ProtectedRoute>
              <DARWriter />
