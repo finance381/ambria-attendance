@@ -54,6 +54,17 @@ var CONFIG_FIELDS = [
     unit: 'half days/year',
     fallback: '6'
   },
+  {
+    key: 'long_shift_alert_hours',
+    label: 'Long Shift Alert',
+    desc: 'If someone is still punched in this many hours after punching in with no punch-out, they get a push notification reminding them to punch out.',
+    type: 'float',
+    min: 1,
+    max: 36,
+    step: 1,
+    unit: 'hours',
+    fallback: '18'
+  },
 ]
 
 export default function AppConfig() {
