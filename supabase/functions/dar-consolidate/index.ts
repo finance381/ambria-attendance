@@ -136,6 +136,16 @@ function parseDate(text: string, msgTimestamp: string): string {
   return fallback
 }
 
+async function withRetry<T>(fn: () => PromiseLike<{ data: T | null, error: any }>, attempts = 3, delayMs = 800): Promise<{ data: T | null, error: any }> {
+  let result: { data: T | null, error: any } = { data: null, error: null }
+  for (let i = 0; i < attempts; i++) {
+    result = await fn()
+    if (!result.error) return result
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, delayMs))
+  }
+  return result
+}
+
 function isDARMessage(text: string): boolean {
   if (!text || text.length < 20) return false
   const lower = text.toLowerCase()
@@ -175,16 +185,45 @@ serve(async (req) => {
   if (dateOverride) console.log(`DATE OVERRIDE: reportDate=${reportDate}`)
 
   // Load groups (with routing info for per-dept report destinations)
-  const { data: groups, error: groupsError } = await supabase
+  const { data: groups, error: groupsError } = await withRetry(() => supabase
     .from('dar_groups')
     .select('whatsapp_group_id, group_name, department, receive_dept_report')
-    .eq('active', true)
+    .eq('active', true))
   console.log(`Loaded ${groups?.length ?? 0} groups`, groupsError ? `ERROR: ${groupsError.message}` : '')
 
+  // Critical dependency — if this still failed after retries, bail out rather than
+  // send a false "everyone missing" report to the whole team.
+  if (groupsError || !groups) {
+    console.error(`CRITICAL: dar_groups failed to load after retries — aborting run. Error: ${groupsError?.message}`)
+    try {
+      const alertRow = await supabase.from('app_config').select('value').eq('key', 'dar_report_recipients').single()
+      let alertRecipients: string[] = []
+      const raw = alertRow.data?.value
+      if (Array.isArray(raw)) alertRecipients = raw
+      else if (typeof raw === 'string') alertRecipients = JSON.parse(raw.replace(/^"|"$/g, ''))
+      for (const phone of alertRecipients) {
+        await fetch('https://gate.whapi.cloud/messages/text', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${WHAPI_TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: phone.includes('@') ? phone : phone + '@s.whatsapp.net',
+            body: `⚠️ DAR report for ${reportDate} FAILED to run — dar_groups did not load (${groupsError?.message || 'unknown error'}). No report was sent. Check function logs.`
+          })
+        })
+      }
+    } catch (alertErr) {
+      console.error('Failed to send failure alert:', alertErr)
+    }
+    return new Response(
+      JSON.stringify({ error: 'dar_groups failed to load', detail: groupsError?.message, date: reportDate }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
   // Load phone map (supports multiple phones per emp_code for alt numbers)
-  const { data: phoneMap, error: phoneMapError } = await supabase
+  const { data: phoneMap, error: phoneMapError } = await withRetry(() => supabase
     .from('dar_phone_map')
-    .select('phone, emp_code, name')
+    .select('phone, emp_code, name'))
   console.log(`Loaded ${phoneMap?.length ?? 0} phone map rows`, phoneMapError ? `ERROR: ${phoneMapError.message}` : '')
 
   const phoneLookup: Record<string, { emp_code: string, name: string }> = {}
@@ -197,18 +236,18 @@ serve(async (req) => {
   }
 
   // Load all active employees who must submit DARs, with department
-  const { data: allEmps, error: allEmpsError } = await supabase
+  const { data: allEmps, error: allEmpsError } = await withRetry(() => supabase
     .from('employees')
     .select('id, emp_code, name, departments(name)')
     .eq('active', true)
-    .eq('dar_required', true)
+    .eq('dar_required', true))
   console.log(`Loaded ${allEmps?.length ?? 0} active DAR-required employees`, allEmpsError ? `ERROR: ${allEmpsError.message}` : '')
 
   // Exclude employees who are absent: zero punches OR total hours < 4 (absent threshold)
-  const { data: punchData, error: punchDataError } = await supabase
+  const { data: punchData, error: punchDataError } = await withRetry(() => supabase
     .from('punches')
     .select('employee_id, punch_type, punched_at')
-    .eq('attendance_date', reportDate)
+    .eq('attendance_date', reportDate))
   console.log(`Loaded ${punchData?.length ?? 0} punches for ${reportDate}`, punchDataError ? `ERROR: ${punchDataError.message}` : '')
 
   // Calculate hours worked per employee
