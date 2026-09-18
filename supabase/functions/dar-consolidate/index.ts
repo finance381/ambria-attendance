@@ -355,7 +355,10 @@ serve(async (req) => {
         if (!submittedByDate[darDate]) submittedByDate[darDate] = new Map()
         const msgTs = parseInt(msg.timestamp || '0')
         const prev = submittedByDate[darDate].get(employee.emp_code)
-        if (prev === undefined || msgTs < prev) {
+        // Ignore malformed/duplicate entries with a missing or zero timestamp —
+        // otherwise one bad entry permanently poisons the recorded send time to 0,
+        // which downstream gets treated as "unknown" and miscounted as late.
+        if (msgTs > 0 && (prev === undefined || msgTs < prev)) {
           submittedByDate[darDate].set(employee.emp_code, msgTs)
         }
       }
