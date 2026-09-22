@@ -294,7 +294,12 @@ serve(async (req) => {
 
   let unknownPhones: string[] = []
 
-  for (const group of (groups || [])) {
+  // Fetch all groups concurrently instead of one-at-a-time — sequential fetches
+  // across 7+ groups (each with its own network round-trip and pagination delay)
+  // previously accumulated enough wall-clock time to hit Supabase's edge function
+  // execution limit (WORKER_RESOURCE_LIMIT / HTTP 546), killing the whole run
+  // before it could persist anything or send the report.
+  async function processGroup(group: any) {
     try {
       // Paginate: fetch up to 1500 msgs (3 pages of 500) to cover high-volume groups
       let messages: any[] = []
@@ -362,13 +367,13 @@ serve(async (req) => {
           submittedByDate[darDate].set(employee.emp_code, msgTs)
         }
       }
-
-      await new Promise(r => setTimeout(r, 1000))
     } catch (err) {
       console.error(`Failed to fetch ${group.group_name}:`, err)
       console.error(`FETCH_FAIL: ${group.group_name}`)
     }
   }
+
+  await Promise.all((groups || []).map(processGroup))
 
   // Persist all matched DARs into daily_reports
   let attemptedCount = 0
