@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
 import { supabase } from './supabase'
 
 const AuthContext = createContext(null)
@@ -19,6 +19,7 @@ export function AuthProvider({ children }) {
   var [session, setSession] = useState(null)
   var [employee, setEmployee] = useState(null)
   var [loading, setLoading] = useState(true)
+  var lastUserIdRef = useRef(null)
 
   var fetchEmployee = useCallback(async function (userId) {
     var { data, error } = await supabase
@@ -39,6 +40,7 @@ export function AuthProvider({ children }) {
   useEffect(function () {
     supabase.auth.getSession().then(function ({ data: { session: s } }) {
       setSession(s)
+      lastUserIdRef.current = s?.user?.id || null
       if (s?.user) {
         fetchEmployee(s.user.id).then(function () { setLoading(false) })
       } else {
@@ -48,7 +50,15 @@ export function AuthProvider({ children }) {
 
     var { data: { subscription } } = supabase.auth.onAuthStateChange(
       function (_event, s) {
+        // supabase-js re-validates the session whenever the tab/app regains
+        // focus, firing this for the SAME user even though nothing changed.
+        // Only treat it as a real sign-in/out when the user actually differs —
+        // otherwise this flips `loading` back to true on every tab switch and
+        // bounces the whole app back to the full-screen spinner.
+        var sameUser = !!(s?.user && lastUserIdRef.current === s.user.id)
         setSession(s)
+        lastUserIdRef.current = s?.user?.id || null
+        if (sameUser) return
         if (s?.user) {
           setLoading(true)
           fetchEmployee(s.user.id).then(function () { setLoading(false) })

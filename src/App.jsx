@@ -1,27 +1,32 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/useAuth'
 import { preloadFaceModels } from './lib/camera'
 import Login from './pages/Login'
 import MobileShell from './pages/mobile/MobileShell'
-import Home from './pages/mobile/Home'
-import MyAttendance from './pages/mobile/MyAttendance'
-import Settings from './pages/mobile/Settings'
 import AdminShell from './pages/admin/AdminShell'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AttendanceHub from './pages/admin/AttendanceHub'
-import PeopleHub from './pages/admin/PeopleHub'
-import RequestsHub from './pages/admin/RequestsHub'
-import ConfigHub from './pages/admin/ConfigHub'
-import PunchForTeam from './pages/mobile/PunchForTeam'
-import DeptAttendance from './pages/mobile/DeptAttendance'
-import MyClaims from './pages/mobile/MyClaims'
-import ClaimsApproval from './pages/mobile/ClaimsApproval'
-import DARWriter from './pages/mobile/DARWriter'
-import AdminAnalysis from './pages/admin/AdminAnalysis'
-import Analysis from './pages/mobile/Analysis'
-import LeaveOverride from './pages/admin/LeaveOverride'
-import AnnualReport from './pages/admin/AnnualReport'
+
+const Home = lazy(() => import('./pages/mobile/Home'))
+const MyAttendance = lazy(() => import('./pages/mobile/MyAttendance'))
+const Settings = lazy(() => import('./pages/mobile/Settings'))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AttendanceHub = lazy(() => import('./pages/admin/AttendanceHub'))
+const PeopleHub = lazy(() => import('./pages/admin/PeopleHub'))
+const RequestsHub = lazy(() => import('./pages/admin/RequestsHub'))
+const ConfigHub = lazy(() => import('./pages/admin/ConfigHub'))
+const PunchForTeam = lazy(() => import('./pages/mobile/PunchForTeam'))
+const DeptAttendance = lazy(() => import('./pages/mobile/DeptAttendance'))
+const MyClaims = lazy(() => import('./pages/mobile/MyClaims'))
+const ClaimsApproval = lazy(() => import('./pages/mobile/ClaimsApproval'))
+const DARWriter = lazy(() => import('./pages/mobile/DARWriter'))
+const AdminAnalysis = lazy(() => import('./pages/admin/AdminAnalysis'))
+const Analysis = lazy(() => import('./pages/mobile/Analysis'))
+const LeaveOverride = lazy(() => import('./pages/admin/LeaveOverride'))
+const AnnualReport = lazy(() => import('./pages/admin/AnnualReport'))
+
+function PageLoading() {
+  return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
+}
 
 function ProtectedRoute({ children, roles }) {
   var { session, employee, loading } = useAuth()
@@ -69,80 +74,82 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={
-        session ? <Navigate to="/" replace /> : <Login />
-      } />
+    <Suspense fallback={<PageLoading />}>
+      <Routes>
+        <Route path="/login" element={
+          session ? <Navigate to="/" replace /> : <Login />
+        } />
 
-      {/* Mobile PWA — all authenticated users */}
-      <Route path="/" element={
-        <ProtectedRoute>
-          <MobileShell />
-        </ProtectedRoute>
-      }>
-        <Route index element={<Home />} />
-        <Route path="team" element={
-          <ProtectedRoute roles={['supervisor', 'manager', 'admin']}>
-            <PunchForTeam />
+        {/* Mobile PWA — all authenticated users */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <MobileShell />
           </ProtectedRoute>
-        } />
-        <Route path="dept" element={
-          <ProtectedRoute roles={['manager', 'admin']}>
-            <DeptAttendance />
-          </ProtectedRoute>
-        } />
-        <Route path="attendance" element={<MyAttendance />} />
-        <Route path="claims" element={<MyClaims />} />
-        <Route path="claims-approval" element={
-          <ProtectedRoute roles={['manager', 'admin']}>
-            <ClaimsApproval />
-          </ProtectedRoute>
-        } />
-        <Route path="dar" element={
-           <ProtectedRoute>
-             <DARWriter />
-           </ProtectedRoute>
-         } />
-        <Route path="analysis" element={
-          <ProtectedRoute roles={['manager', 'admin']}>
-            <Analysis />
-          </ProtectedRoute>
-        } /> 
-        <Route path="settings" element={<Settings />} />
-        <Route path="leave-override" element={<LeaveOverride />} />
-      </Route>
+        }>
+          <Route index element={<Home />} />
+          <Route path="team" element={
+            <ProtectedRoute roles={['supervisor', 'manager', 'admin']}>
+              <PunchForTeam />
+            </ProtectedRoute>
+          } />
+          <Route path="dept" element={
+            <ProtectedRoute roles={['manager', 'admin']}>
+              <DeptAttendance />
+            </ProtectedRoute>
+          } />
+          <Route path="attendance" element={<MyAttendance />} />
+          <Route path="claims" element={<MyClaims />} />
+          <Route path="claims-approval" element={
+            <ProtectedRoute roles={['manager', 'admin']}>
+              <ClaimsApproval />
+            </ProtectedRoute>
+          } />
+          <Route path="dar" element={
+             <ProtectedRoute>
+               <DARWriter />
+             </ProtectedRoute>
+           } />
+          <Route path="analysis" element={
+            <ProtectedRoute roles={['manager', 'admin']}>
+              <Analysis />
+            </ProtectedRoute>
+          } />
+          <Route path="settings" element={<Settings />} />
+          <Route path="leave-override" element={<LeaveOverride />} />
+        </Route>
 
-      {/* Admin Desktop — manager + admin only */}
-      <Route path="/admin" element={
-        <ProtectedRoute roles={['admin', 'manager']}>
-          <AdminShell />
-        </ProtectedRoute>
-      }>
-        <Route index element={<AdminDashboard />} />
-        <Route path="attendance" element={
+        {/* Admin Desktop — manager + admin only */}
+        <Route path="/admin" element={
           <ProtectedRoute roles={['admin', 'manager']}>
-            <AttendanceHub />
+            <AdminShell />
           </ProtectedRoute>
-        } />
-        <Route path="people" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <PeopleHub />
-          </ProtectedRoute>
-        } />
-        <Route path="requests" element={
-          <ProtectedRoute roles={['admin', 'manager']}>
-            <RequestsHub />
-          </ProtectedRoute>
-        } />
-        <Route path="config" element={
-          <ProtectedRoute roles={['admin']}>
-            <ConfigHub />
-          </ProtectedRoute>
-        } />
-      </Route>
-      
+        }>
+          <Route index element={<AdminDashboard />} />
+          <Route path="attendance" element={
+            <ProtectedRoute roles={['admin', 'manager']}>
+              <AttendanceHub />
+            </ProtectedRoute>
+          } />
+          <Route path="people" element={
+            <ProtectedRoute roles={['admin', 'manager']}>
+              <PeopleHub />
+            </ProtectedRoute>
+          } />
+          <Route path="requests" element={
+            <ProtectedRoute roles={['admin', 'manager']}>
+              <RequestsHub />
+            </ProtectedRoute>
+          } />
+          <Route path="config" element={
+            <ProtectedRoute roles={['admin']}>
+              <ConfigHub />
+            </ProtectedRoute>
+          } />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
