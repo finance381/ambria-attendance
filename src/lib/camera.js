@@ -41,7 +41,12 @@ export function capturePhoto() {
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000;transform:scaleX(-1)'
+    // No mirror transform — CSS transforms on a fixed full-screen <video> have
+    // been a known source of black/corrupted rendering on iOS Safari. The
+    // captured photo itself was never affected either way (canvas drawImage
+    // samples raw video pixels, ignoring CSS transforms), so this is purely
+    // a live-preview cosmetic that's not worth the rendering risk.
+    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000'
 
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
