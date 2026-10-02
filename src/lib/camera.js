@@ -1,7 +1,6 @@
-import * as faceapi from 'face-api.js'
-
 var modelsLoaded = false
 var modelLoading = false
+var faceapi = null
 
 async function loadModels() {
   if (modelsLoaded) return
@@ -11,6 +10,10 @@ async function loadModels() {
   }
   modelLoading = true
   try {
+    // Dynamic import — face-api.js (and its model files) only download for
+    // users who actually open the punch camera, instead of every login
+    // eagerly shipping this to people who never touch it (e.g. desktop-only admins).
+    if (!faceapi) faceapi = await import('face-api.js')
     var base = window.location.origin + '/ambria-attendance/models'
     await faceapi.nets.tinyFaceDetector.loadFromUri(base)
     modelsLoaded = true
@@ -21,9 +24,16 @@ async function loadModels() {
   }
 }
 
-// Preload — call from App after login so the camera opens instantly first time
+// Preload — call from App after login so the camera opens instantly first time.
+// Deferred to browser idle time so it never competes with the initial page's
+// own critical-path network/CPU work, especially on slow connections.
 export function preloadFaceModels() {
-  loadModels().catch(function () {})
+  function start() { loadModels().catch(function () {}) }
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(start, { timeout: 5000 })
+  } else {
+    setTimeout(start, 2000)
+  }
 }
 
 export function capturePhoto() {
