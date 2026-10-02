@@ -38,15 +38,21 @@ export function preloadFaceModels() {
 
 export function capturePhoto() {
   return new Promise(function (resolve, reject) {
+    // Mirror the live preview on a wrapper div, not the <video> itself —
+    // a CSS transform directly on a fixed full-screen <video> was a known
+    // source of black/corrupted rendering on iOS Safari. Putting the
+    // transform one level up avoids that compositing path while keeping
+    // the natural "selfie mirror" feel. The captured photo is unaffected
+    // either way (canvas drawImage samples raw video pixels, ignoring any
+    // CSS transform on the video or its ancestors).
+    var videoWrap = document.createElement('div')
+    videoWrap.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;overflow:hidden;z-index:9998;transform:scaleX(-1)'
+
     var video = document.createElement('video')
     video.setAttribute('playsinline', '')
     video.setAttribute('autoplay', '')
-    // No mirror transform — CSS transforms on a fixed full-screen <video> have
-    // been a known source of black/corrupted rendering on iOS Safari. The
-    // captured photo itself was never affected either way (canvas drawImage
-    // samples raw video pixels, ignoring CSS transforms), so this is purely
-    // a live-preview cosmetic that's not worth the rendering risk.
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000'
+    video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000'
+    videoWrap.appendChild(video)
 
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
@@ -94,7 +100,7 @@ export function capturePhoto() {
       if (stream) {
         stream.getTracks().forEach(function (t) { t.stop() })
       }
-      if (video.parentNode) video.parentNode.removeChild(video)
+      if (videoWrap.parentNode) videoWrap.parentNode.removeChild(videoWrap)
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay)
     }
 
@@ -303,7 +309,7 @@ export function capturePhoto() {
       stream = s
       video.srcObject = s
       video.play()
-      document.body.appendChild(video)
+      document.body.appendChild(videoWrap)
       document.body.appendChild(overlay)
 
       video.addEventListener('loadeddata', function () {
