@@ -202,17 +202,8 @@ export default function MyClaims() {
                 min={function () {
                   var now = new Date()
                   var ist = new Date(now.getTime() + (330 * 60000))
-                  var day = ist.getUTCDate()
-                  var y, m
-                  if (day <= 2) {
-                    y = ist.getUTCFullYear()
-                    m = ist.getUTCMonth()
-                    if (m === 0) { m = 12; y-- }
-                    return y + '-' + String(m).padStart(2, '0') + '-01'
-                  }
-                  y = ist.getUTCFullYear()
-                  m = ist.getUTCMonth() + 1
-                  return y + '-' + String(m).padStart(2, '0') + '-01'
+                  var cutoff = new Date(ist.getTime() - 3 * 86400000)
+                  return cutoff.getUTCFullYear() + '-' + String(cutoff.getUTCMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getUTCDate()).padStart(2, '0')
                 }()}
                 max={function () {
                   var now = new Date()
