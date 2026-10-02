@@ -16,12 +16,12 @@ export default function AdminDashboard() {
 
   useEffect(function () {
     loadData()
-    var interval = setInterval(loadData, 30000)
+    var interval = setInterval(loadData, 90000)
     function onVis() {
       if (document.visibilityState === 'visible') {
         loadData()
         clearInterval(interval)
-        interval = setInterval(loadData, 30000)
+        interval = setInterval(loadData, 90000)
       } else {
         clearInterval(interval)
       }

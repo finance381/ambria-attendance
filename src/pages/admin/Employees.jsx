@@ -63,8 +63,10 @@ export default function Employees() {
 
   var loadAll = useCallback(async function () {
     var [empRes, deptRes] = await Promise.all([
-      supabase.from('employees').select('*').eq('is_casual', false).order('created_at', { ascending: false }),
-      supabase.from('departments').select('*').eq('active', true).order('name')
+      supabase.from('employees')
+        .select('id, emp_code, name, phone, department_id, role, designation, date_of_joining, dar_required, active, visible_tabs, expected_hours, continue_enabled')
+        .eq('is_casual', false).order('created_at', { ascending: false }),
+      supabase.from('departments').select('id, name').eq('active', true).order('name')
     ])
     setEmployees(empRes.data || [])
     setDepartments(deptRes.data || [])

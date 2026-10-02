@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
+import { selfieThumbUrl, selfieFullUrl } from '../../lib/selfieUrl'
 
 var STATUS_COLORS = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -268,7 +269,8 @@ export default function ClaimsApproval() {
                                 <div key={i} className="flex items-center gap-2 text-[11px]">
                                   {p.selfie_path && (
                                     <img
-                                      src={supabase.storage.from('selfies').getPublicUrl(p.selfie_path).data.publicUrl}
+                                      src={selfieThumbUrl(p.selfie_path)}
+                                      onError={function (e) { e.target.onerror = null; e.target.src = selfieFullUrl(p.selfie_path) }}
                                       className="w-8 h-8 rounded-full object-cover border border-blue-200 flex-shrink-0"
                                       alt=""
                                     />

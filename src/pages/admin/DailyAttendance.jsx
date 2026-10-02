@@ -510,18 +510,31 @@ function selfieUrl(path) {
   return SUPABASE_URL + '/storage/v1/object/public/selfies/' + path
 }
 
+// Thumbnail-sized render — avatars only ever display at ~28-36px, but the
+// plain object URL serves the full captured file every time. Supabase
+// Storage's image-transform endpoint lets us ask for a small resize instead.
+// Falls back to the full image automatically if transforms aren't available
+// on this project's plan (onError below).
+function selfieThumbUrl(path) {
+  if (!path) return null
+  return SUPABASE_URL + '/storage/v1/render/image/public/selfies/' + path + '?width=96&height=96&resize=cover&quality=60'
+}
+
 function SelfieImg({ path, size, rounded }) {
   var [open, setOpen] = useState(false)
+  var [thumbFailed, setThumbFailed] = useState(false)
   var url = selfieUrl(path)
   if (!url) return null
+  var thumbSrc = thumbFailed ? url : selfieThumbUrl(path)
 
   return (
     <>
       <img
-        src={url}
+        src={thumbSrc}
         alt="Selfie"
         className={'object-cover cursor-pointer border border-gray-200 hover:border-slate-400 transition-colors ' + (size || 'w-8 h-8') + ' ' + (rounded || 'rounded-full')}
         onClick={function (e) { e.stopPropagation(); setOpen(true) }}
+        onError={function () { if (!thumbFailed) setThumbFailed(true) }}
         loading="lazy"
       />
       {open && (
