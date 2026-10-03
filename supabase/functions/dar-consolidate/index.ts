@@ -166,8 +166,9 @@ serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const WHAPI_TOKEN = Deno.env.get('WHAPI_API_TOKEN')!
 
-  // Optional overrides for manual/backfill runs: { "date": "YYYY-MM-DD", "dryRun": true }
-  let body: { date?: string; dryRun?: boolean } = {}
+  // Optional overrides for manual/backfill runs:
+  // { "date": "YYYY-MM-DD", "dryRun": true, "testRecipient": "91XXXXXXXXXX" }
+  let body: { date?: string; dryRun?: boolean; testRecipient?: string; skipRouted?: boolean } = {}
   try {
     body = await req.json()
   } catch {
@@ -175,6 +176,10 @@ serve(async (req) => {
   }
   const dryRun = body.dryRun === true
   if (dryRun) console.log('DRY RUN: WhatsApp sends will be skipped')
+  const testRecipient = typeof body.testRecipient === 'string' && body.testRecipient.trim() ? body.testRecipient.trim() : null
+  if (testRecipient) console.log(`TEST RECIPIENT: all sends redirected to ${testRecipient}`)
+  const skipRouted = body.skipRouted === true
+  if (skipRouted) console.log('SKIP ROUTED: not re-sending department-routed slices')
 
   // Report on yesterday (IST), unless overridden
   const now = new Date()
@@ -243,7 +248,19 @@ serve(async (req) => {
     .eq('dar_required', true))
   console.log(`Loaded ${allEmps?.length ?? 0} active DAR-required employees`, allEmpsError ? `ERROR: ${allEmpsError.message}` : '')
 
-  // Exclude employees who are absent: zero punches OR total hours < 4 (absent threshold)
+  // Exclude employees who are absent: zero punches OR total hours below the
+  // admin-configured absent threshold (same rule the rest of the app uses
+  // for Present/Half Day/Absent — this used to hardcode 4h here regardless
+  // of what was actually configured, incorrectly excluding half-day workers
+  // who cleared the real threshold but not this hardcoded one).
+  const { data: absentConfig } = await withRetry(() => supabase
+    .from('app_config')
+    .select('value')
+    .eq('key', 'absent_threshold_hours')
+    .maybeSingle())
+  const absentThresholdHours = absentConfig?.value ? parseFloat(String(absentConfig.value).replace(/"/g, '')) : 0.5
+  console.log(`Absent threshold: ${absentThresholdHours}h`)
+
   const { data: punchData, error: punchDataError } = await withRetry(() => supabase
     .from('punches')
     .select('employee_id, punch_type, punched_at')
@@ -276,7 +293,7 @@ serve(async (req) => {
       if (outTime) totalMs += outTime - ins[i]
     }
     const totalHours = totalMs / (1000 * 60 * 60)
-    if (totalHours >= 4 || (ins.length > outs.length)) presentIds.add(empId)
+    if (totalHours >= absentThresholdHours || (ins.length > outs.length)) presentIds.add(empId)
   }
 
   // Safety: if punch query returned nothing but we have many employees, skip absent filter
@@ -544,6 +561,7 @@ serve(async (req) => {
     if (Array.isArray(raw)) recipients = raw
     else if (typeof raw === 'string') recipients = JSON.parse(raw.replace(/^"|"$/g, ''))
   } catch { recipients = [] }
+  if (testRecipient) recipients = [testRecipient]
 
   // Collect all dept names present in employee set
   const allDepts = new Set<string>()
@@ -554,16 +572,19 @@ serve(async (req) => {
 
   const sentTo: string[] = []
 
-  // 1. Send routed slices — one dept per group
-  for (const g of routedGroups) {
-    const dept = g.department as string
-    const stats = perDeptStats[dept] || { total: 0, submitted: 0 }
-    const darSlice = buildDarReport([dept], stats.total, stats.submitted)
-    const attSlice = buildAttendanceReport([dept])
-    const ok1 = await sendWhapi(g.whatsapp_group_id, darSlice)
-    const ok2 = await sendWhapi(g.whatsapp_group_id, attSlice)
-    if (ok1 && ok2) sentTo.push(`${g.whatsapp_group_id} (${dept})`)
-    console.log(`Routed slice to ${dept} → ${g.whatsapp_group_id}`)
+  // 1. Send routed slices — one dept per group (or to testRecipient, if set)
+  if (!skipRouted) {
+    for (const g of routedGroups) {
+      const dept = g.department as string
+      const stats = perDeptStats[dept] || { total: 0, submitted: 0 }
+      const darSlice = buildDarReport([dept], stats.total, stats.submitted)
+      const attSlice = buildAttendanceReport([dept])
+      const dest = testRecipient || g.whatsapp_group_id
+      const ok1 = await sendWhapi(dest, darSlice)
+      const ok2 = await sendWhapi(dest, attSlice)
+      if (ok1 && ok2) sentTo.push(`${dest} (${dept})`)
+      console.log(`Routed slice to ${dept} → ${dest}`)
+    }
   }
 
   // 2. Send main report (excluding routed depts) to main recipients
