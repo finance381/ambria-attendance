@@ -54,11 +54,18 @@ export function capturePhoto() {
     video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000'
     videoWrap.appendChild(video)
 
+    // Dim-everything-outside-the-oval effect, via mask-image rather than the
+    // classic "box-shadow: 0 0 0 9999px" spotlight trick — that trick pairs a
+    // huge spread radius with border-radius, which is a known iOS Safari bug
+    // class causing the "hole" to render solid black instead of see-through.
+    var dimLayer = document.createElement('div')
+    dimLayer.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;pointer-events:none;background:rgba(255,255,255,0.25)'
+
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
 
     var guideRing = document.createElement('div')
-    guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:40px;transition:border-color 0.3s;box-shadow:0 0 0 9999px rgba(255,255,255,0.25)'
+    guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:40px;transition:border-color 0.3s'
 
     var faceStatus = document.createElement('div')
     faceStatus.style.cssText = 'color:#fff;font-size:14px;font-weight:600;text-align:center;padding:6px 16px;border-radius:20px;background:rgba(0,0,0,0.5);margin-top:12px'
@@ -101,6 +108,7 @@ export function capturePhoto() {
         stream.getTracks().forEach(function (t) { t.stop() })
       }
       if (videoWrap.parentNode) videoWrap.parentNode.removeChild(videoWrap)
+      if (dimLayer.parentNode) dimLayer.parentNode.removeChild(dimLayer)
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay)
     }
 
@@ -109,7 +117,7 @@ export function capturePhoto() {
       // Fill light — warm bright overlay in low light reflects onto face
       var shadowColor = lowLightMode ? '255,245,220' : '255,255,255'
       var shadowOp = lowLightMode ? (found ? 0.78 : 0.72) : (found ? 0.55 : 0.25)
-      guideRing.style.boxShadow = '0 0 0 9999px rgba(' + shadowColor + ',' + shadowOp + ')'
+      dimLayer.style.background = 'rgba(' + shadowColor + ',' + shadowOp + ')'
       if (found) {
         guideRing.style.borderColor = '#22c55e'
         guideRing.style.borderStyle = 'solid'
@@ -310,7 +318,19 @@ export function capturePhoto() {
       video.srcObject = s
       video.play()
       document.body.appendChild(videoWrap)
+      document.body.appendChild(dimLayer)
       document.body.appendChild(overlay)
+
+      // guideRing's position comes from flex layout, so measure its actual
+      // rendered rect (now that it's in the DOM) to place the mask's hole.
+      var ringRect = guideRing.getBoundingClientRect()
+      var rx = ringRect.width / 2
+      var ry = ringRect.height / 2
+      var cx = ringRect.left + rx
+      var cy = ringRect.top + ry
+      var maskImg = 'radial-gradient(ellipse ' + rx + 'px ' + ry + 'px at ' + cx + 'px ' + cy + 'px, transparent 98%, black 100%)'
+      dimLayer.style.setProperty('-webkit-mask-image', maskImg)
+      dimLayer.style.setProperty('mask-image', maskImg)
 
       video.addEventListener('loadeddata', function () {
         startFaceDetection()
