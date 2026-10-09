@@ -103,6 +103,13 @@ serve(async (req) => {
       })
     }
 
+    // A password change alone doesn't invalidate existing sessions — kill
+    // every active session for this user so the reset actually locks them out.
+    // Non-fatal: the password itself was already changed above either way.
+    try {
+      await adminClient.auth.admin.signOut(employee_id, 'global')
+    } catch (_signOutErr) { /* ignore */ }
+
     await adminClient.from('activity_log').insert({
       actor_id: caller.id,
       action: 'RESET_PASSWORD',
