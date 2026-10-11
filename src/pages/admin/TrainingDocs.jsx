@@ -1,7 +1,8 @@
 // TrainingDocs.jsx
 // Config → "Company Training Docs" tab. Admin uploads PDF/Word training docs
 // targeted at a department + role (either can be "All"), lists them, opens
-// them via signed URLs and deletes them. The list can be narrowed by
+// them via signed URLs, edits them (title, department, role, optionally a new
+// file) and deletes them. The list can be narrowed by
 // department (which also keeps the All-Departments docs, since that
 // department sees them too) and by a title search. Table + bucket: see migration
 // 20261007060000_training_docs.sql.
@@ -42,6 +43,7 @@ export default function TrainingDocs() {
   var [loadError, setLoadError] = useState('')
   var [toast, setToast] = useState('')
   var [showAdd, setShowAdd] = useState(false)
+  var [editTarget, setEditTarget] = useState(null)
   var [deleteTarget, setDeleteTarget] = useState(null)
   var [deleting, setDeleting] = useState(false)
   var [deptFilter, setDeptFilter] = useState(ALL)
@@ -178,6 +180,8 @@ export default function TrainingDocs() {
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={function () { handleOpen(doc) }}
                           className="px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 rounded transition-colors">Open</button>
+                        <button onClick={function () { setEditTarget(doc) }}
+                          className="px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 rounded transition-colors">Edit</button>
                         <button onClick={function () { setDeleteTarget(doc) }}
                           className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors">Delete</button>
                       </div>
@@ -190,14 +194,16 @@ export default function TrainingDocs() {
         )}
       </div>
 
-      {showAdd && (
-        <AddDocModal
+      {(showAdd || editTarget) && (
+        <DocModal
+          doc={editTarget}
           departments={departments}
           employeeId={employee?.id}
-          onClose={function () { setShowAdd(false) }}
+          onClose={function () { setShowAdd(false); setEditTarget(null) }}
           onSaved={function (title) {
+            showToast(title + (editTarget ? ' updated' : ' added'))
             setShowAdd(false)
-            showToast(title + ' added')
+            setEditTarget(null)
             loadAll()
           }}
         />
@@ -229,11 +235,14 @@ export default function TrainingDocs() {
   )
 }
 
-function AddDocModal({ departments, employeeId, onClose, onSaved }) {
-  var [deptId, setDeptId] = useState('')
-  var [role, setRole] = useState('')
+// Add (doc = null) or edit an existing doc. When editing, the file is
+// optional: pick one to replace the current file, leave it empty to keep it.
+function DocModal({ doc, departments, employeeId, onClose, onSaved }) {
+  var isEdit = !!doc
+  var [deptId, setDeptId] = useState(isEdit ? (doc.department_id == null ? ALL : String(doc.department_id)) : '')
+  var [role, setRole] = useState(isEdit ? (doc.role || ALL) : '')
   var [file, setFile] = useState(null)
-  var [title, setTitle] = useState('')
+  var [title, setTitle] = useState(isEdit ? doc.title : '')
   var [saving, setSaving] = useState(false)
   var [error, setError] = useState('')
 
@@ -259,11 +268,25 @@ function AddDocModal({ departments, employeeId, onClose, onSaved }) {
     setError('')
     if (!deptId) return setError('Select a department')
     if (!role) return setError('Select a role')
-    if (!file) return setError('Choose a PDF or Word file')
+    if (!file && !isEdit) return setError('Choose a PDF or Word file')
     var cleanTitle = title.trim()
     if (!cleanTitle) return setError('Enter a title')
 
+    var fields = {
+      title: cleanTitle,
+      department_id: deptId === ALL ? null : Number(deptId),
+      role: role === ALL ? null : role
+    }
+
     setSaving(true)
+
+    if (isEdit && !file) {
+      var { error: updErr } = await supabase.from('training_docs').update(fields).eq('id', doc.id)
+      setSaving(false)
+      if (updErr) return setError(updErr.message)
+      return onSaved(cleanTitle)
+    }
+
     var ext = fileExt(file.name)
     var path = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext
 
@@ -276,21 +299,18 @@ function AddDocModal({ departments, employeeId, onClose, onSaved }) {
       return setError(upErr.message)
     }
 
-    var { error: insErr } = await supabase.from('training_docs').insert({
-      title: cleanTitle,
-      department_id: deptId === ALL ? null : Number(deptId),
-      role: role === ALL ? null : role,
-      file_path: path,
-      file_name: file.name,
-      file_type: ext,
-      uploaded_by: employeeId || null
-    })
-    if (insErr) {
+    var fileFields = { file_path: path, file_name: file.name, file_type: ext }
+    var { error: rowErr } = isEdit
+      ? await supabase.from('training_docs').update(Object.assign({}, fields, fileFields)).eq('id', doc.id)
+      : await supabase.from('training_docs').insert(Object.assign({ uploaded_by: employeeId || null }, fields, fileFields))
+    if (rowErr) {
       // Don't leave an orphan file in the bucket if the row failed.
       await supabase.storage.from(BUCKET).remove([path])
       setSaving(false)
-      return setError(insErr.message)
+      return setError(rowErr.message)
     }
+    // Replaced: the old file is no longer referenced.
+    if (isEdit) await supabase.storage.from(BUCKET).remove([doc.file_path])
 
     setSaving(false)
     onSaved(cleanTitle)
@@ -300,7 +320,7 @@ function AddDocModal({ departments, employeeId, onClose, onSaved }) {
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-xl w-full max-w-md shadow-xl" onClick={function (e) { e.stopPropagation() }}>
         <div className="px-5 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-bold text-gray-900">Add Training Doc</h3>
+          <h3 className="text-sm font-bold text-gray-900">{isEdit ? 'Edit Training Doc' : 'Add Training Doc'}</h3>
           <p className="text-xs text-gray-500">PDF or Word, up to 20 MB</p>
         </div>
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
@@ -327,7 +347,10 @@ function AddDocModal({ departments, employeeId, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className={labelClass}>Upload Doc (PDF / Word) *</label>
+            <label className={labelClass}>{isEdit ? 'Replace File (optional)' : 'Upload Doc (PDF / Word) *'}</label>
+            {isEdit && (
+              <p className="text-[11px] text-gray-500 mb-1.5">Current: {doc.file_name}</p>
+            )}
             <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={handleFile}
               className="w-full text-sm text-gray-600 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200" />
@@ -350,7 +373,7 @@ function AddDocModal({ departments, employeeId, onClose, onSaved }) {
               className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
             <button type="submit" disabled={saving}
               className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
-              {saving ? 'Uploading…' : 'Add Doc'}
+              {saving ? (isEdit ? 'Saving…' : 'Uploading…') : (isEdit ? 'Save Changes' : 'Add Doc')}
             </button>
           </div>
         </form>
