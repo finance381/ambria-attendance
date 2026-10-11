@@ -14,6 +14,7 @@ var TAB_OPTIONS = [
   { id: 'dar', label: 'DAR Writer' },
   { id: 'analysis', label: 'Analysis' },
   { id: 'leave_override', label: 'Leave Override' },
+  { id: 'tasks', label: 'My Tasks' },
 ]
 
 var DEFAULT_TABS = {

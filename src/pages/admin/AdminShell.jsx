@@ -9,6 +9,7 @@ var NAV_ITEMS = [
   { to: '/admin/requests', label: 'Requests', icon: '📝', tabKey: 'claims' },
   { to: '/admin/dars', label: 'DARs', icon: '📄', tabKey: 'dar' },
   { to: '/admin/config', label: 'Config', icon: '⚙️', roles: ['admin'] },
+  { to: '/admin/new-joiners', label: 'New Joiners', icon: '🆕', roles: ['admin'] },
 ]
 
 var DEFAULT_TABS = {

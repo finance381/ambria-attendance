@@ -15,6 +15,7 @@ var ALL_TABS = [
   { to: '/dar', key: 'tab_dar', icon: '📝', tabId: 'dar' },
   { to: '/analysis', key: 'tab_analysis', icon: '📊', tabId: 'analysis' },
   { to: '/leave-override', key: 'tab_leave_override', icon: '📋', tabId: 'leave_override' },
+  { to: '/my-tasks', key: 'tab_tasks', icon: '🗂️', tabId: 'tasks' },
 ]
 
 var DEFAULT_TABS = {

@@ -14,6 +14,9 @@ const AttendanceHub = lazy(() => import('./pages/admin/AttendanceHub'))
 const PeopleHub = lazy(() => import('./pages/admin/PeopleHub'))
 const RequestsHub = lazy(() => import('./pages/admin/RequestsHub'))
 const ConfigHub = lazy(() => import('./pages/admin/ConfigHub'))
+const NewJoiners = lazy(() => import('./pages/admin/NewJoiners'))
+const MarkTests = lazy(() => import('./pages/mobile/MarkTests'))
+const MyTasks = lazy(() => import('./pages/mobile/MyTasks'))
 const PunchForTeam = lazy(() => import('./pages/mobile/PunchForTeam'))
 const DeptAttendance = lazy(() => import('./pages/mobile/DeptAttendance'))
 const MyClaims = lazy(() => import('./pages/mobile/MyClaims'))
@@ -116,6 +119,8 @@ export default function App() {
           } />
           <Route path="settings" element={<Settings />} />
           <Route path="leave-override" element={<LeaveOverride />} />
+          <Route path="mark-tests" element={<MarkTests />} />
+          <Route path="my-tasks" element={<MyTasks />} />
         </Route>
 
         {/* Admin Desktop — manager + admin only */}
@@ -143,6 +148,11 @@ export default function App() {
           <Route path="config" element={
             <ProtectedRoute roles={['admin']}>
               <ConfigHub />
+            </ProtectedRoute>
+          } />
+          <Route path="new-joiners" element={
+            <ProtectedRoute roles={['admin']}>
+              <NewJoiners />
             </ProtectedRoute>
           } />
         </Route>

@@ -30,7 +30,13 @@ export async function refreshPushSubscription(employeeId) {
     var isStale = Date.now() - lastRefresh > REFRESH_INTERVAL_MS
 
     if (sub && isStale) {
+      // Drop the old row too, otherwise every refresh leaves a dead
+      // subscription behind and the employee piles up "devices".
+      var oldEndpoint = sub.endpoint
       await sub.unsubscribe()
+      await supabase.from('push_subscriptions').delete()
+        .eq('employee_id', employeeId)
+        .eq('endpoint', oldEndpoint)
       sub = null
     }
 
