@@ -1,7 +1,9 @@
 // TrainingDocs.jsx
 // Config → "Company Training Docs" tab. Admin uploads PDF/Word training docs
 // targeted at a department + role (either can be "All"), lists them, opens
-// them via signed URLs and deletes them. Table + bucket: see migration
+// them via signed URLs and deletes them. The list can be narrowed by
+// department (which also keeps the All-Departments docs, since that
+// department sees them too) and by a title search. Table + bucket: see migration
 // 20261007060000_training_docs.sql.
 
 import { useState, useEffect, useCallback } from 'react'
@@ -42,6 +44,8 @@ export default function TrainingDocs() {
   var [showAdd, setShowAdd] = useState(false)
   var [deleteTarget, setDeleteTarget] = useState(null)
   var [deleting, setDeleting] = useState(false)
+  var [deptFilter, setDeptFilter] = useState(ALL)
+  var [search, setSearch] = useState('')
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -85,6 +89,14 @@ export default function TrainingDocs() {
     loadAll()
   }
 
+  var query = search.trim().toLowerCase()
+  var shownDocs = docs.filter(function (doc) {
+    if (deptFilter !== ALL && doc.department_id != null && String(doc.department_id) !== deptFilter) return false
+    if (query && doc.title.toLowerCase().indexOf(query) === -1 && doc.file_name.toLowerCase().indexOf(query) === -1) return false
+    return true
+  })
+  var filtering = deptFilter !== ALL || query !== ''
+
   if (loading) {
     return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
   }
@@ -94,7 +106,9 @@ export default function TrainingDocs() {
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
           <h2 className="text-lg font-bold text-gray-900 mb-1">Company Training Docs</h2>
-          <p className="text-xs text-gray-500">{docs.length} {docs.length === 1 ? 'document' : 'documents'}</p>
+          <p className="text-xs text-gray-500">
+            {filtering ? shownDocs.length + ' of ' : ''}{docs.length} {docs.length === 1 ? 'document' : 'documents'}
+          </p>
         </div>
         <button
           onClick={function () { setShowAdd(true) }}
@@ -110,9 +124,30 @@ export default function TrainingDocs() {
         </div>
       )}
 
+      {docs.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
+            <option value={ALL}>All departments</option>
+            {departments.map(function (d) {
+              return <option key={d.id} value={String(d.id)}>{d.name}</option>
+            })}
+          </select>
+          <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
+            placeholder="Search by title"
+            className="flex-1 min-w-[180px] max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+          {filtering && (
+            <button onClick={function () { setDeptFilter(ALL); setSearch('') }}
+              className="px-3 py-2 text-xs text-gray-500 hover:text-gray-800">Clear</button>
+          )}
+        </div>
+      )}
+
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         {docs.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-10">No documents yet.</p>
+        ) : shownDocs.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-10">No documents match this filter.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -126,7 +161,7 @@ export default function TrainingDocs() {
               </tr>
             </thead>
             <tbody>
-              {docs.map(function (doc) {
+              {shownDocs.map(function (doc) {
                 return (
                   <tr key={doc.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-2.5">
