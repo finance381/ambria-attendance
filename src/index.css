@@ -28,3 +28,10 @@ body {
      guard in main.jsx). */
   touch-action: pan-x pan-y;
 }
+
+/* Edge/IE draw their own reveal eye inside password boxes; the login page
+   has its own toggle, so hide the browser one to avoid two icons. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}

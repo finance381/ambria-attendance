@@ -5,6 +5,7 @@ import { useLanguage, LanguageToggle } from '../lib/i18n'
 export default function Login() {
   var [phone, setPhone] = useState('')
   var [password, setPassword] = useState('')
+  var [showPassword, setShowPassword] = useState(false)
   var [error, setError] = useState('')
   var [loading, setLoading] = useState(false)
   var { login } = useAuth()
@@ -78,14 +79,28 @@ export default function Login() {
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                 {t('login_password_label')}
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={function (e) { setPassword(e.target.value) }}
-                placeholder={t('login_password_placeholder')}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 focus:border-transparent"
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={function (e) { setPassword(e.target.value) }}
+                  placeholder={t('login_password_placeholder')}
+                  className="w-full pl-3 pr-11 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 focus:border-transparent"
+                  autoComplete="current-password"
+                />
+                {/* Eye toggle. The icon shows the current state: slashed eye while
+                    hidden, open eye while visible. */}
+                <button type="button" onClick={function () { setShowPassword(!showPassword) }}
+                  aria-label={showPassword ? t('login_hide_password') : t('login_show_password')}
+                  className="absolute inset-y-0 right-0 w-11 inline-flex items-center justify-center text-gray-400 hover:text-gray-700">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    {!showPassword
+                      ? <><path d="M3 3l18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.9 5.1A9.8 9.8 0 0 1 12 5c5 0 9 4.5 10 7a12.7 12.7 0 0 1-2.9 3.9M6.6 6.6C4.3 8 2.7 10.1 2 12c1 2.5 5 7 10 7a9.6 9.6 0 0 0 5.4-1.6" /></>
+                      : <><path d="M2 12c1-2.5 5-7 10-7s9 4.5 10 7c-1 2.5-5 7-10 7S3 14.5 2 12z" /><circle cx="12" cy="12" r="3" /></>}
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {error && (
