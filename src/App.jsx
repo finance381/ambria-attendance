@@ -28,7 +28,7 @@ const LeaveOverride = lazy(() => import('./pages/admin/LeaveOverride'))
 const AnnualReport = lazy(() => import('./pages/admin/AnnualReport'))
 
 function PageLoading() {
-  return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
+  return <div className="min-h-screen bg-gray-50"><p className="text-sm text-gray-400 text-center py-12">Loading…</p></div>
 }
 
 function ProtectedRoute({ children, roles }) {

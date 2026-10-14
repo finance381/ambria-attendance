@@ -55,7 +55,7 @@ export default function MobileShell() {
   return (
     <div className="min-h-screen bg-gray-50 pb-[calc(5rem+env(safe-area-inset-bottom))]">
       {/* Header */}
-      <header className="bg-slate-800 text-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+      <header className="sticky top-0 z-30 bg-slate-800 text-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">

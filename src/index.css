@@ -13,3 +13,12 @@ body::before {
   z-index: 9997;
   pointer-events: none;
 }
+
+/* Newer iOS ignores apple-mobile-web-app-status-bar-style and tints the
+   status bar from the page background and any sticky header at the top.
+   A dark page background (every screen paints its own light container on
+   top) keeps that strip dark instead of white. */
+html,
+body {
+  background-color: #1e293b;
+}
