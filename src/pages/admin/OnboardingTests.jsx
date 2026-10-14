@@ -101,7 +101,8 @@ export default function OnboardingTests({ employees, departments, employeeId, sh
                 stats={[
                   { label: 'Out of', value: test.max_score + ' marks', accent: 'text-amber-700' },
                   { label: 'Departments', value: deptIds.length ? deptLabels(deptIds, departments).join(', ') : 'All', muted: !deptIds.length },
-                  { label: 'Comes', value: placeLabel(test) }
+                  { label: 'Comes', value: placeLabel(test) },
+                  { label: 'Due', value: test.due_days != null ? 'Within ' + test.due_days + (test.due_days === 1 ? ' day' : ' days') + ' of joining' : 'No due date', muted: test.due_days == null }
                 ]}
               >
                 <TileSection label="Point of contact">
@@ -180,6 +181,8 @@ function TestModal({ test, employees, departments, employeeId, onClose, onSaved 
   var [placeMode, setPlaceMode] = useState(
     test.place === 'start' ? 'start' : test.place === 'count' && test.after_count != null ? 'count' : 'end')
   var [afterCount, setAfterCount] = useState(test.after_count != null ? String(test.after_count) : '1')
+  // Optional: blank = no due date
+  var [dueDays, setDueDays] = useState(test.due_days != null ? String(test.due_days) : '')
   var [saving, setSaving] = useState(false)
   var [error, setError] = useState('')
 
@@ -197,6 +200,13 @@ function TestModal({ test, employees, departments, employeeId, onClose, onSaved 
       count = n
     }
 
+    var due = null
+    if (dueDays.trim() !== '') {
+      var dd = Number(dueDays)
+      if (!Number.isInteger(dd) || dd < 1 || dd > 365) return setError('Due days must be between 1 and 365, or leave it blank')
+      due = dd
+    }
+
     setSaving(true)
     var row = {
       title: cleanTitle,
@@ -206,7 +216,8 @@ function TestModal({ test, employees, departments, employeeId, onClose, onSaved 
       marked_by: markedBy[0],
       department_ids: deptIds,
       place: place,
-      after_count: count
+      after_count: count,
+      due_days: due
     }
     var res = isEdit
       ? await supabase.from('onboarding_tests').update(row).eq('id', test.id).select('id').single()
@@ -273,6 +284,16 @@ function TestModal({ test, employees, departments, employeeId, onClose, onSaved 
               <div>
                 <label className={labelClass}>Point of contact <span className="text-red-500">*</span><span className={hintClass}>takes and marks the test</span></label>
                 <EmployeePicker employees={employees} selected={markedBy} onChange={setMarkedBy} single />
+              </div>
+              <div>
+                <label className={labelClass}>Due within<span className={hintClass}>(optional)</span></label>
+                <div className="flex items-center gap-2.5">
+                  <input type="number" min={1} max={365} step={1} value={dueDays}
+                    onChange={function (e) { setDueDays(e.target.value) }} placeholder="—"
+                    className="w-24 px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:border-transparent" />
+                  <span className="text-sm text-gray-600">days of joining</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Leave blank for no due date. With one, the joiner gets a reminder and the point of contact is alerted when it's overdue.</p>
               </div>
             </section>
 

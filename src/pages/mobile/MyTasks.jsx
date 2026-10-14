@@ -123,13 +123,22 @@ export default function MyTasks() {
             {test.description && (
               <p className="text-[13px] text-gray-600 mt-1 leading-relaxed whitespace-pre-line">{test.description}</p>
             )}
-            {test.poc_names.length > 0 && (
-              <p className="flex items-center gap-1.5 text-xs text-gray-600 mt-2">
-                <Icon name="user" className="w-3.5 h-3.5 text-gray-400" />
-                <span className="text-gray-500">{t('mytasks_test_taken_by')}:</span>
-                <span className="font-medium text-gray-800">{test.poc_names.join(', ')}</span>
-              </p>
-            )}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-gray-600">
+              {test.poc_names.length > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon name="user" className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-gray-500">{t('mytasks_test_taken_by')}:</span>
+                  <span className="font-medium text-gray-800">{test.poc_names.join(', ')}</span>
+                </span>
+              )}
+              {/* Tests only have a due date when the admin set one */}
+              {test.due_date && !scored && (
+                <span className={'inline-flex items-center gap-1.5 ' + (isOverdue(test.due_date) ? 'text-red-600 font-medium' : '')}>
+                  <Icon name="calendar" className={'w-3.5 h-3.5 ' + (isOverdue(test.due_date) ? 'text-red-500' : 'text-gray-400')} />
+                  {t('mytasks_due', { date: formatDate(test.due_date) })}
+                </span>
+              )}
+            </div>
             {!scored && (
               <p className="text-xs text-gray-600 mt-3 pt-3 border-t border-black/5">
                 {test.ready ? t('mytasks_test_ready_note') : t('mytasks_test_waiting_note')}

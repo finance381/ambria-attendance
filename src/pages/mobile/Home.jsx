@@ -5,6 +5,8 @@ import { useLanguage } from '../../lib/i18n'
 import PunchCapture from '../../components/PunchCapture'
 import InstallPrompt from '../../components/InstallPrompt'
 import MarkTestsBanner from '../../components/MarkTestsBanner'
+import TaskDueBanner from '../../components/TaskDueBanner'
+import PocOverdueBanner from '../../components/PocOverdueBanner'
 import { getPendingPunches, removePunch } from '../../lib/offlineQueue'
 
 export default function Home() {
@@ -138,6 +140,8 @@ export default function Home() {
         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
       </p>
       <InstallPrompt />
+      <TaskDueBanner />
+      <PocOverdueBanner />
       <MarkTestsBanner />
       {pendingCount > 0 && (
         <div className={'rounded-2xl px-4 py-3 mb-4 border ' + (syncing ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200')}>
