@@ -262,6 +262,7 @@ var translations = {
     mytasks_test_ready_note: 'You have finished the steps before this test. Your contact person has been told and will take the test.',
     mytasks_test_waiting_note: 'Finish the steps above to reach this test.',
     mytasks_locked: '{n} more steps unlock after the test above is done',
+    mytasks_up_next: 'Up next',
   },
 
   hi: {
@@ -522,6 +523,7 @@ var translations = {
     mytasks_test_ready_note: 'इस टेस्ट से पहले के सारे चरण पूरे हो गए। आपके संपर्क व्यक्ति को बता दिया गया है, वे टेस्ट लेंगे।',
     mytasks_test_waiting_note: 'इस टेस्ट तक पहुँचने के लिए ऊपर के चरण पूरे करें।',
     mytasks_locked: 'ऊपर का टेस्ट होने के बाद {n} और चरण खुलेंगे',
+    mytasks_up_next: 'अगला',
   }
 }
 

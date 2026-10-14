@@ -36,33 +36,76 @@ export function preloadFaceModels() {
   }
 }
 
+// The camera <video> is never shown directly. iOS Safari draws a visible
+// <video> on its own layer and sometimes places that layer wrong (shifted by
+// the page scroll, not stretched to cover), which left the feed as a small
+// rectangle in one corner over a black screen. Instead the video sits hidden
+// and every frame is painted onto a normal full-screen <canvas>, which iOS
+// lays out like any other element. Mirroring is done in the canvas drawing,
+// not with a CSS transform.
+function createHiddenVideo() {
+  var video = document.createElement('video')
+  video.setAttribute('playsinline', '')
+  video.setAttribute('autoplay', '')
+  video.setAttribute('muted', '')
+  video.muted = true
+  // Kept in the DOM (some iOS versions stop decoding a detached video) but
+  // 1px and invisible.
+  video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none'
+  return video
+}
+
+function startCanvasPreview(video, mirror) {
+  var canvas = document.createElement('canvas')
+  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:9998;background:#000;display:block'
+  var ctx = canvas.getContext('2d')
+  var dpr = Math.min(window.devicePixelRatio || 1, 2)
+  var rafId = null
+
+  function draw() {
+    rafId = requestAnimationFrame(draw)
+    var cw = Math.round(canvas.clientWidth * dpr)
+    var ch = Math.round(canvas.clientHeight * dpr)
+    if (!cw || !ch) return
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw
+      canvas.height = ch
+    }
+    var vw = video.videoWidth
+    var vh = video.videoHeight
+    if (video.readyState < 2 || !vw || !vh) return
+    // "cover" crop: fill the whole screen, cut the overflow equally on both sides
+    var scale = Math.max(cw / vw, ch / vh)
+    var dw = vw * scale
+    var dh = vh * scale
+    ctx.setTransform(mirror ? -1 : 1, 0, 0, 1, mirror ? cw : 0, 0)
+    ctx.drawImage(video, (cw - dw) / 2, (ch - dh) / 2, dw, dh)
+  }
+  rafId = requestAnimationFrame(draw)
+
+  return {
+    canvas: canvas,
+    stop: function () {
+      if (rafId) cancelAnimationFrame(rafId)
+      if (canvas.parentNode) canvas.parentNode.removeChild(canvas)
+    }
+  }
+}
+
 export function capturePhoto() {
   return new Promise(function (resolve, reject) {
-    // Mirror the live preview on a wrapper div, not the <video> itself —
-    // a CSS transform directly on a fixed full-screen <video> was a known
-    // source of black/corrupted rendering on iOS Safari. Putting the
-    // transform one level up avoids that compositing path while keeping
-    // the natural "selfie mirror" feel. The captured photo is unaffected
-    // either way (canvas drawImage samples raw video pixels, ignoring any
-    // CSS transform on the video or its ancestors).
-    var videoWrap = document.createElement('div')
-    videoWrap.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;overflow:hidden;z-index:9998;transform:scaleX(-1)'
-
-    var video = document.createElement('video')
-    video.setAttribute('playsinline', '')
-    video.setAttribute('autoplay', '')
-    video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000'
-    videoWrap.appendChild(video)
+    var video = createHiddenVideo()
+    var preview = startCanvasPreview(video, true)
 
     // Dim-everything-outside-the-oval effect, via mask-image rather than the
     // classic "box-shadow: 0 0 0 9999px" spotlight trick — that trick pairs a
     // huge spread radius with border-radius, which is a known iOS Safari bug
     // class causing the "hole" to render solid black instead of see-through.
     var dimLayer = document.createElement('div')
-    dimLayer.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;pointer-events:none;background:rgba(255,255,255,0.25)'
+    dimLayer.style.cssText = 'position:fixed;inset:0;z-index:9999;pointer-events:none;background:rgba(255,255,255,0.25)'
 
     var overlay = document.createElement('div')
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
 
     var guideRing = document.createElement('div')
     guideRing.style.cssText = 'width:220px;height:280px;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;margin-top:40px;transition:border-color 0.3s'
@@ -107,7 +150,8 @@ export function capturePhoto() {
       if (stream) {
         stream.getTracks().forEach(function (t) { t.stop() })
       }
-      if (videoWrap.parentNode) videoWrap.parentNode.removeChild(videoWrap)
+      preview.stop()
+      if (video.parentNode) video.parentNode.removeChild(video)
       if (dimLayer.parentNode) dimLayer.parentNode.removeChild(dimLayer)
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay)
     }
@@ -315,11 +359,13 @@ export function capturePhoto() {
       audio: false
     }).then(function (s) {
       stream = s
-      video.srcObject = s
-      video.play()
-      document.body.appendChild(videoWrap)
+      document.body.appendChild(video)
+      document.body.appendChild(preview.canvas)
       document.body.appendChild(dimLayer)
       document.body.appendChild(overlay)
+      video.srcObject = s
+      var playPromise = video.play()
+      if (playPromise && playPromise.catch) playPromise.catch(function () {})
 
       // guideRing's position comes from flex layout, so measure its actual
       // rendered rect (now that it's in the DOM) to place the mask's hole.
@@ -393,10 +439,8 @@ export function capturePhoto() {
 
 export function captureProxyPhoto() {
   return new Promise(function (resolve, reject) {
-    var video = document.createElement('video')
-    video.setAttribute('playsinline', '')
-    video.setAttribute('autoplay', '')
-    video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;object-fit:cover;z-index:9998;background:#000'
+    var video = createHiddenVideo()
+    var preview = startCanvasPreview(video, false)
 
     var overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:40px 0 env(safe-area-inset-bottom,20px)'
@@ -427,6 +471,7 @@ export function captureProxyPhoto() {
     function cleanup() {
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
       if (stream) { stream.getTracks().forEach(function (t) { t.stop() }) }
+      preview.stop()
       if (video.parentNode) video.parentNode.removeChild(video)
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay)
     }
@@ -436,10 +481,12 @@ export function captureProxyPhoto() {
       audio: false
     }).then(function (s) {
       stream = s
-      video.srcObject = s
-      video.play()
       document.body.appendChild(video)
+      document.body.appendChild(preview.canvas)
       document.body.appendChild(overlay)
+      video.srcObject = s
+      var playPromise = video.play()
+      if (playPromise && playPromise.catch) playPromise.catch(function () {})
 
       autoCloseTimer = setTimeout(function () {
         cleanup()

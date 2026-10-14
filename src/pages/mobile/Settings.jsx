@@ -326,36 +326,18 @@ function NotificationSettings({ employeeId }) {
 
     if (!isSupported) { setLoading(false); return }
 
-    // Check existing subscription — browser first, DB fallback
+    // Only trust THIS browser's subscription. A DB row can belong to another
+    // device or another install (e.g. the standalone Attendance app vs. the
+    // Ambria Hub app, which keep separate subscriptions on iOS), and showing
+    // "on" here would hide the Enable button on a context that gets nothing.
     navigator.serviceWorker.ready.then(function (reg) {
       return reg.pushManager.getSubscription()
     }).then(function (sub) {
-      if (sub) {
-        setSubscribed(true)
-        setLoading(false)
-      } else {
-        // Browser lost local state — check DB as fallback
-        supabase
-          .from('push_subscriptions')
-          .select('id')
-          .eq('employee_id', employeeId)
-          .limit(1)
-          .then(function (res) {
-            setSubscribed(res.data && res.data.length > 0)
-            setLoading(false)
-          })
-      }
+      setSubscribed(!!sub && Notification.permission === 'granted')
+      setLoading(false)
     }).catch(function () {
-      // SW not ready — check DB
-      supabase
-        .from('push_subscriptions')
-        .select('id')
-        .eq('employee_id', employeeId)
-        .limit(1)
-        .then(function (res) {
-          setSubscribed(res.data && res.data.length > 0)
-          setLoading(false)
-        })
+      setSubscribed(false)
+      setLoading(false)
     })
 
     // Load reminder preferences
