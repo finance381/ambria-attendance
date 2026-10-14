@@ -21,4 +21,10 @@ body::before {
 html,
 body {
   background-color: #1e293b;
+  /* Anything poking out sideways makes iOS zoom the whole app out, which
+     shows as a small app floating on the dark background. */
+  overflow-x: clip;
+  /* Scroll yes, pinch-zoom / double-tap zoom no (paired with the gesture
+     guard in main.jsx). */
+  touch-action: pan-x pan-y;
 }
