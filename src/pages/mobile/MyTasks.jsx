@@ -207,13 +207,8 @@ export default function MyTasks() {
               </button>
             </div>
           ) : (
-            // Only the current step gets the solid button; later ones stay
-            // tickable but quieter so the screen isn't a stack of green bars.
             <button onClick={function () { toggleDone(task) }} disabled={saving === task.id}
-              className={'mt-4 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 ' +
-                (current
-                  ? 'text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-200'
-                  : 'text-emerald-700 bg-white border border-emerald-200 hover:bg-emerald-50')}>
+              className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50">
               <Icon name="check" className="w-4 h-4" />
               {t('mytasks_mark_done')}
             </button>
