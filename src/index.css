@@ -1,1 +1,15 @@
 @import "tailwindcss";
+/* iPhone status bar: the app draws under it (viewport-fit=cover +
+   black-translucent), so paint that strip in the header colour instead of
+   the old white band. Below the camera overlays (z 9998+). */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: #1e293b;
+  z-index: 9997;
+  pointer-events: none;
+}

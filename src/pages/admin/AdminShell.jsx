@@ -30,7 +30,7 @@ export default function AdminShell() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-slate-800 text-white">
+      <header className="bg-slate-800 text-white pt-[env(safe-area-inset-top)]">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
