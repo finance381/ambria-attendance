@@ -181,6 +181,7 @@ var translations = {
     settings_leave_error: 'Leave balance error',
     settings_quarterly: 'Quarterly',
     settings_halfday_balance: 'Annual Half Day Balance',
+    settings_deductions: 'Salary Deductions',
     
 
     // ── Install Prompt ───────────────────────
@@ -463,6 +464,7 @@ var translations = {
     settings_leave_error: 'छुट्टी बैलेंस में त्रुटि',
     settings_quarterly: 'तिमाही',
     settings_halfday_balance: 'हाफ डे बैलेंस',
+    settings_deductions: 'वेतन कटौती',
 
     // ── Install Prompt ───────────────────────
     install_title: 'ऐप इंस्टॉल करें',
