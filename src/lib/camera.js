@@ -36,22 +36,28 @@ export function preloadFaceModels() {
   }
 }
 
-// The camera <video> is never shown directly. iOS Safari draws a visible
+// The camera <video> is never what the user sees. iOS Safari draws a visible
 // <video> on its own layer and sometimes places that layer wrong (shifted by
 // the page scroll, not stretched to cover), which left the feed as a small
-// rectangle in one corner over a black screen. Instead the video sits hidden
-// and every frame is painted onto a normal full-screen <canvas>, which iOS
-// lays out like any other element. Mirroring is done in the canvas drawing,
-// not with a CSS transform.
+// rectangle in one corner over a black screen. Instead every frame is painted
+// onto a normal full-screen <canvas> stacked on top, which iOS lays out like
+// any other element. Mirroring is done in the canvas drawing, not with CSS.
 function createHiddenVideo() {
   var video = document.createElement('video')
   video.setAttribute('playsinline', '')
   video.setAttribute('autoplay', '')
   video.setAttribute('muted', '')
   video.muted = true
-  // Kept in the DOM (some iOS versions stop decoding a detached video) but
-  // 1px and invisible.
-  video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none'
+  // Full-size and fully opaque, just underneath the canvas (z 9998). It must
+  // not be tiny or transparent: iOS Safari pauses muted videos it considers
+  // invisible, which froze the preview on iPhones (the canvas kept
+  // repainting the last frame).
+  video.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9997;pointer-events:none;background:#000'
+  // If iOS pauses it anyway (e.g. the app was briefly backgrounded), restart
+  // it while the camera is still open.
+  video.addEventListener('pause', function () {
+    if (video.isConnected && video.srcObject) video.play().catch(function () {})
+  })
   return video
 }
 
@@ -59,11 +65,18 @@ function startCanvasPreview(video, mirror) {
   var canvas = document.createElement('canvas')
   canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:9998;background:#000;display:block'
   var ctx = canvas.getContext('2d')
-  var dpr = Math.min(window.devicePixelRatio || 1, 2)
+  // 1.5x is sharp enough for a live preview and much lighter than full
+  // retina; face detection runs on the same phone at the same time.
+  var dpr = Math.min(window.devicePixelRatio || 1, 1.5)
   var rafId = null
+  var lastDraw = 0
 
-  function draw() {
+  function draw(now) {
     rafId = requestAnimationFrame(draw)
+    // Cap repaints at ~30fps (the camera's own rate) instead of every screen
+    // refresh. Time-based on purpose: a live stream's currentTime doesn't
+    // reliably advance on every iOS version, so it can't be the trigger.
+    if (now - lastDraw < 30) return
     var cw = Math.round(canvas.clientWidth * dpr)
     var ch = Math.round(canvas.clientHeight * dpr)
     if (!cw || !ch) return
@@ -80,6 +93,7 @@ function startCanvasPreview(video, mirror) {
     var dh = vh * scale
     ctx.setTransform(mirror ? -1 : 1, 0, 0, 1, mirror ? cw : 0, 0)
     ctx.drawImage(video, (cw - dw) / 2, (ch - dh) / 2, dw, dh)
+    lastDraw = now
   }
   rafId = requestAnimationFrame(draw)
 
@@ -150,6 +164,7 @@ export function capturePhoto() {
       if (stream) {
         stream.getTracks().forEach(function (t) { t.stop() })
       }
+      video.srcObject = null
       preview.stop()
       if (video.parentNode) video.parentNode.removeChild(video)
       if (dimLayer.parentNode) dimLayer.parentNode.removeChild(dimLayer)
@@ -190,7 +205,17 @@ export function capturePhoto() {
       lumCanvas.height = 45
       var lumCtx = lumCanvas.getContext('2d', { willReadFrequently: true })
 
-      faceDetectInterval = setInterval(async function () {
+      // One detection at a time. detectSingleFace can take longer than the
+      // 250ms tick on slower phones; without this guard the calls stacked
+      // up and froze the camera screen (Capture stopped responding).
+      var detecting = false
+      faceDetectInterval = setInterval(function () {
+        if (detecting) return
+        detecting = true
+        detectTick().finally(function () { detecting = false })
+      }, 250)
+
+      async function detectTick() {
         if (video.readyState < 2) return
 
         // Fallback: after 8s of no detection, enable capture anyway
@@ -251,7 +276,7 @@ export function capturePhoto() {
         } catch (e) {
           // transient error, ignore
         }
-      }, 250)
+      }
     }
 
     function startHeuristicDetection() {
@@ -471,6 +496,7 @@ export function captureProxyPhoto() {
     function cleanup() {
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
       if (stream) { stream.getTracks().forEach(function (t) { t.stop() }) }
+      video.srcObject = null
       preview.stop()
       if (video.parentNode) video.parentNode.removeChild(video)
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay)

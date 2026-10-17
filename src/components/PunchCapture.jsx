@@ -6,6 +6,24 @@ import { getLocation } from '../lib/gps'
 import { useLanguage } from '../lib/i18n'
 import { queuePunch, registerBackgroundSync } from '../lib/offlineQueue'
 
+// Network steps get a time limit. On a weak signal an upload or the punch
+// call could hang with no error, leaving the "Recording punch" spinner up
+// forever (looked like a frozen screen). Past the limit we treat it as a
+// network failure and save the punch to the offline queue; if the slow call
+// did reach the server after all, the queued copy is rejected there as a
+// duplicate when it syncs.
+var NETWORK_TIMEOUT_MS = 20000
+
+function withTimeout(promise, ms) {
+  return new Promise(function (resolve, reject) {
+    var timer = setTimeout(function () { reject(new Error('Network timeout')) }, ms)
+    promise.then(
+      function (v) { clearTimeout(timer); resolve(v) },
+      function (e) { clearTimeout(timer); reject(e) }
+    )
+  })
+}
+
 export default function PunchCapture({ punchType, onComplete, onCancel }) {
   var [step, setStep] = useState('ready')
   var [preview, setPreview] = useState(null)
@@ -103,7 +121,10 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
 
     // Step 3: Upload selfie to storage
     var timestamp = Date.now()
-    var { data: { user } } = await supabase.auth.getUser()
+    // getSession reads the saved login on the phone (no network round trip,
+    // unlike getUser); the server still checks the token on upload / punch.
+    var { data: { session } } = await supabase.auth.getSession()
+    var user = session && session.user
     if (!user) {
       setError('Not authenticated')
       setStep('error')
@@ -113,12 +134,18 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     var today = new Date().toISOString().slice(0, 10)
     var filePath = user.id + '/' + today + '_' + punchType + '_' + timestamp + '.jpg'
 
-    var { error: uploadError } = await supabase.storage
-      .from('selfies')
-      .upload(filePath, photo.blob, {
-        contentType: 'image/jpeg',
-        upsert: false
-      })
+    var uploadError = null
+    try {
+      var uploadRes = await withTimeout(supabase.storage
+        .from('selfies')
+        .upload(filePath, photo.blob, {
+          contentType: 'image/jpeg',
+          upsert: false
+        }), NETWORK_TIMEOUT_MS)
+      uploadError = uploadRes.error
+    } catch (upErr) {
+      uploadError = upErr
+    }
 
     // If upload fails (network issue), queue for offline sync
     if (uploadError) {
@@ -149,7 +176,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     // Step 4: Call punch RPC
     var rpcResult
     try {
-      rpcResult = await supabase.rpc('punch', {
+      rpcResult = await withTimeout(supabase.rpc('punch', {
         p_punch_type: punchType,
         p_selfie_path: filePath,
         p_latitude: gps.latitude,
@@ -158,7 +185,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         p_device_info: navigator.userAgent,
         p_client_punch_id: clientPunchId,
         p_location_name: gps.areaName
-      })
+      }), NETWORK_TIMEOUT_MS)
     } catch (netErr) {
       // Network threw before reaching server — queue it
       try {
