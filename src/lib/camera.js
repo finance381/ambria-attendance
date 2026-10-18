@@ -157,10 +157,16 @@ export function capturePhoto() {
     var positionHistory = []
     var motionConfirmed = false
     var lowLightMode = false
+    var fallbackTimer = null
+    var stallTimer = null
+    var detectionStarted = false
+    var captureUnlocked = false
 
     function cleanup() {
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
       if (faceDetectInterval) clearInterval(faceDetectInterval)
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+      if (stallTimer) clearInterval(stallTimer)
       if (stream) {
         stream.getTracks().forEach(function (t) { t.stop() })
       }
@@ -243,7 +249,14 @@ export function capturePhoto() {
         } catch (e) { /* ignore */ }
 
         try {
+          var t0 = Date.now()
           var result = await faceapi.detectSingleFace(video, lowLightMode ? optsLowLight : optsNormal)
+          // Too slow for this phone (each run blocks the screen): stop
+          // detecting and just let them capture.
+          if (Date.now() - t0 > 1200) {
+            unlockCapture()
+            return
+          }
           if (result) {
             var box = result.box
             var vw = video.videoWidth || 640
@@ -370,8 +383,59 @@ export function capturePhoto() {
       }, 500)
     }
 
+    // Capture must never stay locked. The old 8s fallback lived inside the
+    // detection loop, which only runs once the video has a frame — so on an
+    // iPhone whose video stalled, Capture stayed disabled for good and the
+    // screen looked frozen. This timer doesn't depend on the video at all.
+    function unlockCapture() {
+      captureUnlocked = true
+      // Stop detecting so a later "no face" tick can't lock Capture again
+      if (faceDetectInterval) { clearInterval(faceDetectInterval); faceDetectInterval = null }
+      if (faceDetected) return
+      motionConfirmed = true
+      setFaceFound(true)
+      faceStatus.textContent = '✓ Ready — tap Capture'
+    }
+
+    // Stall watchdog: sample a few pixels every second. A live camera never
+    // gives two identical frames, so the same pixels 3 checks running (or no
+    // frame at all) means the video stopped; re-attach the stream and play.
+    function startStallWatch() {
+      var probe = document.createElement('canvas')
+      probe.width = 8
+      probe.height = 8
+      var probeCtx = probe.getContext('2d', { willReadFrequently: true })
+      var lastSig = ''
+      var same = 0
+      var restarts = 0
+      stallTimer = setInterval(function () {
+        var sig = ''
+        if (video.readyState >= 2) {
+          try {
+            probeCtx.drawImage(video, 0, 0, 8, 8)
+            sig = Array.prototype.join.call(probeCtx.getImageData(0, 0, 8, 8).data, ',')
+          } catch (e) { sig = '' }
+        }
+        same = (sig === '' || sig === lastSig) ? same + 1 : 0
+        lastSig = sig
+        if (same >= 3 && restarts < 3 && stream) {
+          restarts++
+          same = 0
+          video.srcObject = null
+          video.srcObject = stream
+          video.play().catch(function () {})
+        }
+      }, 1000)
+    }
+
     async function startFaceDetection() {
+      // Camera already closed (cancelled / captured) — nothing to detect
+      if (detectionStarted || !video.isConnected) return
+      detectionStarted = true
       await loadModels()
+      // Closed while the models loaded, or they took longer than the 8s
+      // unlock (Capture is already open; a detector could lock it again).
+      if (captureUnlocked || !video.isConnected) return
       if (modelsLoaded) {
         startFaceApiDetection()
       } else {
@@ -403,9 +467,14 @@ export function capturePhoto() {
       dimLayer.style.setProperty('-webkit-mask-image', maskImg)
       dimLayer.style.setProperty('mask-image', maskImg)
 
-      video.addEventListener('loadeddata', function () {
-        startFaceDetection()
-      })
+      // loadeddata doesn't always fire for a camera stream on iOS; start on
+      // whichever of these comes first (startFaceDetection runs once).
+      video.addEventListener('loadeddata', startFaceDetection)
+      video.addEventListener('playing', startFaceDetection)
+      setTimeout(startFaceDetection, 2000)
+
+      fallbackTimer = setTimeout(unlockCapture, 8000)
+      startStallWatch()
 
       autoCloseTimer = setTimeout(function () {
         cleanup()
@@ -418,8 +487,17 @@ export function capturePhoto() {
 
     captureBtn.addEventListener('click', function () {
       if (!faceDetected) return
+      // No camera frame yet: say so and kick the video instead of saving a
+      // blank photo.
+      if (!video.videoWidth || !video.videoHeight) {
+        faceStatus.textContent = 'Camera not ready — try again in a moment'
+        video.play().catch(function () {})
+        return
+      }
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
       if (faceDetectInterval) clearInterval(faceDetectInterval)
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+      if (stallTimer) clearInterval(stallTimer)
 
       var flash = document.createElement('div')
       flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:10000;background:#fff;opacity:0;transition:opacity 0.05s'
