@@ -28,8 +28,6 @@ async function loadModels() {
 // Deferred to browser idle time so it never competes with the initial page's
 // own critical-path network/CPU work, especially on slow connections.
 export function preloadFaceModels() {
-  // iPhones don't use face-api (see startFaceDetection), so don't load it
-  if (IS_IOS) return
   function start() { loadModels().catch(function () {}) }
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(start, { timeout: 5000 })
@@ -209,6 +207,7 @@ export function capturePhoto() {
     var stallTimer = null
     var detectionStarted = false
     var captureUnlocked = false
+    var everDetected = false
 
     function cleanup() {
       if (autoCloseTimer) clearTimeout(autoCloseTimer)
@@ -268,13 +267,23 @@ export function capturePhoto() {
         if (detecting) return
         detecting = true
         detectTick().finally(function () { detecting = false })
-      }, 400)
+      }, 250)
+
+      // iPhone: detect on a small copy of the frame, not the video itself.
+      // Handing the full video to the detector's GPU code while the canvas
+      // preview also paints it every frame was too heavy and froze iPhones.
+      var detCanvas = null
+      var detCtx = null
+      if (IS_IOS) {
+        detCanvas = document.createElement('canvas')
+        detCtx = detCanvas.getContext('2d')
+      }
 
       async function detectTick() {
         if (video.readyState < 2) return
 
-        // Fallback: after 6s of no detection, enable capture anyway
-        if (Date.now() - detectionStart > 6000 && !faceDetected) {
+        // Fallback: no face found at all in 6s, enable capture anyway
+        if (Date.now() - detectionStart > 6000 && !everDetected) {
           motionConfirmed = true
           setFaceFound(true)
           faceStatus.textContent = '✓ Ready — tap Capture'
@@ -299,7 +308,19 @@ export function capturePhoto() {
 
         try {
           var t0 = Date.now()
-          var result = await faceapi.detectSingleFace(video, lowLightMode ? optsLowLight : optsNormal)
+          var input = video
+          var vw = video.videoWidth || 640
+          var vh = video.videoHeight || 480
+          if (detCanvas) {
+            var dw = 320
+            var dh = Math.round(320 * vh / vw)
+            if (detCanvas.width !== dw || detCanvas.height !== dh) { detCanvas.width = dw; detCanvas.height = dh }
+            detCtx.drawImage(video, 0, 0, dw, dh)
+            input = detCanvas
+            vw = dw
+            vh = dh
+          }
+          var result = await faceapi.detectSingleFace(input, lowLightMode ? optsLowLight : optsNormal)
           // Too slow for this phone (each run blocks the screen): stop
           // detecting and just let them capture. The first run also sets up
           // the GPU, so it is always slow and doesn't count.
@@ -311,14 +332,13 @@ export function capturePhoto() {
           }
           if (result) {
             var box = result.box
-            var vw = video.videoWidth || 640
-            var vh = video.videoHeight || 480
             var cx = (box.x + box.width / 2) / vw
             var cy = (box.y + box.height / 2) / vh
             var faceW = box.width / vw
             // Face center must be: horizontally centered (20-80%), upper 70%, large enough (>9% of frame)
             var positionOk = cx > 0.20 && cx < 0.80 && cy > 0.05 && cy < 0.70 && faceW > 0.09
             if (positionOk) {
+              everDetected = true
               positionHistory.push({ cx: cx, cy: cy, t: Date.now() })
               if (positionHistory.length > 6) positionHistory.shift()
               // Softened motion gate: any minor drift over 2 samples (500ms) confirms life
@@ -335,9 +355,6 @@ export function capturePhoto() {
               motionConfirmed = false
             }
             setFaceFound(positionOk && motionConfirmed)
-            // Face confirmed: stop detecting. Nothing more to check, and the
-            // detector kept the phone busy until Capture was tapped.
-            if (positionOk && motionConfirmed) unlockCapture()
           } else {
             setFaceFound(false)
           }
@@ -412,9 +429,8 @@ export function capturePhoto() {
 
         if (isLowLight) {
           var lowOk = skinRatio > 0.10 && midSkinRatio > 0.45 && lumVar > 100
+          if (lowOk) everDetected = true
           setFaceFound(lowOk)
-          // Face found: stop checking, the phone has nothing more to do
-          if (lowOk) unlockCapture()
         } else {
           var heuristicOk = skinRatio > 0.22 && brightRatio < 0.40 && midSkinRatio > 0.55 && lumVar > 400
           if (heuristicOk) {
@@ -432,8 +448,8 @@ export function capturePhoto() {
             positionHistory = []
             motionConfirmed = false
           }
+          if (heuristicOk) everDetected = true
           setFaceFound(heuristicOk && motionConfirmed)
-          if (heuristicOk && motionConfirmed) unlockCapture()
         }
       }, 500)
     }
@@ -487,13 +503,6 @@ export function capturePhoto() {
       // Camera already closed (cancelled / captured) — nothing to detect
       if (detectionStarted || !video.isConnected) return
       detectionStarted = true
-      // iPhone: the light pixel check only. face-api runs on the GPU (WebGL),
-      // which on iPhones fought the canvas preview for the same GPU and
-      // froze the punch screen until the app was closed and reopened.
-      if (IS_IOS) {
-        startHeuristicDetection()
-        return
-      }
       await loadModels()
       // Closed while the models loaded, or they took longer than the 8s
       // unlock (Capture is already open; a detector could lock it again).
@@ -535,7 +544,9 @@ export function capturePhoto() {
       video.addEventListener('playing', startFaceDetection)
       setTimeout(startFaceDetection, 2000)
 
-      fallbackTimer = setTimeout(unlockCapture, 6000)
+      // Only when no face was found at all (e.g. the video stalled); while
+      // the detector is seeing faces it keeps running and keeps Capture live.
+      fallbackTimer = setTimeout(function () { if (!everDetected) unlockCapture() }, 6000)
       startStallWatch()
 
       autoCloseTimer = setTimeout(function () {
