@@ -28,6 +28,8 @@ async function loadModels() {
 // Deferred to browser idle time so it never competes with the initial page's
 // own critical-path network/CPU work, especially on slow connections.
 export function preloadFaceModels() {
+  // iPhones don't use face-api (see startFaceDetection), so don't load it
+  if (IS_IOS) return
   function start() { loadModels().catch(function () {}) }
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(start, { timeout: 5000 })
@@ -36,13 +38,22 @@ export function preloadFaceModels() {
   }
 }
 
-// The camera <video> is never what the user sees. iOS Safari draws a visible
-// <video> on its own layer and sometimes places that layer wrong (shifted by
-// the page scroll, not stretched to cover), which left the feed as a small
-// rectangle in one corner over a black screen. Instead every frame is painted
-// onto a normal full-screen <canvas> stacked on top, which iOS lays out like
-// any other element. Mirroring is done in the canvas drawing, not with CSS.
-function createHiddenVideo() {
+// iPhone/iPad (iPadOS reports itself as a Mac with touch)
+var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+// How the live camera is shown differs by platform.
+// Android: the <video> itself is the preview, as it was before the iPhone
+// fix below. Painting every frame onto a canvas (the iPhone fix) while face
+// detection reads the same video was too much work for phones and made the
+// punch screen freeze, and Android never had the iPhone layout bug.
+// iPhone: Safari draws a visible <video> on its own layer and sometimes
+// places that layer wrong (shifted by the page scroll, not stretched to
+// cover), which left the feed as a small rectangle in one corner over a
+// black screen. There, every frame is painted onto a normal full-screen
+// <canvas> stacked on top, which iOS lays out like any other element.
+// Mirroring is done in the canvas drawing, or with CSS on Android.
+function createHiddenVideo(mirror) {
   var video = document.createElement('video')
   video.setAttribute('playsinline', '')
   video.setAttribute('autoplay', '')
@@ -52,7 +63,8 @@ function createHiddenVideo() {
   // not be tiny or transparent: iOS Safari pauses muted videos it considers
   // invisible, which froze the preview on iPhones (the canvas kept
   // repainting the last frame).
-  video.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9997;pointer-events:none;background:#000'
+  video.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9997;pointer-events:none;background:#000' +
+    (!IS_IOS && mirror ? ';transform:scaleX(-1)' : '')
   // If iOS pauses it anyway (e.g. the app was briefly backgrounded), restart
   // it while the camera is still open.
   video.addEventListener('pause', function () {
@@ -62,21 +74,23 @@ function createHiddenVideo() {
 }
 
 function startCanvasPreview(video, mirror) {
+  // Android shows the video directly (see above): no canvas, no paint loop
+  if (!IS_IOS) return { canvas: null, stop: function () {} }
   var canvas = document.createElement('canvas')
   canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:9998;background:#000;display:block'
   var ctx = canvas.getContext('2d')
-  // 1.5x is sharp enough for a live preview and much lighter than full
-  // retina; face detection runs on the same phone at the same time.
-  var dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+  // 1x is sharp enough for a live preview and far lighter than retina;
+  // face detection runs on the same phone at the same time.
+  var dpr = 1
   var rafId = null
   var lastDraw = 0
 
   function draw(now) {
     rafId = requestAnimationFrame(draw)
-    // Cap repaints at ~30fps (the camera's own rate) instead of every screen
-    // refresh. Time-based on purpose: a live stream's currentTime doesn't
-    // reliably advance on every iOS version, so it can't be the trigger.
-    if (now - lastDraw < 30) return
+    // Cap repaints at ~25fps instead of every screen refresh. Time-based on
+    // purpose: a live stream's currentTime doesn't reliably advance on every
+    // iOS version, so it can't be the trigger.
+    if (now - lastDraw < 40) return
     var cw = Math.round(canvas.clientWidth * dpr)
     var ch = Math.round(canvas.clientHeight * dpr)
     if (!cw || !ch) return
@@ -106,9 +120,43 @@ function startCanvasPreview(video, mirror) {
   }
 }
 
+// "data:image/jpeg;base64,..." -> Blob
+function dataUrlToBlob(dataUrl) {
+  var parts = dataUrl.split(',')
+  var bin = atob(parts[1])
+  var bytes = new Uint8Array(bin.length)
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: 'image/jpeg' })
+}
+
+// getUserMedia with a time limit. On some phones it never answers (no
+// stream, no error), which left "Opening camera" spinning until the app was
+// closed. A stream that arrives after the limit is stopped straight away.
+var CAMERA_OPEN_TIMEOUT_MS = 25000
+function openCamera(constraints) {
+  return new Promise(function (resolve, reject) {
+    var done = false
+    var timer = setTimeout(function () {
+      done = true
+      reject(new Error('camera did not start — try again'))
+    }, CAMERA_OPEN_TIMEOUT_MS)
+    navigator.mediaDevices.getUserMedia(constraints).then(function (s) {
+      if (done) { s.getTracks().forEach(function (t) { t.stop() }); return }
+      done = true
+      clearTimeout(timer)
+      resolve(s)
+    }, function (err) {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      reject(err)
+    })
+  })
+}
+
 export function capturePhoto() {
   return new Promise(function (resolve, reject) {
-    var video = createHiddenVideo()
+    var video = createHiddenVideo(true)
     var preview = startCanvasPreview(video, true)
 
     // Dim-everything-outside-the-oval effect, via mask-image rather than the
@@ -204,6 +252,7 @@ export function capturePhoto() {
       var optsNormal = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.2 })
       var optsLowLight = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 })
       var detectionStart = Date.now()
+      var firstRun = true
 
       // Small canvas for cheap per-tick luminance sampling (~1ms)
       var lumCanvas = document.createElement('canvas')
@@ -219,13 +268,13 @@ export function capturePhoto() {
         if (detecting) return
         detecting = true
         detectTick().finally(function () { detecting = false })
-      }, 250)
+      }, 400)
 
       async function detectTick() {
         if (video.readyState < 2) return
 
-        // Fallback: after 8s of no detection, enable capture anyway
-        if (Date.now() - detectionStart > 8000 && !faceDetected) {
+        // Fallback: after 6s of no detection, enable capture anyway
+        if (Date.now() - detectionStart > 6000 && !faceDetected) {
           motionConfirmed = true
           setFaceFound(true)
           faceStatus.textContent = '✓ Ready — tap Capture'
@@ -252,8 +301,11 @@ export function capturePhoto() {
           var t0 = Date.now()
           var result = await faceapi.detectSingleFace(video, lowLightMode ? optsLowLight : optsNormal)
           // Too slow for this phone (each run blocks the screen): stop
-          // detecting and just let them capture.
-          if (Date.now() - t0 > 1200) {
+          // detecting and just let them capture. The first run also sets up
+          // the GPU, so it is always slow and doesn't count.
+          var slow = !firstRun && Date.now() - t0 > 1000
+          firstRun = false
+          if (slow) {
             unlockCapture()
             return
           }
@@ -283,6 +335,9 @@ export function capturePhoto() {
               motionConfirmed = false
             }
             setFaceFound(positionOk && motionConfirmed)
+            // Face confirmed: stop detecting. Nothing more to check, and the
+            // detector kept the phone busy until Capture was tapped.
+            if (positionOk && motionConfirmed) unlockCapture()
           } else {
             setFaceFound(false)
           }
@@ -356,11 +411,10 @@ export function capturePhoto() {
         var lumVar = (lumSqSum / lumValues.length) - (lumMean * lumMean)
 
         if (isLowLight) {
-          setFaceFound(
-            skinRatio > 0.10 &&
-            midSkinRatio > 0.45 &&
-            lumVar > 100
-          )
+          var lowOk = skinRatio > 0.10 && midSkinRatio > 0.45 && lumVar > 100
+          setFaceFound(lowOk)
+          // Face found: stop checking, the phone has nothing more to do
+          if (lowOk) unlockCapture()
         } else {
           var heuristicOk = skinRatio > 0.22 && brightRatio < 0.40 && midSkinRatio > 0.55 && lumVar > 400
           if (heuristicOk) {
@@ -379,6 +433,7 @@ export function capturePhoto() {
             motionConfirmed = false
           }
           setFaceFound(heuristicOk && motionConfirmed)
+          if (heuristicOk && motionConfirmed) unlockCapture()
         }
       }, 500)
     }
@@ -432,6 +487,13 @@ export function capturePhoto() {
       // Camera already closed (cancelled / captured) — nothing to detect
       if (detectionStarted || !video.isConnected) return
       detectionStarted = true
+      // iPhone: the light pixel check only. face-api runs on the GPU (WebGL),
+      // which on iPhones fought the canvas preview for the same GPU and
+      // froze the punch screen until the app was closed and reopened.
+      if (IS_IOS) {
+        startHeuristicDetection()
+        return
+      }
       await loadModels()
       // Closed while the models loaded, or they took longer than the 8s
       // unlock (Capture is already open; a detector could lock it again).
@@ -443,13 +505,13 @@ export function capturePhoto() {
       }
     }
 
-    navigator.mediaDevices.getUserMedia({
+    openCamera({
       video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     }).then(function (s) {
       stream = s
       document.body.appendChild(video)
-      document.body.appendChild(preview.canvas)
+      if (preview.canvas) document.body.appendChild(preview.canvas)
       document.body.appendChild(dimLayer)
       document.body.appendChild(overlay)
       video.srcObject = s
@@ -473,7 +535,7 @@ export function capturePhoto() {
       video.addEventListener('playing', startFaceDetection)
       setTimeout(startFaceDetection, 2000)
 
-      fallbackTimer = setTimeout(unlockCapture, 8000)
+      fallbackTimer = setTimeout(unlockCapture, 6000)
       startStallWatch()
 
       autoCloseTimer = setTimeout(function () {
@@ -524,12 +586,12 @@ export function capturePhoto() {
         var ctx = canvas.getContext('2d')
         ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH)
 
-        canvas.toBlob(function (blob) {
-          var dataUrl = canvas.toDataURL('image/jpeg', 0.6)
-          if (flash.parentNode) flash.parentNode.removeChild(flash)
-          cleanup()
-          resolve({ blob: blob, dataUrl: dataUrl })
-        }, 'image/jpeg', 0.6)
+        // Built synchronously: on some phones canvas.toBlob's callback never
+        // fired, leaving the white flash and camera stuck on screen.
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+        if (flash.parentNode) flash.parentNode.removeChild(flash)
+        cleanup()
+        resolve({ blob: dataUrlToBlob(dataUrl), dataUrl: dataUrl })
       }, 300)
     })
 
@@ -542,7 +604,7 @@ export function capturePhoto() {
 
 export function captureProxyPhoto() {
   return new Promise(function (resolve, reject) {
-    var video = createHiddenVideo()
+    var video = createHiddenVideo(false)
     var preview = startCanvasPreview(video, false)
 
     var overlay = document.createElement('div')
@@ -580,13 +642,13 @@ export function captureProxyPhoto() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay)
     }
 
-    navigator.mediaDevices.getUserMedia({
+    openCamera({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     }).then(function (s) {
       stream = s
       document.body.appendChild(video)
-      document.body.appendChild(preview.canvas)
+      if (preview.canvas) document.body.appendChild(preview.canvas)
       document.body.appendChild(overlay)
       video.srcObject = s
       var playPromise = video.play()
@@ -629,12 +691,12 @@ export function captureProxyPhoto() {
         var ctx = canvas.getContext('2d')
         ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH)
 
-        canvas.toBlob(function (blob) {
-          var dataUrl = canvas.toDataURL('image/jpeg', 0.6)
-          if (flash.parentNode) flash.parentNode.removeChild(flash)
-          cleanup()
-          resolve({ blob: blob, dataUrl: dataUrl })
-        }, 'image/jpeg', 0.6)
+        // Built synchronously: on some phones canvas.toBlob's callback never
+        // fired, leaving the white flash and camera stuck on screen.
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+        if (flash.parentNode) flash.parentNode.removeChild(flash)
+        cleanup()
+        resolve({ blob: dataUrlToBlob(dataUrl), dataUrl: dataUrl })
       }, 300)
     })
 

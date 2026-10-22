@@ -13,6 +13,9 @@ import { queuePunch, registerBackgroundSync } from '../lib/offlineQueue'
 // did reach the server after all, the queued copy is rejected there as a
 // duplicate when it syncs.
 var NETWORK_TIMEOUT_MS = 20000
+var GPS_TIMEOUT_MS = 20000
+var SESSION_TIMEOUT_MS = 8000
+var STORAGE_TIMEOUT_MS = 8000
 
 function withTimeout(promise, ms) {
   return new Promise(function (resolve, reject) {
@@ -52,10 +55,11 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
       })
     }
 
-    // Start GPS request immediately (runs in parallel with camera)
-
-    // Start GPS request immediately (runs in parallel with camera)
-    var gpsPromise = getLocation()
+    // Start GPS request immediately (runs in parallel with camera). Hard
+    // limit on top of the GPS timeout: on some phones getCurrentPosition
+    // never calls back at all, which left the punch spinning forever.
+    var gpsPromise = withTimeout(getLocation(), GPS_TIMEOUT_MS)
+    gpsPromise.catch(function () {})
 
     // Step 1: Capture selfie
     setStep('capturing')
@@ -80,7 +84,7 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     var gps
     try {
       gps = await gpsPromise
-    } catch (gpsErr) {
+    } catch {
       var proceed = await new Promise(function (resolve) {
         modalResolve.current = resolve
         setShowGpsPrompt(true)
@@ -93,10 +97,13 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
       gps = { latitude: null, longitude: null, accuracy: null, areaName: null }
     }
 
-    // Offline detection — queue locally if no network
-    if (!navigator.onLine) {
+    // Save the punch on the phone to send later. Every step has a limit:
+    // the phone's storage or the service worker can fail to answer, and an
+    // unanswered await here used to leave the spinner up until the app was
+    // closed and reopened.
+    async function saveOffline() {
       try {
-        await queuePunch({
+        await withTimeout(queuePunch({
           punchType: punchType,
           selfieBlob: photo.blob,
           selfieDataUrl: photo.dataUrl,
@@ -107,24 +114,39 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
           deviceInfo: navigator.userAgent,
           clientTimestamp: new Date().toISOString(),
           clientPunchId: clientPunchId
-        })
-        await registerBackgroundSync()
-        setStep('queued')
-        if (onComplete) onComplete({ queued: true })
-        return
-      } catch (qErr) {
-        setError('Failed to save offline: ' + qErr.message)
+        }), STORAGE_TIMEOUT_MS)
+      } catch {
+        setError(t('punch_failed_retry'))
         setStep('error')
         return
       }
+      // Background sync is a bonus; never wait long on it
+      withTimeout(registerBackgroundSync(), STORAGE_TIMEOUT_MS).catch(function () {})
+      setStep('queued')
+      if (onComplete) onComplete({ queued: true })
+    }
+
+    // Offline detection — queue locally if no network
+    if (!navigator.onLine) {
+      await saveOffline()
+      return
     }
 
     // Step 3: Upload selfie to storage
     var timestamp = Date.now()
     // getSession reads the saved login on the phone (no network round trip,
     // unlike getUser); the server still checks the token on upload / punch.
-    var { data: { session } } = await supabase.auth.getSession()
-    var user = session && session.user
+    // It can hang (Supabase's auth lock, e.g. right after the app comes back
+    // from the background), so it gets a limit too; then the punch is saved
+    // offline and sent later.
+    var user = null
+    try {
+      var sessionRes = await withTimeout(supabase.auth.getSession(), SESSION_TIMEOUT_MS)
+      user = sessionRes.data.session && sessionRes.data.session.user
+    } catch {
+      await saveOffline()
+      return
+    }
     if (!user) {
       setError('Not authenticated')
       setStep('error')
@@ -149,28 +171,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
 
     // If upload fails (network issue), queue for offline sync
     if (uploadError) {
-      try {
-        await queuePunch({
-          punchType: punchType,
-          selfieBlob: photo.blob,
-          selfieDataUrl: photo.dataUrl,
-          latitude: gps.latitude,
-          longitude: gps.longitude,
-          gpsAccuracy: gps.accuracy,
-          areaName: gps.areaName || null,
-          deviceInfo: navigator.userAgent,
-          clientTimestamp: new Date().toISOString(),
-          clientPunchId: clientPunchId
-        })
-        await registerBackgroundSync()
-        setStep('queued')
-        if (onComplete) onComplete({ queued: true })
-        return
-      } catch (qErr) {
-        setError('Network issue — try again: ' + uploadError.message)
-        setStep('error')
-        return
-      }
+      await saveOffline()
+      return
     }
 
     // Step 4: Call punch RPC
@@ -186,30 +188,10 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         p_client_punch_id: clientPunchId,
         p_location_name: gps.areaName
       }), NETWORK_TIMEOUT_MS)
-    } catch (netErr) {
-      // Network threw before reaching server — queue it
-      try {
-        await queuePunch({
-          punchType: punchType,
-          selfieBlob: photo.blob,
-          selfieDataUrl: photo.dataUrl,
-          latitude: gps.latitude,
-          longitude: gps.longitude,
-          gpsAccuracy: gps.accuracy,
-          areaName: gps.areaName || null,
-          deviceInfo: navigator.userAgent,
-          clientTimestamp: new Date().toISOString(),
-          clientPunchId: clientPunchId
-        })
-        await registerBackgroundSync()
-        setStep('queued')
-        if (onComplete) onComplete({ queued: true })
-        return
-      } catch (qErr) {
-        setError('Network issue — try again')
-        setStep('error')
-        return
-      }
+    } catch {
+      // Network threw (or timed out) before reaching the server — queue it
+      await saveOffline()
+      return
     }
 
     var data = rpcResult.data
