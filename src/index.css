@@ -50,13 +50,12 @@ input::-ms-clear {
 
 /* ── Mobile app: warm cream background + neumorphism ─────────────────────
    The staff app sits on a warm cream base with large soft colour washes in
-   the corners (lavender, rose, sage, honey). Surfaces are neumorphic (see
+   the corners (lavender, rose, sage, honey). Surfaces are flat (see
    below). */
 :root {
-  --neu-surface: #f8f6f3;
-  --neu-inset: #fcfbf9;
-  --neu-dark: rgba(120, 102, 80, 0.38);
-  --neu-light: rgba(255, 255, 255, 1);
+  --neu-surface: #ffffff;
+  --neu-inset: #f5f3ef;
+  --neu-line: rgba(120, 100, 80, 0.12);
 }
 
 .app-gradient {
@@ -68,37 +67,39 @@ input::-ms-clear {
     linear-gradient(170deg, #fbfaf8 0%, #ffffff 50%, #faf8f5 100%);
 }
 
-/* Neumorphic surfaces: the same warm tone as the background, lifted by a
-   white highlight top-left and a soft warm shadow bottom-right (raised), or
-   the same two shadows inset (pressed in). Note: these set box-shadow, so
-   Tailwind ring-* utilities don't show on them; use outline-* instead. */
+/* Flat surfaces (the class names are from the earlier neumorphic look):
+   white cards with a hairline border and a barely-there shadow, light grey
+   wells for inputs and selected items, and buttons that just tint when
+   pressed. Note: these set box-shadow, so Tailwind ring-* utilities don't
+   show on them; use outline-* instead. */
 
-/* Raised card */
+/* Card */
 .neu {
   background: var(--neu-surface);
-  box-shadow: 7px 7px 16px var(--neu-dark), -7px -7px 16px var(--neu-light);
+  border: 1px solid var(--neu-line);
+  box-shadow: 0 1px 2px rgba(60, 45, 30, 0.04);
 }
 
-/* Smaller raised element: chips, small buttons, icon tiles */
+/* Small element: chips, small buttons, icon tiles */
 .neu-sm {
   background: var(--neu-surface);
-  box-shadow: 4px 4px 9px var(--neu-dark), -4px -4px 9px var(--neu-light);
+  border: 1px solid var(--neu-line);
 }
 
-/* Pressed in: inputs, active tab, selected chips, inner wells */
+/* Well: inputs, active tab, selected chips, inner boxes */
 .neu-inset {
   background: var(--neu-inset);
-  box-shadow: inset 2px 2px 5px rgba(120, 102, 80, 0.18), inset -2px -2px 5px var(--neu-light);
+  border: 1px solid var(--neu-line);
 }
 
-/* Raised button that presses in when tapped */
+/* Button that tints when tapped */
 .neu-press {
   background: var(--neu-surface);
-  box-shadow: 4px 4px 9px var(--neu-dark), -4px -4px 9px var(--neu-light);
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  border: 1px solid var(--neu-line);
+  transition: background-color 0.15s ease, transform 0.15s ease;
 }
 .neu-press:active {
-  box-shadow: inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light);
+  background: var(--neu-inset);
   transform: scale(0.985);
 }
 

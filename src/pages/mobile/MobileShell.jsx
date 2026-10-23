@@ -66,7 +66,7 @@ export default function MobileShell() {
   var tabs = ALL_TABS.filter(function (tab) { return allowed.includes(tab.tabId) })
 
   return (
-    <div className="mobile-theme relative min-h-screen pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+    <div className="mobile-theme relative min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))]">
       {/* Warm cream background with soft corner washes (fixed so it doesn't scroll) */}
       <div aria-hidden="true" className="app-gradient fixed inset-0 z-0 pointer-events-none" />
 
@@ -110,8 +110,8 @@ export default function MobileShell() {
           neumorphic glow: that glow showed as a white haze over content
           scrolling underneath. */}
       <nav className="fixed bottom-0 left-0 right-0 z-40">
-        <div className="max-w-lg mx-auto rounded-t-2xl bg-(--neu-surface) shadow-[0_-6px_18px_-8px_rgba(120,102,80,0.35)] pb-[env(safe-area-inset-bottom)]">
-          <div className="flex justify-around items-stretch h-16 px-1">
+        <div className="max-w-lg mx-auto rounded-t-2xl bg-(--neu-surface) shadow-[0_-6px_18px_-8px_rgba(120,102,80,0.35)] pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+          <div className="flex justify-around items-stretch h-14 px-1">
           {tabs.map(function (tab) {
             return (
               <NavLink
@@ -119,18 +119,18 @@ export default function MobileShell() {
                 to={tab.to}
                 end={tab.to === '/'}
                 className={function ({ isActive }) {
-                  return 'relative flex-1 flex flex-col items-center justify-center gap-1 transition-colors ' +
+                  return 'relative flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 transition-colors ' +
                     (isActive ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800')
                 }}
               >
                 {function ({ isActive }) {
                   return (
                     <>
-                      <span className={'w-10 h-8 rounded-xl inline-flex items-center justify-center transition-all ' +
+                      <span className={'w-9 h-7 rounded-lg inline-flex items-center justify-center transition-all ' +
                         (isActive ? 'neu-inset' : '')}>
-                        <TabIcon name={tab.tabId} className="w-5 h-5" />
+                        <TabIcon name={tab.tabId} className="w-[18px] h-[18px]" />
                       </span>
-                      <span className={'text-[11px] ' + (isActive ? 'font-semibold' : 'font-medium')}>{t(tab.key)}</span>
+                      <span className={'text-[10px] leading-tight truncate max-w-full ' + (isActive ? 'font-semibold' : 'font-medium')}>{t(tab.key)}</span>
                     </>
                   )
                 }}

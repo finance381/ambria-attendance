@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useLanguage } from '../../lib/i18n'
 
@@ -24,6 +24,10 @@ var STATUS_DOT_COLORS = {
   Incomplete: 'text-amber-500'
 }
 
+// Months already built this session ("<user>:2026-10" -> day map), so reopening
+// the tab or a month shows the calendar at once while it refreshes.
+var monthCache = {}
+
 export default function MyAttendance() {
   var now = new Date()
   var [year, setYear] = useState(now.getFullYear())
@@ -36,51 +40,61 @@ export default function MyAttendance() {
   var [filter, setFilter] = useState(null)
   function toggleFilter(status) { setFilter(filter === status ? null : status) }
 
+  // Only the latest request may update the screen (fast month switching)
+  var requestId = useRef(0)
+
   var loadMonth = useCallback(async function () {
-    setLoading(true)
+    var myRequest = ++requestId.current
     setSelectedDay(null)
     setFilter(null)
+
+    // The saved login on the phone (no network round trip, unlike getUser)
+    var { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setLoading(false); return }
+    var userId = session.user.id
+
+    // Cached per person, so a different login on the same phone never sees it
+    var cacheKey = userId + ':' + year + '-' + month
+    if (monthCache[cacheKey]) {
+      setDays(monthCache[cacheKey])
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
 
     var startDate = year + '-' + String(month).padStart(2, '0') + '-01'
     var endDay = new Date(year, month, 0).getDate()
     var endDate = year + '-' + String(month).padStart(2, '0') + '-' + String(endDay).padStart(2, '0')
 
-    // Get user once
-    var { data: { user } } = await supabase.auth.getUser()
-    var userId = user.id
+    // Everything the calendar needs, fetched in parallel (these used to run
+    // one after another, so a slow network added up six waits)
+    var results = await Promise.all([
+      supabase
+        .from('punches')
+        .select('attendance_date, punch_type, punched_at, nearest_venue_id')
+        .eq('employee_id', userId)
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate)
+        .order('punched_at'),
+      supabase
+        .from('attendance_overrides')
+        .select('attendance_date, override_type, override_value')
+        .eq('employee_id', userId)
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate),
+      supabase.from('app_config').select('value').eq('key', 'half_day_threshold_hours').maybeSingle(),
+      supabase.from('app_config').select('value').eq('key', 'absent_threshold_hours').maybeSingle(),
+      supabase.from('employees').select('date_of_joining').eq('id', userId).maybeSingle()
+    ])
+    // A newer month was opened meanwhile: drop this result
+    if (myRequest !== requestId.current) return
 
-    // Get all my punches for this month
-    var { data: punches } = await supabase
-      .from('punches')
-      .select('attendance_date, punch_type, punched_at, nearest_venue_id')
-      .eq('employee_id', userId)
-      .gte('attendance_date', startDate)
-      .lte('attendance_date', endDate)
-      .order('punched_at')
-
-    // Get overrides
-    var { data: overrides } = await supabase
-      .from('attendance_overrides')
-      .select('attendance_date, override_type, override_value')
-      .eq('employee_id', userId)
-      .gte('attendance_date', startDate)
-      .lte('attendance_date', endDate)
-
-    // Get config
-    var { data: halfConfig } = await supabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'half_day_threshold_hours')
-      .maybeSingle()
-
+    var punches = results[0].data
+    var overrides = results[1].data
+    var halfConfig = results[2].data
+    var absentConfig = results[3].data
+    var empData = results[4].data
     var halfThreshold = halfConfig ? parseFloat(halfConfig.value) : 4
-
-    var { data: absentConfig } = await supabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'absent_threshold_hours')
-      .maybeSingle()
-
     var absentThreshold = absentConfig ? parseFloat(absentConfig.value) : 0.5
 
     // Build day map
@@ -152,12 +166,6 @@ export default function MyAttendance() {
     })
 
     // Fill absent for past working days with no punches
-    var { data: empData } = await supabase
-      .from('employees')
-      .select('date_of_joining')
-      .eq('id', userId)
-      .maybeSingle()
-
     var joiningDate = empData && empData.date_of_joining ? empData.date_of_joining : null
 
     for (var day = 1; day <= endDay; day++) {
@@ -168,6 +176,8 @@ export default function MyAttendance() {
       }
     }
 
+    // Keep the cached copy unless this load failed (punches query errored)
+    if (!results[0].error) monthCache[cacheKey] = dayMap
     setDays(dayMap)
     setLoading(false)
   }, [year, month])

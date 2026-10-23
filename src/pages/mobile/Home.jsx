@@ -131,9 +131,6 @@ export default function Home() {
   
   var isPunchedIn = status && status.is_punched_in
   var punchType = isPunchedIn ? 'out' : 'in'
-  // Venue of the latest punch-in today, shown under "Punched In"
-  var lastInVenue = null
-  punches.forEach(function (p) { if (p.punch_type === 'in' && p.nearest_venue) lastInVenue = p.nearest_venue })
 
   return (
     <div>
@@ -191,51 +188,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* Status card: status on the left, since-when on the right */}
-      <div className="neu rounded-2xl mb-4 flex">
-        <div className="flex-1 min-w-0 px-4 py-4">
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('home_current_status')}</p>
-          <div className="flex items-center gap-2.5 mt-2.5">
-            <span className={'w-6 h-6 rounded-full shrink-0 ring-4 ' +
-              (isPunchedIn ? 'bg-emerald-500 ring-emerald-100' : 'bg-gray-300 ring-gray-100')} />
-            <p className={'text-[22px] font-bold leading-tight ' + (isPunchedIn ? 'text-emerald-600' : 'text-gray-500')}>
-              {isPunchedIn ? t('home_punched_in') : t('home_not_punched_in')}
-            </p>
-          </div>
-          {isPunchedIn && lastInVenue && (
-            <p className="flex items-center gap-1 text-[13px] text-gray-600 mt-2 pl-0.5">
-              <HomeIcon name="pin" className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span className="truncate">{lastInVenue}</span>
-            </p>
-          )}
-        </div>
-        {status && status.last_in && (
-          <div className="shrink-0 px-4 py-4 border-l border-slate-300/60 flex flex-col justify-center">
-            <p className="flex items-center gap-1.5 text-[13px] text-gray-600">
-              <HomeIcon name="clock" className="w-4 h-4 text-gray-700" />
-              {t('home_since')}
-            </p>
-            <p className="text-[22px] font-bold text-gray-900 leading-tight tabular-nums mt-1.5">{formatTime(status.last_in)}</p>
-            {status.sessions_today > 0 && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                {status.sessions_today} {status.sessions_today > 1 ? t('home_sessions_plural') : t('home_sessions')} {t('home_today_word')}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Punch button */}
-      <div className="mb-6">
-        <PunchCapture
-          punchType={punchType}
-          onComplete={handlePunchComplete}
-        />
-      </div>
-
       {/* Today's punches */}
       {punches.length > 0 && (
-        <div>
+        <div className="mb-5">
           <div className="flex items-center justify-between mb-2.5">
             <h3 className="flex items-center gap-2 text-base font-bold text-gray-900">
               {t('home_today_punches')}
@@ -279,6 +234,14 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Punch button */}
+      <div>
+        <PunchCapture
+          punchType={punchType}
+          onComplete={handlePunchComplete}
+        />
+      </div>
     </div>
   )
 }
