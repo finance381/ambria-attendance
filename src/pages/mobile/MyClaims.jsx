@@ -240,7 +240,7 @@ export default function MyClaims() {
                     <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">Punch Out</label>
                     {existingOut ? (
                       <input type="time" value={formOutTime} onChange={function (e) { setFormOutTime(e.target.value) }}
-                        className="w-full h-11 px-3 border-0 neu-inset rounded-xl text-base font-mono text-emerald-700 outline-none focus:outline-2 focus:outline-blue-400/60" />
+                        className="w-full h-11 px-3 border-0 neu-inset rounded-xl text-base font-mono text-red-600 outline-none focus:outline-2 focus:outline-blue-400/60" />
                     ) : pendingOut ? (
                       <div className="h-11 px-3 flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700 font-mono">
                         <MiniIcon name="hourglass" className="w-3.5 h-3.5" /> <span className="text-[10px] font-sans">claim pending</span>
