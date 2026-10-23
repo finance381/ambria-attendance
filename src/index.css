@@ -142,6 +142,22 @@ input::-ms-clear {
   --color-gray-900: #1f1b17;
 }
 
+/* Date / time inputs: iOS Safari gives them a fixed built-in width that
+   ignores width:100%, so in a card they stuck out past the right edge.
+   Dropping the native look lets them size like any other input; the value
+   is kept left-aligned like the other fields. */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* Slim scrollbar for lists that scroll inside a card (admin live feed) */
 .thin-scroll {
   scrollbar-width: thin;
