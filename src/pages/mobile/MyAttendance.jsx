@@ -240,7 +240,7 @@ export default function MyAttendance() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 min-[370px]:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-4 gap-1.5 min-[370px]:gap-2 mb-4">
         <MiniStat label={t('attendance_present')} value={stats.Present} color="text-emerald-600"
           active={filter === 'Present'} onClick={function () { toggleFilter('Present') }} />
         <MiniStat label={t('attendance_half_day')} value={stats['Half Day']} color="text-orange-500"
@@ -376,11 +376,14 @@ function MiniStat({ label, value, color, active, onClick }) {
   return (
     <Tag onClick={onClick} aria-pressed={onClick ? !!active : undefined}
       className={'min-w-0 rounded-2xl px-1.5 py-3 text-center transition-all ' + (active ? 'neu-on' : onClick ? 'neu-press' : 'neu')}>
-      <p className={'text-[11px] truncate ' + (active ? 'font-semibold text-gray-800' : 'font-medium text-gray-500')}>{label}</p>
-      {/* Longer numbers (e.g. 147.3 hours) drop a size so they always fit
-          whole; the fixed height keeps every card the same height */}
+      {/* Always four in a row: on narrow screens (small phones, or Android
+          with a large font size, which zooms the page) the text scales down
+          with the screen width so it still fits; on a normal phone it tops
+          out at the usual sizes. Longer numbers (147.3 hours) use a smaller
+          scale; the fixed height keeps the cards level. */}
+      <p className={'text-[clamp(9px,2.8vw,11px)] truncate ' + (active ? 'font-semibold text-gray-800' : 'font-medium text-gray-500')}>{label}</p>
       <p className={'h-8 mt-1 flex items-center justify-center font-bold tabular-nums whitespace-nowrap tracking-tight ' +
-        (String(value).length > 3 ? 'text-lg' : 'text-2xl') + ' ' + (color || 'text-gray-900')}>{value}</p>
+        (String(value).length > 3 ? 'text-[clamp(12px,4.6vw,18px)]' : 'text-[clamp(15px,6.2vw,24px)]') + ' ' + (color || 'text-gray-900')}>{value}</p>
     </Tag>
   )
 }
