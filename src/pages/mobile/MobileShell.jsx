@@ -84,10 +84,11 @@ export default function MobileShell() {
           Hub shows as an icon only. */}
       {/* When the status bar floats over the page (e.g. opened inside the
           Hub, which launches with a translucent status bar), iOS blurs a
-          band ~30pt below it. The top padding then grows to 1.6x the
-          status-bar inset so the header's text sits below that blur. In our
+          band ~30pt below it, strongest near the bar. The top padding then
+          grows to 1.35x the status-bar inset so the header's text clears the
+          strong part of that blur without a big empty gap. In our
           own app and on Android the inset is 0, so nothing changes. */}
-      <header className="sticky top-0 z-30 bg-white border-b border-(--neu-line) pt-[calc(env(safe-area-inset-top)*1.6)]">
+      <header className="sticky top-0 z-30 bg-white border-b border-(--neu-line) pt-[calc(env(safe-area-inset-top)*1.35)]">
         <div className="max-w-lg mx-auto flex items-center justify-between gap-2 text-slate-800 px-4 py-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-700/25">
