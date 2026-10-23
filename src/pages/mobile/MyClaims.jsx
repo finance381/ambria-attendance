@@ -293,7 +293,7 @@ export default function MyClaims() {
                       (c.claim_type === 'missed_in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
                       {c.claim_type === 'missed_in' ? t('claims_missed_in_short') : t('claims_missed_out_short')}
                     </span>
-                    <span className="text-xs text-gray-500">{c.attendance_date}</span>
+                    <span className={'text-xs ' + (c.claim_type === 'missed_in' ? 'text-gray-500' : 'font-semibold text-red-600')}>{c.attendance_date}</span>
                   </div>
                   <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' +
                     (STATUS_COLORS[c.status] || 'bg-gray-100 text-gray-500')}>
