@@ -24,6 +24,35 @@ async function loadModels() {
   }
 }
 
+// The detector's first run sets up the GPU (compiles its shaders), which
+// blocks the page for about a second. Done once per session on a blank
+// frame while the camera is starting, so it never freezes the live preview.
+var warmedUp = false
+var warming = null
+function warmUpDetector() {
+  if (warmedUp) return Promise.resolve()
+  if (warming) return warming
+  warming = (async function () {
+    // Models normally preloaded after login; if not, wait for them, but
+    // never hold the camera back more than 1.5s on a slow network
+    if (!modelsLoaded) {
+      await Promise.race([loadModels(), new Promise(function (r) { setTimeout(r, 1500) })])
+      if (!modelsLoaded) { warming = null; return }
+    }
+    try {
+      var c = document.createElement('canvas')
+      c.width = 160
+      c.height = 160
+      var ctx = c.getContext('2d')
+      ctx.fillStyle = '#888'
+      ctx.fillRect(0, 0, 160, 160)
+      await faceapi.detectSingleFace(c, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.2 }))
+    } catch { /* a failed warm-up just means the first real run is slower */ }
+    warmedUp = true
+  })()
+  return warming
+}
+
 // Preload — call from App after login so the camera opens instantly first time.
 // Deferred to browser idle time so it never competes with the initial page's
 // own critical-path network/CPU work, especially on slow connections.
@@ -514,10 +543,16 @@ export function capturePhoto() {
       }
     }
 
-    openCamera({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-      audio: false
-    }).then(function (s) {
+    // The detector warm-up runs while the camera hardware starts (the
+    // "Opening camera" spinner is up anyway); the preview appears after both
+    Promise.all([
+      openCamera({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      }),
+      warmUpDetector()
+    ]).then(function (res) {
+      var s = res[0]
       stream = s
       document.body.appendChild(video)
       if (preview.canvas) document.body.appendChild(preview.canvas)
