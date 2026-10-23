@@ -66,7 +66,7 @@ export default function MobileShell() {
   var tabs = ALL_TABS.filter(function (tab) { return allowed.includes(tab.tabId) })
 
   return (
-    <div className="mobile-theme relative min-h-screen pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+    <div className="mobile-theme relative min-h-screen pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       {/* Warm cream background with soft corner washes (fixed so it doesn't scroll) */}
       <div aria-hidden="true" className="app-gradient fixed inset-0 z-0 pointer-events-none" />
 
@@ -104,10 +104,14 @@ export default function MobileShell() {
         </PullToRefresh>
       </main>
 
-      {/* Bottom tabs: a raised neumorphic bar; the active tab's icon sits in a
-          pressed-in well, in blue */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <div className="neu flex justify-around items-stretch h-17 max-w-lg mx-auto rounded-2xl px-1">
+      {/* Bottom tabs: a bar sitting on the bottom edge (it fills the iPhone
+          home-indicator strip too); the active tab's icon sits in a
+          pressed-in well, in blue. Only a soft upward shadow, no white
+          neumorphic glow: that glow showed as a white haze over content
+          scrolling underneath. */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40">
+        <div className="max-w-lg mx-auto rounded-t-2xl bg-(--neu-surface) shadow-[0_-6px_18px_-8px_rgba(120,102,80,0.35)] pb-[env(safe-area-inset-bottom)]">
+          <div className="flex justify-around items-stretch h-16 px-1">
           {tabs.map(function (tab) {
             return (
               <NavLink
@@ -133,6 +137,7 @@ export default function MobileShell() {
               </NavLink>
             )
           })}
+          </div>
         </div>
       </nav>
     </div>
