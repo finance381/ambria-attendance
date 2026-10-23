@@ -74,8 +74,8 @@ export default function MobileShell() {
   var tabs = ALL_TABS.filter(function (tab) { return allowed.includes(tab.tabId) })
 
   return (
-    <div className="mobile-theme relative min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))]">
-      {/* Warm cream background with soft corner washes (fixed so it doesn't scroll) */}
+    <div className="mobile-theme relative min-h-dvh pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      {/* Plain white background (fixed so it doesn't scroll) */}
       <div aria-hidden="true" className="app-gradient fixed inset-0 z-0 pointer-events-none" />
 
       {/* Header: a full-width bar, so content scrolling under it never

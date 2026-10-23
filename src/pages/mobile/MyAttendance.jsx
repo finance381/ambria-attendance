@@ -375,9 +375,12 @@ function MiniStat({ label, value, color, active, onClick }) {
   var Tag = onClick ? 'button' : 'div'
   return (
     <Tag onClick={onClick} aria-pressed={onClick ? !!active : undefined}
-      className={'rounded-2xl px-2 py-3 text-center transition-all ' + (active ? 'neu-on' : onClick ? 'neu-press' : 'neu')}>
+      className={'min-w-0 rounded-2xl px-1.5 py-3 text-center transition-all ' + (active ? 'neu-on' : onClick ? 'neu-press' : 'neu')}>
       <p className={'text-[11px] truncate ' + (active ? 'font-semibold text-gray-800' : 'font-medium text-gray-500')}>{label}</p>
-      <p className={'text-2xl font-bold mt-1 tabular-nums truncate ' + (color || 'text-gray-900')}>{value}</p>
+      {/* Longer numbers (e.g. 147.3 hours) drop a size so they always fit
+          whole; the fixed height keeps every card the same height */}
+      <p className={'h-8 mt-1 flex items-center justify-center font-bold tabular-nums whitespace-nowrap tracking-tight ' +
+        (String(value).length > 3 ? 'text-lg' : 'text-2xl') + ' ' + (color || 'text-gray-900')}>{value}</p>
     </Tag>
   )
 }

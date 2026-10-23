@@ -39,6 +39,10 @@ body {
   /* Scroll yes, pinch-zoom / double-tap zoom no (paired with the gesture
      guard in main.jsx). */
   touch-action: pan-x pan-y;
+  /* No iOS rubber-band bounce: a short page (Home) stays put instead of
+     sliding when dragged. Pull-to-refresh is our own touch code, so it
+     still works. */
+  overscroll-behavior-y: none;
 }
 
 /* Edge/IE draw their own reveal eye inside password boxes; the login page
@@ -48,10 +52,9 @@ input::-ms-clear {
   display: none;
 }
 
-/* ── Mobile app: warm cream background + neumorphism ─────────────────────
-   The staff app sits on a warm cream base with large soft colour washes in
-   the corners (lavender, rose, sage, honey). Surfaces are flat (see
-   below). */
+/* ── Mobile app surfaces ──────────────────────────────────────────────────
+   The staff app sits on a plain white background; cards are white with a
+   hairline border (see below). */
 :root {
   --neu-surface: #ffffff;
   --neu-inset: #ffffff;
@@ -59,12 +62,7 @@ input::-ms-clear {
 }
 
 .app-gradient {
-  background:
-    radial-gradient(60% 35% at 0% 0%, rgba(200, 186, 240, 0.35) 0%, rgba(200, 186, 240, 0) 70%),
-    radial-gradient(55% 32% at 100% 10%, rgba(244, 196, 196, 0.28) 0%, rgba(244, 196, 196, 0) 70%),
-    radial-gradient(60% 35% at 0% 100%, rgba(200, 214, 190, 0.3) 0%, rgba(200, 214, 190, 0) 70%),
-    radial-gradient(60% 35% at 100% 100%, rgba(240, 214, 170, 0.3) 0%, rgba(240, 214, 170, 0) 70%),
-    linear-gradient(170deg, #fbfaf8 0%, #ffffff 50%, #faf8f5 100%);
+  background: #ffffff;
 }
 
 /* Flat surfaces (the class names are from the earlier neumorphic look):
