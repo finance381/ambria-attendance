@@ -50,14 +50,14 @@ export default function Settings() {
             {employee.name.charAt(0)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-lg font-bold text-gray-900 truncate leading-tight">{employee.name}</p>
+            <p className="text-lg font-bold text-gray-900 leading-tight line-clamp-2 wrap-break-word">{employee.name}</p>
             <p className="text-sm text-gray-500 truncate mt-0.5">{employee.designation || employee.role}</p>
           </div>
           <span className="shrink-0 text-[11px] font-semibold capitalize px-2.5 py-1 rounded-full neu-inset text-blue-700">
             {employee.role}
           </span>
         </div>
-        <div className="grid grid-cols-2 border-t border-slate-300/50 divide-x divide-slate-300/50">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 border-t border-slate-300/50 divide-y min-[360px]:divide-y-0 min-[360px]:divide-x divide-slate-300/50">
           <InfoCell icon="id" label={t('settings_emp_code')} value={employee.emp_code} />
           <InfoCell icon="phone" label={t('settings_phone')} value={employee.phone || '—'} />
         </div>
@@ -204,7 +204,7 @@ function LeaveBalance() {
     ? Math.max(0, Math.round((data.leaves_remaining / effectiveTotal) * 100))
     : 0
   var barColor = pct > 40 ? 'bg-emerald-500' : pct > 15 ? 'bg-amber-500' : 'bg-red-500'
-  var fyLabel = data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(0, 4)
+  var fyLabel = data.fy_start.slice(0, 4) + '–' + data.fy_end.slice(2, 4)
 
   var total = data.annual_leaves + (data.continue_credits_earned || 0)
   var ringColor = pct > 40 ? '#10b981' : pct > 15 ? '#f59e0b' : '#ef4444'
@@ -218,9 +218,9 @@ function LeaveBalance() {
           <span className="w-9 h-9 rounded-xl neu-sm text-emerald-600 inline-flex items-center justify-center">
             <SIcon name="calendar" className="w-[18px] h-[18px]" />
           </span>
-          <p className="text-base font-bold text-gray-900">{t('settings_leave_balance')}</p>
+          <p className="text-base font-bold text-gray-900 leading-tight">{t('settings_leave_balance')}</p>
         </div>
-        <span className="text-[11px] font-semibold text-slate-600 neu-inset px-2 py-1 rounded-lg">{t('settings_fy')} {fyLabel}</span>
+        <span className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-slate-600 neu-inset px-2 py-1 rounded-lg">{t('settings_fy')} {fyLabel}</span>
       </div>
 
       {isMonthly && (
@@ -262,7 +262,7 @@ function LeaveBalance() {
       </div>
 
       {(showQuarter || showHalf) && (
-        <div className={'grid gap-2.5 mt-4 ' + (showQuarter && showHalf ? 'grid-cols-2' : 'grid-cols-1')}>
+        <div className={'grid gap-2.5 mt-4 ' + (showQuarter && showHalf ? 'grid-cols-1 min-[360px]:grid-cols-2' : 'grid-cols-1')}>
           {showQuarter && (
             <MiniBalance
               title={data.quarter_label + ' ' + (t('settings_quarterly') || 'Quarterly')}

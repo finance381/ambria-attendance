@@ -8,7 +8,7 @@
 // Header, page and tab bar share one phone-width column (max-w-lg), so on a
 // laptop the app stays a centred phone-sized layout instead of stretching.
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../lib/useAuth'
 import { refreshPushSubscription } from '../../lib/pushRefresh'
@@ -62,6 +62,14 @@ export default function MobileShell() {
     }
   }, [location.pathname, navigate])
 
+  // Keep the open tab in view when the tab bar scrolls (many tabs)
+  var tabBarRef = useRef(null)
+  useEffect(function () {
+    var bar = tabBarRef.current
+    var active = bar && bar.querySelector('[aria-current="page"]')
+    if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [location.pathname])
+
   var allowed = employee.visible_tabs || DEFAULT_TABS[employee.role] || DEFAULT_TABS.staff
   var tabs = ALL_TABS.filter(function (tab) { return allowed.includes(tab.tabId) })
 
@@ -70,9 +78,12 @@ export default function MobileShell() {
       {/* Warm cream background with soft corner washes (fixed so it doesn't scroll) */}
       <div aria-hidden="true" className="app-gradient fixed inset-0 z-0 pointer-events-none" />
 
-      {/* Header: a raised neumorphic bar */}
-      <header className="sticky top-0 z-30 px-3 pt-[calc(0.5rem+env(safe-area-inset-top))]">
-        <div className="neu max-w-lg mx-auto flex items-center justify-between gap-3 rounded-2xl text-slate-800 px-3 py-2.5">
+      {/* Header: a full-width bar, so content scrolling under it never
+          peeks out around its edges. On narrow screens (small phones, or a
+          large system font size, which zooms the page) it tightens up and
+          Hub shows as an icon only. */}
+      <header className="sticky top-0 z-30 bg-white/95 border-b border-(--neu-line) pt-[env(safe-area-inset-top)]">
+        <div className="max-w-lg mx-auto flex items-center justify-between gap-2 text-slate-800 px-4 py-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-700/25">
               <span className="text-sm font-bold">A</span>
@@ -82,17 +93,17 @@ export default function MobileShell() {
               <p className="text-[11px] text-slate-500 truncate">{employee.name} · {employee.designation || employee.role}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <NavLink to="/settings" aria-label={t('settings_title')}
               className="neu-press w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-600 hover:text-blue-600">
               <TabIcon name="settings" className="w-4 h-4" />
             </NavLink>
-            <a href="/"
-              className="neu-press h-8 px-2 inline-flex items-center gap-1 rounded-lg text-slate-600 text-xs font-semibold no-underline hover:text-blue-600">
+            <a href="/" aria-label="Hub"
+              className="neu-press h-8 min-w-8 px-2 max-[380px]:px-0 inline-flex items-center justify-center gap-1 rounded-lg text-slate-600 text-xs font-semibold no-underline hover:text-blue-600">
               <TabIcon name="home" className="w-3.5 h-3.5" />
-              Hub
+              <span className="max-[380px]:hidden">Hub</span>
             </a>
-            <LanguageToggle className="neu-press h-8 px-2.5 text-xs font-bold rounded-lg text-slate-600 hover:text-blue-600 tracking-wide" />
+            <LanguageToggle className="neu-press h-8 px-2 text-xs font-bold rounded-lg text-slate-600 hover:text-blue-600" />
           </div>
         </div>
       </header>
@@ -111,7 +122,9 @@ export default function MobileShell() {
           scrolling underneath. */}
       <nav className="fixed bottom-0 left-0 right-0 z-40">
         <div className="max-w-lg mx-auto rounded-t-2xl bg-(--neu-surface) shadow-[0_-6px_18px_-8px_rgba(120,102,80,0.35)] pb-[max(0.375rem,env(safe-area-inset-bottom))]">
-          <div className="flex justify-around items-stretch h-14 px-1">
+          {/* Each tab gets at least 60px; with too many tabs for the screen
+              the bar scrolls sideways instead of cutting the names */}
+          <div ref={tabBarRef} className="flex items-stretch h-14 px-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map(function (tab) {
             return (
               <NavLink
@@ -119,7 +132,7 @@ export default function MobileShell() {
                 to={tab.to}
                 end={tab.to === '/'}
                 className={function ({ isActive }) {
-                  return 'relative flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 transition-colors ' +
+                  return 'relative flex-1 shrink-0 min-w-[60px] flex flex-col items-center justify-center gap-0.5 transition-colors ' +
                     (isActive ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800')
                 }}
               >
@@ -127,7 +140,7 @@ export default function MobileShell() {
                   return (
                     <>
                       <span className={'w-9 h-7 rounded-lg inline-flex items-center justify-center transition-all ' +
-                        (isActive ? 'neu-inset' : '')}>
+                        (isActive ? 'neu-on' : '')}>
                         <TabIcon name={tab.tabId} className="w-[18px] h-[18px]" />
                       </span>
                       <span className={'text-[10px] leading-tight truncate max-w-full ' + (isActive ? 'font-semibold' : 'font-medium')}>{t(tab.key)}</span>

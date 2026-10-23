@@ -240,7 +240,7 @@ export default function MyAttendance() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 min-[370px]:grid-cols-4 gap-2 mb-4">
         <MiniStat label={t('attendance_present')} value={stats.Present} color="text-emerald-600"
           active={filter === 'Present'} onClick={function () { toggleFilter('Present') }} />
         <MiniStat label={t('attendance_half_day')} value={stats['Half Day']} color="text-orange-500"
@@ -290,7 +290,7 @@ export default function MyAttendance() {
                       (isFuture ? 'text-gray-400 cursor-default' + (filter ? ' opacity-40' : '') :
                        matches ? STATUS_HILITE[status] + (isSelected ? ' outline-2 outline-blue-500' : '') :
                        faded ? 'text-gray-800 opacity-25' :
-                       isSelected ? 'neu-inset text-blue-600' :
+                       isSelected ? 'neu-on text-blue-600' :
                        isToday ? 'neu-sm text-blue-600' :
                        'text-gray-800 hover:bg-white/40')
                     }
@@ -375,9 +375,9 @@ function MiniStat({ label, value, color, active, onClick }) {
   var Tag = onClick ? 'button' : 'div'
   return (
     <Tag onClick={onClick} aria-pressed={onClick ? !!active : undefined}
-      className={'rounded-2xl px-2 py-3 text-center transition-all ' + (active ? 'neu-inset' : onClick ? 'neu-press' : 'neu')}>
+      className={'rounded-2xl px-2 py-3 text-center transition-all ' + (active ? 'neu-on' : onClick ? 'neu-press' : 'neu')}>
       <p className={'text-[11px] truncate ' + (active ? 'font-semibold text-gray-800' : 'font-medium text-gray-500')}>{label}</p>
-      <p className={'text-2xl font-bold mt-1 tabular-nums ' + (color || 'text-gray-900')}>{value}</p>
+      <p className={'text-2xl font-bold mt-1 tabular-nums truncate ' + (color || 'text-gray-900')}>{value}</p>
     </Tag>
   )
 }

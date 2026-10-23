@@ -283,17 +283,17 @@ export default function DeptAttendance() {
       <div className="flex gap-1 neu rounded-2xl p-1.5 mb-4">
         <button onClick={function () { setView('daily') }}
           className={'flex-1 py-1.5 text-xs font-semibold rounded-xl transition-colors ' +
-            (view === 'daily' ? 'neu-inset text-blue-600' : 'text-gray-600')}>
+            (view === 'daily' ? 'neu-on text-blue-600' : 'text-gray-600')}>
           Daily
         </button>
         <button onClick={function () { setView('monthly') }}
           className={'flex-1 py-1.5 text-xs font-semibold rounded-xl transition-colors ' +
-            (view === 'monthly' ? 'neu-inset text-blue-600' : 'text-gray-600')}>
+            (view === 'monthly' ? 'neu-on text-blue-600' : 'text-gray-600')}>
           Monthly
         </button>
         <button onClick={function () { setView('leaves') }}
           className={'flex-1 py-1.5 text-xs font-semibold rounded-xl transition-colors ' +
-            (view === 'leaves' ? 'neu-inset text-blue-600' : 'text-gray-600')}>
+            (view === 'leaves' ? 'neu-on text-blue-600' : 'text-gray-600')}>
           Leaves
         </button>
       </div>
@@ -416,7 +416,7 @@ export default function DeptAttendance() {
           return (
             <button key={s.label} onClick={function () { setStatusFilter(isActive && s.filter ? '' : s.filter) }}
               className={'rounded-xl px-1 py-2 text-center transition-colors ' +
-                (isActive && s.filter ? 'neu-inset outline-1 outline-blue-400/70' : 'neu-sm')}>
+                (isActive && s.filter ? 'neu-on' : 'neu-sm')}>
               <p className="text-[8px] font-semibold text-slate-500 uppercase">{s.label}</p>
               <p className={'text-lg font-bold ' + s.color}>{s.value}</p>
             </button>

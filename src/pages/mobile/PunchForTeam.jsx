@@ -476,7 +476,7 @@ export default function PunchForTeam() {
             <button key={tb.id}
               onClick={function () { setTab(tb.id) }}
               className={'flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ' +
-                (tab === tb.id ? 'neu-inset text-blue-600' : 'text-gray-600')}
+                (tab === tb.id ? 'neu-on text-blue-600' : 'text-gray-600')}
             >
               {tb.label}
               {tb.count > 0 && (

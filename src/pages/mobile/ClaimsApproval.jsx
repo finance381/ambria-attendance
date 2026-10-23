@@ -182,7 +182,7 @@ export default function ClaimsApproval() {
           return (
             <button key={chip.id} onClick={function () { setStatusFilter(chip.id) }}
               className={'flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-xl ' +
-                (active ? 'neu-inset text-blue-600' : 'neu-press text-gray-700')}>
+                (active ? 'neu-on text-blue-600' : 'neu-press text-gray-700')}>
               {t(chip.key)}
             </button>
           )

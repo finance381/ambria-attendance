@@ -54,7 +54,7 @@ input::-ms-clear {
    below). */
 :root {
   --neu-surface: #ffffff;
-  --neu-inset: #f5f3ef;
+  --neu-inset: #ffffff;
   --neu-line: rgba(120, 100, 80, 0.12);
 }
 
@@ -86,10 +86,16 @@ input::-ms-clear {
   border: 1px solid var(--neu-line);
 }
 
-/* Well: inputs, active tab, selected chips, inner boxes */
+/* Box: inputs, dropdowns and inner boxes (white, with a hairline) */
 .neu-inset {
   background: var(--neu-inset);
   border: 1px solid var(--neu-line);
+}
+
+/* Selected: active tab, chosen chip or day (light indigo) */
+.neu-on {
+  background: #eef0fd;
+  border: 1px solid #c7cbf6;
 }
 
 /* Button that tints when tapped */
@@ -99,7 +105,7 @@ input::-ms-clear {
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 .neu-press:active {
-  background: var(--neu-inset);
+  background: #f3f1ed;
   transform: scale(0.985);
 }
 

@@ -245,7 +245,7 @@ export default function Analysis() {
             <button key={v.key} onClick={function () { setView(v.key); setSearch('') }}
               className={'flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ' +
                 (active
-                  ? 'neu-inset text-blue-600'
+                  ? 'neu-on text-blue-600'
                   : 'neu-press text-slate-600')}>
               <MiniIcon name={v.icon} className="w-3.5 h-3.5" /> {v.label}
             </button>
