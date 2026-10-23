@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import EmployeeImport from '../../components/EmployeeImport'
+import DeptPicker from '../../components/DeptPicker'
 
 var ROLES = ['staff', 'supervisor', 'manager', 'admin']
 
@@ -163,13 +164,24 @@ export default function Employees() {
     loadAll()
   }
 
+  // Smart search: every word typed must match somewhere (name, code,
+  // department, designation, role or phone), in any order, any case. So
+  // "rah kit" finds Rahul in Kitchen. Number words are matched against the
+  // phone digits, ignoring spaces, dashes and a leading +91.
+  var searchWords = search.toLowerCase().trim().split(/\s+/).filter(Boolean)
   var filtered = employees.filter(function (e) {
-    var matchSearch = !search ||
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.emp_code.toLowerCase().includes(search.toLowerCase()) ||
-      (e.phone && e.phone.includes(search))
-    var matchDept = !deptFilter || String(e.department_id) === deptFilter
-    return matchSearch && matchDept
+    if (deptFilter && String(e.department_id) !== deptFilter) return false
+    if (!searchWords.length) return true
+    var text = [e.name, e.emp_code, deptName(e.department_id), e.designation, e.role]
+      .join(' ').toLowerCase()
+    var phoneDigits = (e.phone || '').replace(/\D/g, '')
+    return searchWords.every(function (w) {
+      if (text.includes(w)) return true
+      if (!/^\+?[\d-]{3,}$/.test(w)) return false
+      var digits = w.replace(/\D/g, '')
+      if (digits.length === 12 && digits.indexOf('91') === 0) digits = digits.slice(2)
+      return phoneDigits.includes(digits)
+    })
   })
 
   function handleSort(col) {
@@ -195,6 +207,8 @@ export default function Employees() {
     return sortDir === 'asc' ? va - vb : vb - va
   })
 
+  var deptCounts = {}
+  employees.forEach(function (e) { deptCounts[e.department_id] = (deptCounts[e.department_id] || 0) + 1 })
   var activeCount = employees.filter(function (e) { return e.active }).length
   var inactiveCount = employees.filter(function (e) { return !e.active }).length
 
@@ -437,24 +451,30 @@ export default function Employees() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <input
-          type="text"
-          value={search}
-          onChange={function (e) { setSearch(e.target.value) }}
-          placeholder="Search name, code, phone…"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-slate-700"
-        />
-        <select
-          value={deptFilter}
-          onChange={function (e) { setDeptFilter(e.target.value) }}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
-        >
-          <option value="">All Departments</option>
-          {departments.map(function (d) {
-            return <option key={d.id} value={d.id}>{d.name}</option>
-          })}
-        </select>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="relative min-w-[260px] flex-1 sm:flex-none sm:w-80">
+          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+          <input
+            type="text"
+            value={search}
+            onChange={function (e) { setSearch(e.target.value) }}
+            onKeyDown={function (e) { if (e.key === 'Escape') setSearch('') }}
+            placeholder="Search name, code, phone, dept…"
+            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+          />
+          {search && (
+            <button onClick={function () { setSearch('') }} aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          )}
+        </div>
+        <DeptPicker departments={departments} value={deptFilter} onChange={setDeptFilter}
+          counts={deptCounts} total={employees.length} allLabel="All Departments" className="h-[38px] rounded-lg min-w-52" />
+        {(search || deptFilter) && (
+          <p className="text-xs text-gray-500">{filtered.length} {filtered.length === 1 ? 'match' : 'matches'}</p>
+        )}
       </div>
 
       {/* Bulk action bar */}

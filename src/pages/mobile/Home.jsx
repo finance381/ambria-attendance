@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
@@ -8,6 +9,7 @@ import MarkTestsBanner from '../../components/MarkTestsBanner'
 import TaskDueBanner from '../../components/TaskDueBanner'
 import PocOverdueBanner from '../../components/PocOverdueBanner'
 import { getPendingPunches, removePunch } from '../../lib/offlineQueue'
+import MiniIcon from '../../components/MiniIcon'
 
 export default function Home() {
   var { employee } = useAuth()
@@ -123,21 +125,24 @@ export default function Home() {
   }
 
   if (loading) {
-    return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
+    return <p className="text-sm text-slate-500 text-center py-12">Loading…</p>
   }
 
   
   var isPunchedIn = status && status.is_punched_in
   var punchType = isPunchedIn ? 'out' : 'in'
+  // Venue of the latest punch-in today, shown under "Punched In"
+  var lastInVenue = null
+  punches.forEach(function (p) { if (p.punch_type === 'in' && p.nearest_venue) lastInVenue = p.nearest_venue })
 
   return (
     <div>
       {/* Greeting */}
-      <h2 className="text-lg font-bold text-gray-900 mb-0.5">
+      <h2 className="text-[26px] font-bold text-slate-900 tracking-tight leading-tight">
         {t('home_greeting')}, {employee.name.split(' ')[0]}
       </h2>
-      <p className="text-xs text-gray-400 mb-5">
-        {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+      <p className="text-sm text-slate-500 mt-1 mb-5">
+        {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
       </p>
       <InstallPrompt />
       <TaskDueBanner />
@@ -147,8 +152,9 @@ export default function Home() {
         <div className={'rounded-2xl px-4 py-3 mb-4 border ' + (syncing ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className={'text-sm font-semibold ' + (syncing ? 'text-blue-800' : 'text-amber-800')}>
-                {syncing ? '⟳ Syncing...' : '📶 ' + pendingCount + ' punch' + (pendingCount > 1 ? 'es' : '') + ' waiting'}
+              <p className={'flex items-center gap-1.5 text-sm font-semibold ' + (syncing ? 'text-blue-800' : 'text-amber-800')}>
+                <MiniIcon name={syncing ? 'sync' : 'offline'} className={'w-4 h-4 shrink-0' + (syncing ? ' animate-spin' : '')} />
+                {syncing ? 'Syncing...' : pendingCount + ' punch' + (pendingCount > 1 ? 'es' : '') + ' waiting'}
               </p>
               <p className={'text-[11px] mt-0.5 ' + (syncing ? 'text-blue-600' : 'text-amber-600')}>
                 {syncing ? 'Uploading offline punches' : 'Will sync when back online'}
@@ -180,35 +186,43 @@ export default function Home() {
       )}
       {status && status.has_stale_punch && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
-          <p className="text-sm font-semibold text-amber-800">⚠️ {t('home_stale_title')}</p>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800"><MiniIcon name="alert" className="w-4 h-4 shrink-0" />{t('home_stale_title')}</p>
           <p className="text-[11px] text-amber-600 mt-0.5">{t('home_stale_desc')}</p>
         </div>
       )}
 
-      {/* Status card */}
-      <div className={'rounded-2xl px-5 py-4 mb-5 border ' + (isPunchedIn
-        ? 'bg-emerald-50 border-emerald-200'
-        : 'bg-gray-50 border-gray-200'
-      )}>
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('home_status')}</p>
-          {status && status.sessions_today > 0 && (
-            <p className="text-[10px] text-gray-400">
-              {status.sessions_today} {status.sessions_today > 1 ? t('home_sessions_plural') : t('home_sessions')}
+      {/* Status card: status on the left, since-when on the right */}
+      <div className="neu rounded-2xl mb-4 flex">
+        <div className="flex-1 min-w-0 px-4 py-4">
+          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('home_current_status')}</p>
+          <div className="flex items-center gap-2.5 mt-2.5">
+            <span className={'w-6 h-6 rounded-full shrink-0 ring-4 ' +
+              (isPunchedIn ? 'bg-emerald-500 ring-emerald-100' : 'bg-gray-300 ring-gray-100')} />
+            <p className={'text-[22px] font-bold leading-tight ' + (isPunchedIn ? 'text-emerald-600' : 'text-gray-500')}>
+              {isPunchedIn ? t('home_punched_in') : t('home_not_punched_in')}
+            </p>
+          </div>
+          {isPunchedIn && lastInVenue && (
+            <p className="flex items-center gap-1 text-[13px] text-gray-600 mt-2 pl-0.5">
+              <HomeIcon name="pin" className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span className="truncate">{lastInVenue}</span>
             </p>
           )}
         </div>
-        <div className="flex items-center justify-between">
-          <p className={'text-base font-bold ' + (isPunchedIn ? 'text-emerald-700' : 'text-gray-500')}>
-            {isPunchedIn ? '🟢 ' + t('home_punched_in') : '⚪ ' + t('home_not_punched_in')}
-          </p>
-          {status && status.last_in && (
-            <div className="text-right">
-              <p className="text-[10px] text-gray-400">{t('home_since')}</p>
-              <p className="text-sm font-mono text-gray-700">{formatTime(status.last_in)}</p>
-            </div>
-          )}
-        </div>
+        {status && status.last_in && (
+          <div className="shrink-0 px-4 py-4 border-l border-slate-300/60 flex flex-col justify-center">
+            <p className="flex items-center gap-1.5 text-[13px] text-gray-600">
+              <HomeIcon name="clock" className="w-4 h-4 text-gray-700" />
+              {t('home_since')}
+            </p>
+            <p className="text-[22px] font-bold text-gray-900 leading-tight tabular-nums mt-1.5">{formatTime(status.last_in)}</p>
+            {status.sessions_today > 0 && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                {status.sessions_today} {status.sessions_today > 1 ? t('home_sessions_plural') : t('home_sessions')} {t('home_today_word')}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Punch button */}
@@ -222,34 +236,46 @@ export default function Home() {
       {/* Today's punches */}
       {punches.length > 0 && (
         <div>
-          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('home_today_punches')}</h3>
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="divide-y divide-gray-100">
-              {punches.map(function (p) {
-                return (
-                  <div key={p.id} className="px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={'w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ' +
-                        (p.punch_type === 'in'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-red-100 text-red-600')
-                      }>
-                        {p.punch_type === 'in' ? 'IN' : 'OUT'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {p.punch_type === 'in' ? t('home_punch_in') : t('home_punch_out')}
-                        </p>
-                        <p className="text-[11px] text-gray-400">{p.nearest_venue || ''}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm font-mono text-gray-600">
-                      {formatTime(p.punched_at)}
+          <div className="flex items-center justify-between mb-2.5">
+            <h3 className="flex items-center gap-2 text-base font-bold text-gray-900">
+              {t('home_today_punches')}
+              <span className="min-w-6 h-6 px-1.5 rounded-full neu-inset text-xs font-semibold text-gray-700 inline-flex items-center justify-center">{punches.length}</span>
+            </h3>
+            <Link to="/attendance" className="inline-flex items-center gap-0.5 text-sm font-medium text-blue-600 no-underline">
+              {t('home_view_all')}
+              <HomeIcon name="chevron" className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="space-y-2.5">
+            {punches.map(function (p) {
+              var isIn = p.punch_type === 'in'
+              return (
+                <div key={p.id} className={'px-4 py-3 flex items-center gap-3 rounded-2xl neu'}>
+                  <span className={'w-11 h-11 rounded-full neu-sm inline-flex items-center justify-center shrink-0 ' +
+                    (isIn ? 'text-emerald-600' : 'text-red-500')}>
+                    <HomeIcon name={isIn ? 'login' : 'logout'} className="w-5 h-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-gray-900">
+                      {isIn ? t('home_punch_in') : t('home_punch_out')}
                     </p>
+                    {p.nearest_venue && (
+                      <p className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                        <HomeIcon name="pin" className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{p.nearest_venue}</span>
+                      </p>
+                    )}
                   </div>
-                )
-              })}
-            </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={'text-[10px] font-bold px-2 py-0.5 rounded-full ' +
+                      (isIn ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/80' : 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200/80')}>
+                      {isIn ? 'IN' : 'OUT'}
+                    </span>
+                    <p className="text-sm font-semibold text-gray-800 tabular-nums">{formatTime(p.punched_at)}</p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -260,5 +286,21 @@ export default function Home() {
 function formatTime(isoString) {
   if (!isoString) return '—'
   var d = new Date(isoString)
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
 }
+
+// Small line icons for the Home cards (24x24).
+function HomeIcon({ name, className }) {
+  var paths = {
+    pin: <><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    chevron: <path d="M9 6l6 6-6 6" />,
+    login: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" /></>,
+    logout: <><path d="M14 17l5-5-5-5M19 12H8" /><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5" /></>
+  }
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
+  )
+}
+

@@ -9,6 +9,14 @@ var STATUS_COLORS = {
   Incomplete: 'bg-amber-400',
 }
 
+// Filled day cells when a status is picked from the stat cards / legend
+var STATUS_HILITE = {
+  Present: 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-300',
+  'Half Day': 'bg-orange-100 text-orange-800 ring-1 ring-inset ring-orange-300',
+  Absent: 'bg-red-100 text-red-700 ring-1 ring-inset ring-red-300',
+  Incomplete: 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300',
+}
+
 var STATUS_DOT_COLORS = {
   Present: 'text-emerald-600',
   'Half Day': 'text-orange-500',
@@ -23,10 +31,15 @@ export default function MyAttendance() {
   var [days, setDays] = useState({})
   var [loading, setLoading] = useState(true)
   var [selectedDay, setSelectedDay] = useState(null)
+  // Status picked on a stat card: those days are filled in, the
+  // rest fade. Tap the same one again to show everything.
+  var [filter, setFilter] = useState(null)
+  function toggleFilter(status) { setFilter(filter === status ? null : status) }
 
   var loadMonth = useCallback(async function () {
     setLoading(true)
     setSelectedDay(null)
+    setFilter(null)
 
     var startDate = year + '-' + String(month).padStart(2, '0') + '-01'
     var endDay = new Date(year, month, 0).getDate()
@@ -201,33 +214,42 @@ export default function MyAttendance() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-4">{t('attendance_title')}</h2>
+      <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight mb-4">{t('attendance_title')}</h2>
 
       {/* Month/Year picker */}
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg">←</button>
-        <p className="text-sm font-bold text-gray-800">{MONTH_NAMES_T[month - 1]} {year}</p>
-        <button onClick={nextMonth} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg">→</button>
+        <button onClick={prevMonth} aria-label="Previous month"
+          className="w-10 h-10 flex items-center justify-center rounded-xl neu-press text-gray-700">
+          <AttIcon name="left" className="w-5 h-5" />
+        </button>
+        <p className="text-lg font-bold text-slate-800">{MONTH_NAMES_T[month - 1]} {year}</p>
+        <button onClick={nextMonth} aria-label="Next month"
+          className="w-10 h-10 flex items-center justify-center rounded-xl neu-press text-gray-700">
+          <AttIcon name="right" className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-4 gap-2 mb-4">
-        <MiniStat label={t('attendance_present')} value={stats.Present} color="text-emerald-600" />
-        <MiniStat label={t('attendance_half')} value={stats['Half Day']} color="text-orange-500" />
-        <MiniStat label={t('attendance_absent')} value={stats.Absent} color="text-red-500" />
-        <MiniStat label={t('attendance_hours')} value={Math.round(stats.hours * 10) / 10} color="text-slate-700" />
+        <MiniStat label={t('attendance_present')} value={stats.Present} color="text-emerald-600"
+          active={filter === 'Present'} onClick={function () { toggleFilter('Present') }} />
+        <MiniStat label={t('attendance_half_day')} value={stats['Half Day']} color="text-orange-500"
+          active={filter === 'Half Day'} onClick={function () { toggleFilter('Half Day') }} />
+        <MiniStat label={t('attendance_absent')} value={stats.Absent} color="text-red-500"
+          active={filter === 'Absent'} onClick={function () { toggleFilter('Absent') }} />
+        <MiniStat label={t('attendance_hours')} value={Math.round(stats.hours * 10) / 10} color="text-gray-900" />
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400 text-center py-8">{t('loading')}</p>
+        <p className="text-sm text-slate-500 text-center py-8">{t('loading')}</p>
       ) : (
         <>
           {/* Calendar grid */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4">
+          <div className="neu rounded-2xl px-3 pt-4 pb-3 mb-4">
             {/* Day headers */}
-            <div className="grid grid-cols-7 gap-1 mb-1">
+            <div className="grid grid-cols-7 gap-1 mb-2">
               {DAY_NAMES_T.map(function (d) {
-                return <div key={d} className="text-center text-[10px] font-bold text-gray-400 uppercase">{d}</div>
+                return <div key={d} className="text-center text-[11px] font-semibold text-gray-500 uppercase">{d}</div>
               })}
             </div>
 
@@ -235,7 +257,7 @@ export default function MyAttendance() {
             <div className="grid grid-cols-7 gap-1">
               {calendarCells.map(function (day, idx) {
                 if (day === null) {
-                  return <div key={'e' + idx} className="h-10" />
+                  return <div key={'e' + idx} className="h-12" />
                 }
 
                 var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0')
@@ -245,6 +267,8 @@ export default function MyAttendance() {
                 var isFuture = dateStr > todayStr
                 var isSelected = selectedDay === dateStr
                 var dotColor = status ? (STATUS_COLORS[status] || '') : ''
+                var matches = filter && status === filter
+                var faded = filter && !matches
 
                 return (
                   <button
@@ -252,24 +276,28 @@ export default function MyAttendance() {
                     onClick={function () {
                       if (!isFuture && dayData) setSelectedDay(isSelected ? null : dateStr)
                     }}
-                    className={'h-10 rounded-lg flex flex-col items-center justify-center relative transition-colors ' +
-                      (isFuture ? 'text-gray-300 cursor-default' :
-                       isSelected ? 'bg-slate-800 text-white' :
-                       isToday ? 'bg-slate-100 font-bold' :
-                       'hover:bg-gray-50')
+                    className={'h-12 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ' +
+                      (isFuture ? 'text-gray-400 cursor-default' + (filter ? ' opacity-40' : '') :
+                       matches ? STATUS_HILITE[status] + (isSelected ? ' outline-2 outline-blue-500' : '') :
+                       faded ? 'text-gray-800 opacity-25' :
+                       isSelected ? 'neu-inset text-blue-600' :
+                       isToday ? 'neu-sm text-blue-600' :
+                       'text-gray-800 hover:bg-white/40')
                     }
                   >
-                    <span className="text-xs">{day}</span>
-                    {dotColor && !isSelected && (
-                      <div className={'w-1.5 h-1.5 rounded-full absolute bottom-1 ' + dotColor} />
-                    )}
+                    <span className={'text-sm ' + (isSelected || isToday || matches ? 'font-bold' : 'font-medium')}>{day}</span>
+                    <span className={'w-1.5 h-1.5 rounded-full ' + (dotColor || 'bg-transparent')} />
                   </button>
                 )
               })}
             </div>
 
+            {filter && (
+              <p className="text-center text-[11px] text-slate-500 mt-2">{t('attendance_filter_hint')}</p>
+            )}
+
             {/* Legend */}
-            <div className="flex flex-wrap gap-3 mt-3 pt-2 border-t border-gray-100">
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-slate-300/50">
               {[
                 { key: 'Present', label: t('attendance_present') },
                 { key: 'Half Day', label: t('attendance_half_day') },
@@ -277,9 +305,9 @@ export default function MyAttendance() {
                 { key: 'Incomplete', label: t('attendance_incomplete') }
               ].map(function (s) {
                 return (
-                  <div key={s.key} className="flex items-center gap-1">
-                    <div className={'w-2 h-2 rounded-full ' + (STATUS_COLORS[s.key] || 'bg-gray-300')} />
-                    <span className="text-[10px] text-gray-500">{s.label}</span>
+                  <div key={s.key} className="flex items-center gap-1.5">
+                    <div className={'w-2.5 h-2.5 rounded-full ' + (STATUS_COLORS[s.key] || 'bg-gray-300')} />
+                    <span className="text-xs text-gray-600">{s.label}</span>
                   </div>
                 )
               })}
@@ -288,43 +316,40 @@ export default function MyAttendance() {
 
           {/* Selected day detail */}
           {selectedDay && days[selectedDay] && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-bold text-gray-800">
+            <div className="neu rounded-2xl p-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-base font-bold text-gray-900">
                   {new Date(selectedDay + 'T00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
-                <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' +
-                  (STATUS_DOT_COLORS[days[selectedDay].status] || 'text-gray-500') + ' ' +
-                  (STATUS_COLORS[days[selectedDay].status] ? STATUS_COLORS[days[selectedDay].status].replace('bg-', 'bg-opacity-20 bg-') : 'bg-gray-100')
-                }>
+                <span className={'text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg shrink-0 ' +
+                  (STATUS_PILL[days[selectedDay].status] || 'bg-gray-100 text-gray-600')}>
                   {days[selectedDay].status}
                 </span>
               </div>
 
               {days[selectedDay].totalHours > 0 && (
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-sm text-gray-500 mb-3">
                   {days[selectedDay].sessions} {days[selectedDay].sessions > 1 ? t('attendance_sessions_plural') : t('attendance_sessions')} · {days[selectedDay].totalHours} {t('attendance_hours')}
                 </p>
               )}
 
               {days[selectedDay].punches.length > 0 ? (
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {days[selectedDay].punches.map(function (p, i) {
+                    var isIn = p.punch_type === 'in'
                     return (
-                      <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className={'text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ' +
-                            (p.punch_type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
-                            {p.punch_type}
-                          </span>
-                        </div>
-                        <span className="text-xs font-mono text-gray-600">{formatTime(p.punched_at)}</span>
+                      <div key={i} className="flex items-center justify-between neu-inset rounded-xl px-3 py-2.5">
+                        <span className={'text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' +
+                          (isIn ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/80' : 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200/80')}>
+                          {isIn ? 'IN' : 'OUT'}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-800 tabular-nums">{formatTime(p.punched_at)}</span>
                       </div>
                     )
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-gray-400 italic">{t('attendance_no_punches')}</p>
+                <p className="text-sm text-gray-500">{t('attendance_no_punches')}</p>
               )}
             </div>
           )}
@@ -334,17 +359,37 @@ export default function MyAttendance() {
   )
 }
 
-function MiniStat({ label, value, color }) {
+// A stat card; with onClick it's a toggle that fills in matching days on
+// the calendar (pressed in while active)
+function MiniStat({ label, value, color, active, onClick }) {
+  var Tag = onClick ? 'button' : 'div'
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-center">
-      <p className="text-[9px] font-semibold text-gray-400 uppercase">{label}</p>
-      <p className={'text-lg font-bold ' + (color || 'text-gray-900')}>{value}</p>
-    </div>
+    <Tag onClick={onClick} aria-pressed={onClick ? !!active : undefined}
+      className={'rounded-2xl px-2 py-3 text-center transition-all ' + (active ? 'neu-inset' : onClick ? 'neu-press' : 'neu')}>
+      <p className={'text-[11px] truncate ' + (active ? 'font-semibold text-gray-800' : 'font-medium text-gray-500')}>{label}</p>
+      <p className={'text-2xl font-bold mt-1 tabular-nums ' + (color || 'text-gray-900')}>{value}</p>
+    </Tag>
+  )
+}
+
+// Light pill colours for the selected day status
+var STATUS_PILL = {
+  Present: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/80',
+  'Half Day': 'bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-200/80',
+  Absent: 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200/80',
+  Incomplete: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/80'
+}
+
+function AttIcon({ name, className }) {
+  var paths = { left: <path d="M15 18l-6-6 6-6" />, right: <path d="M9 6l6 6-6 6" /> }
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
   )
 }
 
 function formatTime(isoString) {
   if (!isoString) return '—'
   var d = new Date(isoString)
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }).toUpperCase()
 }

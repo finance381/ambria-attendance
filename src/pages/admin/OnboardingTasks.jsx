@@ -1,15 +1,16 @@
 // OnboardingTasks.jsx
-// New Joiners → Tasks sub-tab. Onboarding tasks shown as tiles; "+ Add Task" /
+// New Joiners → Tasks sub-tab. Onboarding tasks shown as tiles; "Add Task" /
 // Edit opens a form for name, description, assigned departments + roles
 // (empty = all), points of contact (multiple employees), days-to-complete
 // (counted from each joiner's date of joining) and attached Company Training
 // Docs (picked by title). Tables: migrations 20261007070000_onboarding_tasks.sql
-// onward.
+// onward. Phones: toolbar fields go full width, one tile per row, and the
+// form modal is a single scrolling column.
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ROLES, inputClass, labelClass, hintClass, sectionClass, toggle, deptLabels, ICONS } from './onboardingUtils'
-import { TileCard, TileSection, PeopleList, AttachmentList, ChipPick, EmployeePicker, ConfirmDelete } from './OnboardingFields'
+import { TileCard, TileSection, PeopleList, AttachmentList, ChipPick, EmployeePicker, ConfirmDelete, Icon, PLUS_ICON, EmptyState } from './OnboardingFields'
 
 var DEFAULT_DUE_DAYS = 7
 var MAX_DUE_DAYS = 365
@@ -68,18 +69,18 @@ export default function OnboardingTasks({ employees, departments, docs, employee
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm p-3 mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-52">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" viewBox="0 0 24 24"
             fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
           </svg>
           <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
             placeholder="Search tasks"
-            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+            className="w-full h-10 pl-9 pr-3 border border-gray-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-          className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+          className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto sm:min-w-44">
           <option value="">All departments</option>
           {departments.map(function (d) {
             return <option key={d.id} value={String(d.id)}>{d.name}</option>
@@ -87,35 +88,32 @@ export default function OnboardingTasks({ employees, departments, docs, employee
         </select>
         {filtering && (
           <button onClick={function () { setSearch(''); setDeptFilter('') }}
-            className="px-3 py-2 text-xs text-gray-500 hover:text-gray-800">Clear</button>
+            className="h-10 px-3 text-sm font-medium text-gray-500 hover:text-gray-800 rounded-xl hover:bg-gray-50">Clear</button>
         )}
-        <p className="text-xs text-gray-500 ml-auto">
+        <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full tabular-nums">
           {filtering ? shownTasks.length + ' of ' : ''}{tasks.length} onboarding {tasks.length === 1 ? 'task' : 'tasks'}
-        </p>
+        </span>
         <button
           onClick={function () { setEditing({}) }}
-          className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors font-medium"
+          className="h-10 px-4 ml-auto sm:ml-0 inline-flex items-center gap-1.5 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-600/30 transition-colors font-semibold"
         >
-          + Add Task
+          <Icon d={PLUS_ICON} />
+          Add Task
         </button>
       </div>
 
       {loadError && (
-        <div className="px-3 py-2 mb-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-xs text-red-600">{loadError}</p>
+        <div className="mb-4 px-4 py-3 bg-red-50 ring-1 ring-red-200 rounded-xl">
+          <p className="text-sm text-red-600">{loadError}</p>
         </div>
       )}
 
       {tasks.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-10 shadow-sm">
-          <p className="text-sm text-gray-400 text-center">No tasks yet. Click "+ Add Task" to create one.</p>
-        </div>
+        <EmptyState icon={ICONS.task} title="No onboarding tasks yet" body={'Click "Add Task" to create the first one.'} />
       ) : shownTasks.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-10 shadow-sm">
-          <p className="text-sm text-gray-400 text-center">No tasks match this search.</p>
-        </div>
+        <EmptyState icon={ICONS.task} title="No tasks match this search" body="Try another name or department." />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
           {shownTasks.map(function (task) {
             var pocs = employees.filter(function (e) { return task.poc_ids.includes(e.id) })
             var taskDocs = docs.filter(function (d) { return task.training_doc_ids.includes(d.id) })
@@ -135,8 +133,8 @@ export default function OnboardingTasks({ employees, departments, docs, employee
                 onDelete={function () { setDeleteTarget(task) }}
                 stats={[
                   { label: 'Complete within', value: task.due_days + (task.due_days === 1 ? ' day' : ' days') + ' of joining', accent: 'text-amber-700' },
-                  { label: 'Departments', value: deptIds.length ? deptLabels(deptIds, departments).join(', ') : 'All departments', muted: !deptIds.length },
-                  { label: 'Roles', value: roleLabels.length ? roleLabels.join(', ') : 'All roles', muted: !roleLabels.length }
+                  { label: 'Departments', value: deptIds.length ? deptLabels(deptIds, departments).join(', ') : 'All departments', muted: !deptIds.length, chips: deptIds.length ? deptLabels(deptIds, departments) : null },
+                  { label: 'Roles', value: roleLabels.length ? roleLabels.join(', ') : 'All roles', muted: !roleLabels.length, chips: roleLabels.length ? roleLabels : null }
                 ]}
               >
                 <TileSection label="Point of contact">
@@ -237,21 +235,21 @@ function TaskModal({ task, employees, docs, departments, employeeId, onClose, on
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-4xl shadow-xl max-h-[92vh] flex flex-col" onClick={function (e) { e.stopPropagation() }}>
-        <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-4 border-b border-gray-100">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-4xl shadow-xl max-h-[94vh] sm:max-h-[92vh] flex flex-col" onClick={function (e) { e.stopPropagation() }}>
+        <div className="flex items-start justify-between gap-3 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-gray-100">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 tracking-tight">{isEdit ? 'Edit onboarding task' : 'Add onboarding task'}</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Applies to new joiners in the selected departments and roles</p>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight">{isEdit ? 'Edit onboarding task' : 'Add onboarding task'}</h3>
+            <p className="text-[13px] sm:text-sm text-gray-500 mt-0.5">Applies to new joiners in the selected departments and roles</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
-            className="w-8 h-8 -mr-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 inline-flex items-center justify-center">
+            className="w-9 h-9 sm:w-8 sm:h-8 -mr-2 shrink-0 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 inline-flex items-center justify-center">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-          <div className="px-6 py-5 overflow-y-auto grid gap-x-8 gap-y-5 md:grid-cols-2">
+          <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
             {/* Left: what the task is */}
             <div className="space-y-4">
               <p className={sectionClass}>Details</p>
@@ -278,7 +276,7 @@ function TaskModal({ task, employees, docs, departments, employeeId, onClose, on
                 <div className="flex items-center gap-2.5">
                   <input type="number" min={1} max={MAX_DUE_DAYS} step={1} value={dueDays}
                     onChange={function (e) { setDueDays(e.target.value) }}
-                    className="w-24 px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:border-transparent" />
+                    className="w-24 px-3.5 py-2.5 border border-gray-200 rounded-xl bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   <span className="text-sm text-gray-600">days of joining</span>
                 </div>
               </div>
@@ -305,12 +303,12 @@ function TaskModal({ task, employees, docs, departments, employeeId, onClose, on
                 ) : shownDocs.length === 0 ? (
                   <p className="text-xs text-gray-400">No docs for the selected departments. Add them in Config → Company Training Docs.</p>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto divide-y divide-gray-100">
+                  <div className="border border-gray-200 rounded-xl max-h-52 overflow-y-auto divide-y divide-gray-100">
                     {shownDocs.map(function (d) {
                       var fits = docFitsDepts(d)
                       return (
-                        <label key={d.id} className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50">
-                          <input type="checkbox" checked={docIds.includes(d.id)}
+                        <label key={d.id} className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 cursor-pointer hover:bg-blue-50/40">
+                          <input type="checkbox" className="accent-blue-600" checked={docIds.includes(d.id)}
                             onChange={function () { setDocIds(toggle(docIds, d.id)) }} />
                           <span className="flex-1">{d.title}</span>
                           <span className={'text-[10px] ' + (fits ? 'text-gray-400' : 'text-amber-600')}>
@@ -325,17 +323,17 @@ function TaskModal({ task, employees, docs, departments, employeeId, onClose, on
             </div>
 
             {error && (
-              <div className="md:col-span-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-xs text-red-600">{error}</p>
+              <div className="md:col-span-2 px-4 py-3 bg-red-50 ring-1 ring-red-200 rounded-xl">
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <div className="flex justify-end gap-2 px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-100 bg-gray-50/60 rounded-b-2xl">
             <button type="button" onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              className="h-10 flex-1 sm:flex-none px-4 text-sm font-medium bg-white ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">Cancel</button>
             <button type="submit" disabled={saving}
-              className="px-5 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-semibold">
+              className="h-10 flex-1 sm:flex-none px-5 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-600/30 disabled:opacity-40 transition-colors font-semibold">
               {saving ? 'Saving\u2026' : (isEdit ? 'Save Changes' : 'Add Task')}
             </button>
           </div>

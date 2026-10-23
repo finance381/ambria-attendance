@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { fmtTime } from '../../lib/formatters'
+import MiniIcon from '../../components/MiniIcon'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
 
@@ -275,31 +276,31 @@ export default function DeptAttendance() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-0.5">My Department</h2>
-      <p className="text-xs text-gray-400 mb-3">{employee.role === 'admin' ? 'All Departments' : deptName}</p>
+      <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">My Department</h2>
+      <p className="text-[13px] text-slate-500 mt-1 mb-4">{employee.role === 'admin' ? 'All Departments' : deptName}</p>
 
       {/* Daily / Monthly toggle */}
-      <div className="flex bg-gray-100 rounded-lg p-0.5 mb-3">
+      <div className="flex gap-1 neu rounded-2xl p-1.5 mb-4">
         <button onClick={function () { setView('daily') }}
-          className={'flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ' +
-            (view === 'daily' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
+          className={'flex-1 py-1.5 text-xs font-semibold rounded-xl transition-colors ' +
+            (view === 'daily' ? 'neu-inset text-blue-600' : 'text-gray-600')}>
           Daily
         </button>
         <button onClick={function () { setView('monthly') }}
-          className={'flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ' +
-            (view === 'monthly' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
+          className={'flex-1 py-1.5 text-xs font-semibold rounded-xl transition-colors ' +
+            (view === 'monthly' ? 'neu-inset text-blue-600' : 'text-gray-600')}>
           Monthly
         </button>
         <button onClick={function () { setView('leaves') }}
-          className={'flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ' +
-            (view === 'leaves' ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}>
+          className={'flex-1 py-1.5 text-xs font-semibold rounded-xl transition-colors ' +
+            (view === 'leaves' ? 'neu-inset text-blue-600' : 'text-gray-600')}>
           Leaves
         </button>
       </div>
 
       {employee.role === 'admin' && depts.length > 0 && (
         <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-700">
+          className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 mb-3 outline-none focus:outline-2 focus:outline-blue-400/60">
           <option value="">All Departments</option>
           {depts.map(function (d) {
             return <option key={d.id} value={d.id}>{d.name}</option>
@@ -314,19 +315,19 @@ export default function DeptAttendance() {
       />}
       {view === 'leaves' && <>
         {leaveData && (
-          <p className="text-[10px] text-gray-400 mb-2">
+          <p className="text-[10px] text-slate-500 mb-2">
             FY {leaveData.fy_start.slice(0, 4)}–{leaveData.fy_end.slice(0, 4)} · {leaveData.quarter_label} ({new Date(leaveData.quarter_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} – {new Date(leaveData.quarter_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})
           </p>
         )}
 
         <input type="text" value={leaveSearch} onChange={function (e) { setLeaveSearch(e.target.value) }}
           placeholder="Search name or code…"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-slate-700" />
+          className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 mb-3 outline-none focus:outline-2 focus:outline-blue-400/60" />
 
         {leaveLoading ? (
-          <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+          <p className="text-sm text-slate-500 text-center py-12">{t('loading')}</p>
         ) : !leaveData || leaveData.balances.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No data</p>
+          <p className="text-sm text-slate-500 text-center py-8">No data</p>
         ) : (function () {
           var balances = leaveData.balances.filter(function (b) {
             if (!leaveSearch) return true
@@ -344,11 +345,11 @@ export default function DeptAttendance() {
                 var textColor = pct > 40 ? 'text-emerald-600' : pct > 15 ? 'text-amber-600' : 'text-red-600'
 
                 return (
-                  <div key={b.employee_id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+                  <div key={b.employee_id} className="neu rounded-2xl px-4 py-3">
                     <div className="flex items-center justify-between mb-1.5">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{b.name}</p>
-                        <p className="text-[11px] text-gray-400">
+                        <p className="text-[11px] text-slate-500">
                           {b.emp_code}
                           {isMonthly && <span className="ml-1.5 text-[9px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-semibold">{b.monthly_cap}/mo</span>}
                           {b.leave_scheme === 'new_joiner' && <span className="ml-1.5 text-[9px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded font-semibold">New</span>}
@@ -356,11 +357,11 @@ export default function DeptAttendance() {
                       </div>
                       <div className="text-right">
                         <p className={'text-lg font-bold ' + textColor}>{b.annual_remaining}</p>
-                        <p className="text-[9px] text-gray-400">of {b.annual_total} left</p>
+                        <p className="text-[9px] text-slate-500">of {b.annual_total} left</p>
                       </div>
                     </div>
 
-                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                    <div className="w-full h-1.5 neu-inset rounded-full overflow-hidden mb-1.5">
                       <div className={'h-full rounded-full ' + barColor} style={{ width: Math.max(pct, 2) + '%' }} />
                     </div>
 
@@ -392,14 +393,14 @@ export default function DeptAttendance() {
       <div className="flex items-center gap-2 mb-3">
         <button onClick={function () {
           var d = new Date(date); d.setDate(d.getDate() - 1); setDate(d.toISOString().slice(0, 10))
-        }} className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300">←</button>
+        }} className="px-3 py-1.5 text-sm text-gray-700 neu-press rounded-xl">←</button>
         <input type="date" value={date} onChange={function (e) { setDate(e.target.value) }}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-slate-700" />
+          className="flex-1 px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 text-center outline-none focus:outline-2 focus:outline-blue-400/60" />
         <button onClick={function () {
           var d = new Date(date); d.setDate(d.getDate() + 1)
           if (d <= new Date()) setDate(d.toISOString().slice(0, 10))
         }} disabled={isToday}
-          className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30">→</button>
+          className="px-3 py-1.5 text-sm text-gray-700 neu-press rounded-xl disabled:opacity-30">→</button>
       </div>
 
       {/* Stats — tappable to filter */}
@@ -414,9 +415,9 @@ export default function DeptAttendance() {
           var isActive = statusFilter === s.filter
           return (
             <button key={s.label} onClick={function () { setStatusFilter(isActive && s.filter ? '' : s.filter) }}
-              className={'bg-white border rounded-lg px-1 py-2 text-center transition-colors ' +
-                (isActive && s.filter ? 'border-slate-700 ring-1 ring-slate-700' : 'border-gray-200')}>
-              <p className="text-[8px] font-semibold text-gray-400 uppercase">{s.label}</p>
+              className={'rounded-xl px-1 py-2 text-center transition-colors ' +
+                (isActive && s.filter ? 'neu-inset outline-1 outline-blue-400/70' : 'neu-sm')}>
+              <p className="text-[8px] font-semibold text-slate-500 uppercase">{s.label}</p>
               <p className={'text-lg font-bold ' + s.color}>{s.value}</p>
             </button>
           )
@@ -426,13 +427,13 @@ export default function DeptAttendance() {
       {/* Search */}
       <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
         placeholder="Search name or code…"
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-slate-700" />
+        className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 mb-3 outline-none focus:outline-2 focus:outline-blue-400/60" />
 
       {/* List */}
       {loading ? (
-        <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+        <p className="text-sm text-slate-500 text-center py-12">{t('loading')}</p>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">No records</p>
+        <p className="text-sm text-slate-500 text-center py-8">No records</p>
       ) : (
         <div className="space-y-2">
           {filtered.map(function (r) {
@@ -462,8 +463,8 @@ export default function DeptAttendance() {
                           var inLoc = inP && (inP.venue || inP.location_name)
                           var outLoc = outP && (outP.venue || outP.location_name)
                           return <>
-                            {inLoc && <span className={inP.venue ? 'text-emerald-600' : 'text-gray-500'}>📍 {inLoc.length > 20 ? inLoc.slice(0, 20) + '…' : inLoc}</span>}
-                            {outLoc && <span className={outP.venue ? 'text-emerald-600' : 'text-gray-500'}>📍 {outLoc.length > 20 ? outLoc.slice(0, 20) + '…' : outLoc}</span>}
+                            {inLoc && <span className={'inline-flex items-center gap-0.5 ' + (inP.venue ? 'text-emerald-600' : 'text-gray-500')}><MiniIcon name="pin" className="w-3 h-3 shrink-0" /> {inLoc.length > 20 ? inLoc.slice(0, 20) + '…' : inLoc}</span>}
+                            {outLoc && <span className={'inline-flex items-center gap-0.5 ' + (outP.venue ? 'text-emerald-600' : 'text-gray-500')}><MiniIcon name="pin" className="w-3 h-3 shrink-0" /> {outLoc.length > 20 ? outLoc.slice(0, 20) + '…' : outLoc}</span>}
                           </>
                         })()}
                       </div>
@@ -492,14 +493,14 @@ export default function DeptAttendance() {
                   (STATUS_COLORS[detail.status] || 'bg-gray-100 text-gray-500')}>
                   {detail.status}
                 </span>
-                <button onClick={function () { setDetail(null) }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+                <button onClick={function () { setDetail(null) }} className="p-1 text-slate-500 hover:text-gray-700"><MiniIcon name="x" className="w-5 h-5" /></button>
               </div>
             </div>
             <div className="overflow-y-auto flex-1 px-5 py-4">
               {detailLoading ? (
-                <p className="text-sm text-gray-400 text-center py-8">{t('loading')}</p>
+                <p className="text-sm text-slate-500 text-center py-8">{t('loading')}</p>
               ) : detailPunches.length === 0 ? (
-                <p className="text-sm text-gray-400 italic text-center py-8">No punches recorded</p>
+                <p className="text-sm text-slate-500 italic text-center py-8">No punches recorded</p>
               ) : (
                 <div className="space-y-3">
                   {detailPunches.map(function (p) {
@@ -522,15 +523,15 @@ export default function DeptAttendance() {
 
                         {/* Location */}
                         <div className="flex items-center gap-1.5 mt-1">
-                          <span className="text-xs">📍</span>
+                          <MiniIcon name="pin" className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                           {venueName ? (
                             <span className="text-xs text-emerald-700 font-medium">{venueName}</span>
                           ) : p.location_name ? (
                             <span className="text-xs text-gray-600">{p.location_name}</span>
                           ) : hasGps ? (
-                            <span className="text-xs text-gray-400 italic">Unknown area</span>
+                            <span className="text-xs text-slate-500 italic">Unknown area</span>
                           ) : (
-                            <span className="text-xs text-gray-400">No GPS data</span>
+                            <span className="text-xs text-slate-500">No GPS data</span>
                           )}
                           {p.gps_accuracy_meters && p.gps_accuracy_meters > 100 && (
                             <span className="text-[9px] text-amber-500 ml-1">±{Math.round(p.gps_accuracy_meters)}m</span>
@@ -555,7 +556,7 @@ export default function DeptAttendance() {
                 <h3 className="text-sm font-bold text-gray-900">{mDetail.name}</h3>
                 <p className="text-xs text-gray-500">{mDetail.emp_code} · {MONTHS[mMonth - 1]} {mYear}</p>
               </div>
-              <button onClick={function () { setMDetail(null) }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+              <button onClick={function () { setMDetail(null) }} className="p-1 text-slate-500 hover:text-gray-700"><MiniIcon name="x" className="w-5 h-5" /></button>
             </div>
 
             <div className="flex gap-2 px-5 py-2.5 border-b border-gray-100 bg-gray-50">
@@ -568,9 +569,9 @@ export default function DeptAttendance() {
 
             <div className="overflow-y-auto flex-1 px-5 py-3">
               {mDetailLoading ? (
-                <p className="text-sm text-gray-400 text-center py-8">{t('loading')}</p>
+                <p className="text-sm text-slate-500 text-center py-8">{t('loading')}</p>
               ) : mDetailDays.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">No data</p>
+                <p className="text-sm text-slate-500 text-center py-8">No data</p>
               ) : (
                 <div className="space-y-1.5">
                   {mDetailDays.map(function (day) {
@@ -592,13 +593,13 @@ export default function DeptAttendance() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-gray-700 w-5">{day.day}</span>
-                            <span className="text-[10px] text-gray-400 w-7">{day.weekday}</span>
+                            <span className="text-[10px] text-slate-500 w-7">{day.weekday}</span>
                             {day.status !== 'Absent' && (
                               <>
                                 <span className="text-[11px] text-gray-600">
                                   {day.firstIn ? fmtTime(day.firstIn.punched_at) : '—'}
                                 </span>
-                                <span className="text-[10px] text-gray-400">→</span>
+                                <span className="text-[10px] text-slate-500">→</span>
                                 <span className="text-[11px] text-gray-600">
                                   {day.lastOut ? fmtTime(day.lastOut.punched_at) : '—'}
                                 </span>
@@ -612,7 +613,7 @@ export default function DeptAttendance() {
                         </div>
                         {day.status !== 'Absent' && locationIn && (
                           <div className="flex items-center gap-1 mt-1 ml-14">
-                            <span className="text-[10px]">📍</span>
+                            <MiniIcon name="pin" className="w-3 h-3 text-slate-500 shrink-0" />
                             <span className="text-[10px] text-gray-500 truncate">{locationIn}</span>
                           </div>
                         )}
@@ -671,12 +672,12 @@ function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, m
       {/* Month nav */}
       <div className="flex items-center gap-2 mb-3">
         <button onClick={prevMonth}
-          className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300">←</button>
+          className="px-3 py-1.5 text-sm text-gray-700 neu-press rounded-xl">←</button>
         <div className="flex-1 text-center text-sm font-semibold text-gray-700">
           {MONTHS[mMonth - 1]} {mYear}
         </div>
         <button onClick={nextMonth} disabled={isCurrentMonth}
-          className="px-2.5 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30">→</button>
+          className="px-3 py-1.5 text-sm text-gray-700 neu-press rounded-xl disabled:opacity-30">→</button>
       </div>
 
       {/* Summary cards */}
@@ -689,8 +690,8 @@ function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, m
           { label: 'Hours', value: Math.round(totals.hours * 10) / 10, color: 'text-blue-600' }
         ].map(function (s) {
           return (
-            <div key={s.label} className="bg-white border border-gray-200 rounded-lg px-1 py-2 text-center">
-              <p className="text-[8px] font-semibold text-gray-400 uppercase">{s.label}</p>
+            <div key={s.label} className="neu-sm rounded-xl px-1 py-2 text-center">
+              <p className="text-[8px] font-semibold text-slate-500 uppercase">{s.label}</p>
               <p className={'text-lg font-bold ' + s.color}>{s.value}</p>
             </div>
           )
@@ -700,13 +701,13 @@ function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, m
       {/* Search */}
       <input type="text" value={mSearch} onChange={function (e) { setMSearch(e.target.value) }}
         placeholder="Search name or code…"
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-slate-700" />
+        className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 mb-3 outline-none focus:outline-2 focus:outline-blue-400/60" />
 
       {/* Employee cards */}
       {mLoading ? (
-        <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+        <p className="text-sm text-slate-500 text-center py-12">{t('loading')}</p>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">No records</p>
+        <p className="text-sm text-slate-500 text-center py-8">No records</p>
       ) : (
         <div className="space-y-2">
           {filtered.map(function (r) {
@@ -714,17 +715,17 @@ function MonthlyView({ mYear, setMYear, mMonth, setMMonth, mRecords, mLoading, m
             var pctColor = pct >= 90 ? 'text-emerald-600' : pct >= 75 ? 'text-amber-600' : 'text-red-600'
             return (
               <div key={r.employee_id} onClick={function () { if (onTapEmployee) onTapEmployee(r) }}
-                className="bg-white border border-gray-200 rounded-xl px-4 py-3 cursor-pointer active:scale-[0.99] transition-transform">
+                className="neu rounded-2xl px-4 py-3 cursor-pointer active:scale-[0.99] transition-transform">
                 <div className="flex items-center justify-between mb-1.5">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{r.name}
-                      {r.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">casual</span>}
+                      {r.is_casual && <span className="ml-1 text-[9px] text-slate-600 neu-inset px-1 rounded">casual</span>}
                     </p>
-                    <p className="text-[11px] text-gray-400">{r.emp_code} · {r.designation || ''}</p>
+                    <p className="text-[11px] text-slate-500">{r.emp_code} · {r.designation || ''}</p>
                   </div>
                   <div className="text-right">
                     <p className={'text-lg font-bold ' + pctColor}>{pct}%</p>
-                    <p className="text-[9px] text-gray-400">attendance</p>
+                    <p className="text-[9px] text-slate-500">attendance</p>
                   </div>
                 </div>
                 <div className="flex gap-3 text-[11px]">

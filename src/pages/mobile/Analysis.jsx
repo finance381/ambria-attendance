@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
+import MiniIcon from '../../components/MiniIcon'
 
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -48,7 +49,7 @@ function DonutChart({ pct, size, color, stroke }) {
   var offset = clamped >= 100 ? 0.001 : circ - (clamped / 100) * circ
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#efe9e0" strokeWidth={stroke} />
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color || '#059669'}
         strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset}
         strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
@@ -62,10 +63,10 @@ function TimeRangeBar({ inSecs, outSecs }) {
   var right = Math.max(0, Math.min(100, ((outSecs - minT) / span) * 100))
   var width = Math.max(right - left, 2)
   return (
-    <div className="relative w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+    <div className="relative w-full h-2 neu-inset rounded-full overflow-hidden">
       <div className="absolute h-full rounded-full" style={{
         left: left + '%', width: width + '%',
-        background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)'
+        background: 'linear-gradient(90deg, #4f46e5, #8b5cf6)'
       }} />
     </div>
   )
@@ -74,17 +75,17 @@ function TimeRangeBar({ inSecs, outSecs }) {
 /* ── Stat Card ── */
 function StatCard({ label, value, sub, color, icon, donut }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 px-3 py-3"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+    <div className="relative overflow-hidden rounded-2xl neu px-3 py-3"
+     >
       {donut != null && (
         <div className="absolute -right-1 -top-1 opacity-20">
           <DonutChart pct={donut} size={48} color={color} stroke={3} />
         </div>
       )}
-      <p className="text-[9px] font-bold tracking-wider uppercase" style={{ color: '#94a3b8' }}>{label}</p>
-      <p className="text-xl font-extrabold mt-0.5" style={{ color: color || '#1e293b', letterSpacing: '-0.02em' }}>{value}</p>
-      {sub && <p className="text-[10px] mt-0.5" style={{ color: '#94a3b8' }}>{sub}</p>}
-      {icon && <span className="absolute right-2.5 bottom-2 text-lg opacity-10">{icon}</span>}
+      <p className="text-[9px] font-bold tracking-wider uppercase" style={{ color: '#776e63' }}>{label}</p>
+      <p className="text-xl font-extrabold mt-0.5" style={{ color: color || '#2c2722', letterSpacing: '-0.02em' }}>{value}</p>
+      {sub && <p className="text-[10px] mt-0.5" style={{ color: '#776e63' }}>{sub}</p>}
+      {icon && <MiniIcon name={icon} className="absolute right-2.5 bottom-2.5 w-5 h-5 text-slate-700 opacity-15" />}
     </div>
   )
 }
@@ -207,11 +208,11 @@ export default function Analysis() {
   }
 
   var views = [
-    { key: 'concerns', label: 'Concerns', emoji: '🚨' },
-    { key: 'timing', label: 'Timing', emoji: '⏱' },
-    { key: 'attendance', label: 'Attend', emoji: '📊' },
-    { key: 'hours', label: 'Hours', emoji: '⏳' },
-    { key: 'dar', label: 'DARs', emoji: '📝' },
+    { key: 'concerns', label: 'Concerns', icon: 'alert' },
+    { key: 'timing', label: 'Timing', icon: 'clock' },
+    { key: 'attendance', label: 'Attend', icon: 'chart' },
+    { key: 'hours', label: 'Hours', icon: 'hourglass' },
+    { key: 'dar', label: 'DARs', icon: 'note' },
   ]
 
   var isLoading = (view === 'timing' && timingLoading) ||
@@ -224,29 +225,29 @@ export default function Analysis() {
       {/* Header with month nav */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-900" style={{ letterSpacing: '-0.03em' }}>Analysis</h2>
-          <p className="text-[11px] font-medium text-slate-400 -mt-0.5">{MONTHS[month - 1]} {year} Overview</p>
+          <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">Analysis</h2>
+          <p className="text-[13px] text-slate-500 mt-0.5">{MONTHS[month - 1]} {year} Overview</p>
         </div>
-        <div className="flex items-center gap-1 bg-slate-50 rounded-xl px-1 py-0.5">
+        <div className="flex items-center gap-1.5 neu rounded-xl px-1.5 py-1">
           <button onClick={prevMonth}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:shadow-sm active:scale-95 transition-all text-sm font-bold">‹</button>
+            className="w-8 h-8 flex items-center justify-center rounded-lg neu-press text-slate-600 text-sm font-bold">‹</button>
           <span className="text-xs font-bold text-slate-600 min-w-[52px] text-center">{MONTHS[month - 1].toUpperCase()}</span>
           <button onClick={nextMonth} disabled={isCurrentMonth}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:shadow-sm active:scale-95 transition-all text-sm font-bold disabled:opacity-20">›</button>
+            className="w-8 h-8 flex items-center justify-center rounded-lg neu-press text-slate-600 text-sm font-bold disabled:opacity-20">›</button>
         </div>
       </div>
 
       {/* View pills */}
-      <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="flex gap-1.5 mb-3 overflow-x-auto pt-1 pb-3 -mx-1 px-1">
         {views.map(function (v) {
           var active = view === v.key
           return (
             <button key={v.key} onClick={function () { setView(v.key); setSearch('') }}
               className={'flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ' +
                 (active
-                  ? 'bg-slate-800 text-white shadow-md shadow-slate-300'
-                  : 'bg-white text-slate-500 border border-slate-100 hover:border-slate-200')}>
-              <span className="text-[10px]">{v.emoji}</span> {v.label}
+                  ? 'neu-inset text-blue-600'
+                  : 'neu-press text-slate-600')}>
+              <MiniIcon name={v.icon} className="w-3.5 h-3.5" /> {v.label}
             </button>
           )
         })}
@@ -255,14 +256,14 @@ export default function Analysis() {
       {/* Dept filter */}
       {employee.role === 'admin' && depts.length > 0 && (
         <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+          className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-xs font-medium text-slate-800 mb-3 outline-none focus:outline-2 focus:outline-blue-400/60">
           <option value="">All Departments</option>
           {depts.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
         </select>
       )}
       {employee.role === 'manager' && managerDeptIds.length > 1 && (
         <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+          className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-xs font-medium text-slate-800 mb-3 outline-none focus:outline-2 focus:outline-blue-400/60">
           <option value="">All My Departments</option>
           {managerDeptIds.map(function (id) { return <option key={id} value={id}>{deptNames[id] || 'Dept ' + id}</option> })}
         </select>
@@ -270,12 +271,12 @@ export default function Analysis() {
 
       {/* Search */}
       <div className="relative mb-3">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
         <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
           placeholder="Search name or code…"
-          className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-300" />
+          className="w-full pl-9 pr-3 py-2 border-0 neu-inset rounded-xl text-xs font-medium text-slate-800 outline-none focus:outline-2 focus:outline-blue-400/60 placeholder:text-slate-400" />
       </div>
 
       {/* Loading state */}
@@ -327,20 +328,20 @@ export default function Analysis() {
 
         return (
           <>
-            <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Top Concerns · {MONTHS[month - 1]} {year}</p>
-              <p className="text-[10px] text-slate-400">Employees ranked by composite concern score across timing, attendance, hours, and DAR compliance.</p>
+            <div className="neu rounded-2xl p-3 mb-3">
+              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-500 mb-1">Top Concerns · {MONTHS[month - 1]} {year}</p>
+              <p className="text-[10px] text-slate-500">Employees ranked by composite concern score across timing, attendance, hours, and DAR compliance.</p>
             </div>
 
-            {top10.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No concerns this period 🎉</p>}
+            {top10.length === 0 && <p className="text-xs text-slate-500 text-center py-12">No concerns this period</p>}
 
             <div className="space-y-1.5">
               {top10.map(function (e, i) {
                 var barPct = maxScore > 0 ? Math.round((e.score / maxScore) * 100) : 0
                 var barColor = e.score >= 60 ? '#dc2626' : e.score >= 30 ? '#f97316' : '#d97706'
                 return (
-                  <div key={e.id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
-                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                  <div key={e.id} className="neu rounded-2xl px-3.5 py-2.5"
+                    >
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold text-white flex-shrink-0"
                         style={{ background: barColor }}>
@@ -351,8 +352,8 @@ export default function Analysis() {
                           <p className="text-[13px] font-bold text-slate-800 truncate">{e.name}</p>
                           <p className="text-sm font-extrabold" style={{ color: barColor }}>{Math.round(e.score)}</p>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium">{e.emp_code} · {e.department_name || ''}</p>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
+                        <p className="text-[10px] text-slate-500 font-medium">{e.emp_code} · {e.department_name || ''}</p>
+                        <div className="w-full bg-slate-300/50 rounded-full h-1.5 mt-1">
                           <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: barPct + '%', background: barColor }} />
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1.5">
@@ -372,8 +373,8 @@ export default function Analysis() {
               })}
             </div>
 
-            <div className="mt-4 bg-slate-50 border border-slate-100 rounded-2xl p-3">
-              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Scoring Criteria</p>
+            <div className="mt-4 neu-inset rounded-2xl p-3">
+              <p className="text-[9px] font-bold tracking-wider uppercase text-slate-500 mb-2">Scoring Criteria</p>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] text-slate-500">
                 <span>Late arrival (after 12PM): <strong>30</strong></span>
                 <span>Critical attend (&lt;50%): <strong>35</strong></span>
@@ -407,14 +408,14 @@ export default function Analysis() {
         return (
           <>
             <div className="grid grid-cols-3 gap-2 mb-3">
-              <StatCard label="Avg In" value={fmtSecs(avgIn)} icon="🌅" />
-              <StatCard label="Avg Out" value={fmtSecs(avgOut)} icon="🌆" />
-              <StatCard label="Avg Hrs" value={avgHrs + 'h'} color="#3b82f6" icon="⏱" />
+              <StatCard label="Avg In" value={fmtSecs(avgIn)} icon="sunrise" />
+              <StatCard label="Avg Out" value={fmtSecs(avgOut)} icon="sunset" />
+              <StatCard label="Avg Hrs" value={avgHrs + 'h'} color="#4f46e5" icon="clock" />
             </div>
 
             {filtered.length > 0 && (
-              <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Punch-In Distribution</p>
+              <div className="neu rounded-2xl p-3 mb-3">
+                <p className="text-[9px] font-bold tracking-wider uppercase text-slate-500 mb-2">Punch-In Distribution</p>
                 <div className="flex items-end gap-1 h-10">
                   {inBuckets.map(function (count, i) {
                     var h = maxBucket > 0 ? (count / maxBucket) * 36 : 0
@@ -423,11 +424,11 @@ export default function Analysis() {
                       <div key={i} className="flex-1 flex flex-col items-center">
                         <div className="w-full rounded-t" style={{
                           height: Math.max(h, 2) + 'px',
-                          background: count > 0 ? 'linear-gradient(180deg, #3b82f6, #6366f1)' : '#e2e8f0',
+                          background: count > 0 ? 'linear-gradient(180deg, #4f46e5, #6366f1)' : '#e6e0d7',
                           borderRadius: '3px 3px 0 0',
                           transition: 'height 0.4s ease'
                         }} />
-                        <span className="text-[7px] text-slate-400 mt-0.5 font-medium">{label}</span>
+                        <span className="text-[7px] text-slate-500 mt-0.5 font-medium">{label}</span>
                       </div>
                     )
                   })}
@@ -438,28 +439,28 @@ export default function Analysis() {
             <div className="space-y-1.5">
               {filtered.map(function (r) {
                 return (
-                  <div key={r.employee_id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
-                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                  <div key={r.employee_id} className="neu rounded-2xl px-3.5 py-2.5"
+                    >
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-bold text-slate-800 truncate">{r.name}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">{r.emp_code} · {r.department_name || ''}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{r.emp_code} · {r.department_name || ''}</p>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
                         <span className={'text-sm font-extrabold ' + hrsTextClass(r.avg_hours)}>{r.avg_hours}h</span>
-                        <span className="text-[9px] text-slate-400 font-medium">{r.days_worked}d</span>
+                        <span className="text-[9px] text-slate-500 font-medium">{r.days_worked}d</span>
                       </div>
                     </div>
                     <TimeRangeBar inSecs={r.avg_in_secs || 0} outSecs={r.avg_out_secs || 0} />
                     <div className="flex gap-3 mt-1.5 text-[10px] text-slate-500 font-medium">
                       <span>In <strong className="text-slate-700">{fmtSecs(r.avg_in_secs)}</strong></span>
                       <span>Out <strong className="text-slate-700">{fmtSecs(r.avg_out_secs)}</strong></span>
-                      <span className="text-slate-400">{r.min_hours}–{r.max_hours}h</span>
+                      <span className="text-slate-500">{r.min_hours}–{r.max_hours}h</span>
                     </div>
                   </div>
                 )
               })}
-              {filtered.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No data for this period</p>}
+              {filtered.length === 0 && <p className="text-xs text-slate-500 text-center py-12">No data for this period</p>}
             </div>
           </>
         )
@@ -493,21 +494,21 @@ export default function Analysis() {
         return (
           <>
             <div className="grid grid-cols-3 gap-2 mb-3">
-              <div className="relative rounded-2xl bg-white border border-slate-100 px-3 py-3 flex items-center gap-2"
-                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div className="relative rounded-2xl neu px-3 py-3 flex items-center gap-2"
+               >
                 <DonutChart pct={overallPct} size={38} color={pctColor(overallPct)} stroke={3.5} />
                 <div>
-                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400">Att %</p>
+                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-500">Att %</p>
                   <p className="text-lg font-extrabold" style={{ color: pctColor(overallPct), letterSpacing: '-0.02em' }}>{overallPct}%</p>
                 </div>
               </div>
               <StatCard label="Half Days" value={filtered.reduce(function (s, r) { return s + (r.days_half || 0) }, 0)} color="#f97316" icon="½" />
-              <StatCard label="Absent" value={filtered.reduce(function (s, r) { return s + (r.days_absent || 0) }, 0)} color="#dc2626" icon="✕" />
+              <StatCard label="Absent" value={filtered.reduce(function (s, r) { return s + (r.days_absent || 0) }, 0)} color="#dc2626" icon="xCircle" />
             </div>
 
             {filtered.length > 0 && (
-              <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Attendance Distribution</p>
+              <div className="neu rounded-2xl p-3 mb-3">
+                <p className="text-[9px] font-bold tracking-wider uppercase text-slate-500 mb-2">Attendance Distribution</p>
                 <div className="flex items-end gap-1.5 h-10">
                   {attBuckets.map(function (count, i) {
                     var maxB = Math.max.apply(null, attBuckets.concat([1]))
@@ -522,7 +523,7 @@ export default function Analysis() {
                           opacity: 0.8,
                           transition: 'height 0.4s ease'
                         }} />
-                        <span className="text-[7px] text-slate-400 mt-0.5 font-bold">{attLabels[i]}</span>
+                        <span className="text-[7px] text-slate-500 mt-0.5 font-bold">{attLabels[i]}</span>
                       </div>
                     )
                   })}
@@ -534,8 +535,8 @@ export default function Analysis() {
               {filtered.map(function (r) {
                 var pct = r.attendance_pct != null ? r.attendance_pct : (r.effective_days > 0 ? Math.round(((r.days_present + (r.days_half || 0) * 0.5) / r.effective_days) * 100) : 0)
                 return (
-                  <div key={r.employee_id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
-                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                  <div key={r.employee_id} className="neu rounded-2xl px-3.5 py-2.5"
+                    >
                     <div className="flex items-center gap-2.5">
                       <DonutChart pct={pct} size={36} color={pctColor(pct)} stroke={3} />
                       <div className="flex-1 min-w-0">
@@ -543,20 +544,20 @@ export default function Analysis() {
                           <p className="text-[13px] font-bold text-slate-800 truncate">{r.name}</p>
                           <p className={'text-sm font-extrabold ' + pctTextClass(pct)}>{pct}%</p>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium">{r.emp_code} · {r.department_name || ''}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{r.emp_code} · {r.department_name || ''}</p>
                         <div className="flex gap-2.5 mt-1 text-[10px] font-bold">
                           <span className="text-emerald-600">{r.days_present || 0}P</span>
                           <span className="text-orange-500">{r.days_half || 0}H</span>
                           <span className="text-red-500">{r.days_absent || 0}A</span>
                           <span className="text-amber-500">{r.days_incomplete || 0}Inc</span>
-                          <span className="text-slate-400 font-medium">{r.total_hours}h</span>
+                          <span className="text-slate-500 font-medium">{r.total_hours}h</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 )
               })}
-              {filtered.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No data</p>}
+              {filtered.length === 0 && <p className="text-xs text-slate-500 text-center py-12">No data</p>}
             </div>
           </>
         )
@@ -583,14 +584,14 @@ export default function Analysis() {
         return (
           <>
             <div className="grid grid-cols-3 gap-2 mb-3">
-              <StatCard label="Avg Daily" value={overallAvg + 'h'} color="#3b82f6" icon="📊" />
-              <StatCard label="< 8h Avg" value={below8} color="#dc2626" icon="⚠" />
-              <StatCard label="≥ 10h Avg" value={above10} color="#059669" icon="💪" />
+              <StatCard label="Avg Daily" value={overallAvg + 'h'} color="#4f46e5" icon="chart" />
+              <StatCard label="< 8h Avg" value={below8} color="#dc2626" icon="alert" />
+              <StatCard label="≥ 10h Avg" value={above10} color="#059669" icon="trend" />
             </div>
 
             {hrValues.length > 0 && (
-              <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-2">Hours per Person (sorted low→high)</p>
+              <div className="neu rounded-2xl p-3 mb-3">
+                <p className="text-[9px] font-bold tracking-wider uppercase text-slate-500 mb-2">Hours per Person (sorted low→high)</p>
                 <div className="flex items-end gap-px h-10">
                   {hrValues.map(function (v, i) {
                     var h = maxHr > 0 ? (v / maxHr) * 36 : 0
@@ -607,7 +608,7 @@ export default function Analysis() {
                 </div>
                 <div className="flex justify-between mt-1">
                   <span className="text-[7px] text-red-400 font-bold">Low</span>
-                  <span className="text-[7px] text-slate-300">— 8h threshold —</span>
+                  <span className="text-[7px] text-slate-400">— 8h threshold —</span>
                   <span className="text-[7px] text-emerald-500 font-bold">High</span>
                 </div>
               </div>
@@ -617,19 +618,19 @@ export default function Analysis() {
               {avgHrsPerPerson.map(function (r) {
                 var barWidth = Math.min(Math.round((r.avgDaily / 14) * 100), 100)
                 return (
-                  <div key={r.employee_id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
-                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                  <div key={r.employee_id} className="neu rounded-2xl px-3.5 py-2.5"
+                    >
                     <div className="flex items-center justify-between mb-1">
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-bold text-slate-800 truncate">{r.name}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">{r.emp_code} · {r.department_name || ''}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{r.emp_code} · {r.department_name || ''}</p>
                       </div>
                       <div className="text-right ml-2">
                         <p className={'text-sm font-extrabold ' + hrsTextClass(r.avgDaily)}>{r.avgDaily}h</p>
-                        <p className="text-[8px] text-slate-400">avg/day</p>
+                        <p className="text-[8px] text-slate-500">avg/day</p>
                       </div>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
+                    <div className="w-full bg-slate-300/50 rounded-full h-1.5">
                       <div className="h-1.5 rounded-full transition-all duration-500" style={{
                         width: barWidth + '%',
                         background: 'linear-gradient(90deg, ' + hrsColor(r.avgDaily) + ', ' + hrsColor(r.avgDaily) + '88)'
@@ -642,7 +643,7 @@ export default function Analysis() {
                   </div>
                 )
               })}
-              {avgHrsPerPerson.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No data</p>}
+              {avgHrsPerPerson.length === 0 && <p className="text-xs text-slate-500 text-center py-12">No data</p>}
             </div>
           </>
         )
@@ -665,20 +666,20 @@ export default function Analysis() {
           <>
             {isRecent && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
-                <p className="text-[10px] text-amber-700 font-medium">🕑 Today's DARs may not be reflected yet (nightly consolidation at 11:20 PM)</p>
+                <p className="flex items-center gap-1 text-[10px] text-amber-700 font-medium"><MiniIcon name="clock" className="w-3 h-3 shrink-0" />Today's DARs may not be reflected yet (nightly consolidation at 11:20 PM)</p>
               </div>
             )}
             {filtered.length > 0 && filtered[0].dar_cutoff && (
-              <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 mb-3">
-                <p className="text-[10px] text-slate-500 font-medium">📅 DAR data through <strong className="text-slate-700">{filtered[0].dar_cutoff}</strong></p>
+              <div className="neu-inset rounded-xl px-3 py-1.5 mb-3">
+                <p className="flex items-center gap-1 text-[10px] text-slate-500 font-medium"><MiniIcon name="calendar" className="w-3 h-3 shrink-0" />DAR data through <strong className="text-slate-700">{filtered[0].dar_cutoff}</strong></p>
               </div>
             )}
             <div className="grid grid-cols-4 gap-2 mb-3">
-              <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 px-3 py-3 flex items-center gap-2"
-                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div className="relative overflow-hidden rounded-2xl neu px-3 py-3 flex items-center gap-2"
+               >
                 <DonutChart pct={overallPct} size={38} color={pctColor(overallPct)} stroke={3.5} />
                 <div>
-                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400">Rate</p>
+                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-500">Rate</p>
                   <p className="text-lg font-extrabold" style={{ color: pctColor(overallPct), letterSpacing: '-0.02em' }}>{overallPct}%</p>
                 </div>
               </div>
@@ -690,8 +691,8 @@ export default function Analysis() {
             <div className="space-y-1.5">
               {filtered.map(function (r) {
                 return (
-                  <div key={r.employee_id} className="bg-white border border-slate-100 rounded-2xl px-3.5 py-2.5"
-                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                  <div key={r.employee_id} className="neu rounded-2xl px-3.5 py-2.5"
+                    >
                     <div className="flex items-center gap-2.5">
                       <DonutChart pct={r.compliance_pct} size={36} color={pctColor(r.compliance_pct)} stroke={3} />
                       <div className="flex-1 min-w-0">
@@ -699,18 +700,18 @@ export default function Analysis() {
                           <p className="text-[13px] font-bold text-slate-800 truncate">{r.name}</p>
                           <p className={'text-sm font-extrabold ' + pctTextClass(r.compliance_pct)}>{r.compliance_pct}%</p>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium">{r.emp_code} · {r.department_name || ''}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{r.emp_code} · {r.department_name || ''}</p>
                         <div className="flex gap-3 mt-1 text-[10px] font-medium">
                           <span className="text-emerald-600">{r.days_submitted_on_time || 0} on-time</span>
                           {(r.days_late || 0) > 0 && <span className="text-amber-600">{r.days_late} late</span>}
-                          <span className="text-slate-400">{r.days_present} present</span>
+                          <span className="text-slate-500">{r.days_present} present</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 )
               })}
-              {filtered.length === 0 && <p className="text-xs text-slate-400 text-center py-12">No data</p>}
+              {filtered.length === 0 && <p className="text-xs text-slate-500 text-center py-12">No data</p>}
             </div>
           </>
         )

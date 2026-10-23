@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatDate, formatTime12, formatDisplayDate } from '../../lib/formatters'
+import MiniIcon from '../../components/MiniIcon'
 import { useAuth } from '../../lib/useAuth'
 import { useLanguage } from '../../lib/i18n'
 
@@ -175,21 +176,21 @@ export default function DARWriter() {
     var bullets = formatTasksBullets(existingDAR.tasks)
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-slate-800">{t('dar_title')}</h2>
+        <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">{t('dar_title')}</h2>
 
         <div className="flex items-center gap-2">
           <input type="date" value={selectedDate} onChange={handleDateChange}
             min={formatDate(new Date(Date.now() - 86400000))}
             max={formatDate(new Date())}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1" />
+            className="border-0 neu-inset rounded-xl px-3 py-2.5 text-sm flex-1 text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60" />
         </div>
 
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+        <div className="neu rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2 text-emerald-700 text-xs font-medium">
-            <span>✅</span> {t('dar_exists')}
+            <MiniIcon name="checkCircle" className="w-4 h-4" /> {t('dar_exists')}
           </div>
 
-          <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
+          <div className="neu-inset rounded-xl p-3 space-y-2 text-sm">
             <p className="font-semibold text-slate-700">DAR: {formatDisplayDate(existingDAR.report_date)}</p>
             <p className="text-slate-600">{t('dar_punch_in')}: {formatTime12(existingDAR.punch_in)}</p>
             <div>
@@ -308,20 +309,20 @@ export default function DARWriter() {
       <div className="mt-6">
         <h3 className="text-sm font-bold text-slate-700 mb-3">{t('dar_history')}</h3>
         {historyLoading ? (
-          <p className="text-xs text-gray-400">{t('loading')}</p>
+          <p className="text-xs text-slate-500">{t('loading')}</p>
         ) : history.length === 0 ? (
-          <p className="text-xs text-gray-400">{t('dar_no_history')}</p>
+          <p className="text-xs text-slate-500">{t('dar_no_history')}</p>
         ) : (
           <div className="space-y-2">
             {history.map(function (dar) {
               var bullets = formatTasksBullets(dar.tasks)
               return (
-                <details key={dar.report_date} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <details key={dar.report_date} className="neu rounded-2xl overflow-hidden">
                   <summary className="px-4 py-3 text-sm font-medium text-slate-700 cursor-pointer flex items-center justify-between">
                     <span>{formatDisplayDate(dar.report_date)}</span>
-                    <span className="text-xs text-gray-400">{bullets.length} tasks</span>
+                    <span className="text-xs text-slate-500">{bullets.length} tasks</span>
                   </summary>
-                  <div className="px-4 pb-3 space-y-1 text-sm border-t border-gray-100 pt-2">
+                  <div className="px-4 pb-3 space-y-1 text-sm border-t border-slate-300/50 pt-2">
                     <p className="text-slate-500">{t('dar_punch_in')}: {formatTime12(dar.punch_in)}</p>
                     {bullets.map(function (b, i) {
                       return <p key={i} className="text-slate-600">{b}</p>
@@ -340,15 +341,15 @@ export default function DARWriter() {
   // ── Main form ──
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-slate-800">{t('dar_title')}</h2>
+      <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">{t('dar_title')}</h2>
 
       {/* Date picker */}
       <div>
-        <label className="text-xs font-medium text-slate-500 mb-1 block">{t('dar_date')}</label>
+        <label className="text-xs font-medium text-slate-600 mb-1 block">{t('dar_date')}</label>
         <input type="date" value={selectedDate} onChange={handleDateChange}
           min={formatDate(new Date(Date.now() - 86400000))}
           max={formatDate(new Date())}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          className="w-full border-0 neu-inset rounded-xl px-3 py-2.5 text-sm text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60" />
       </div>
 
       {loading ? (
@@ -358,7 +359,7 @@ export default function DARWriter() {
       ) : (
         <>
           {/* Punch times */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+          <div className="neu rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-500">{t('dar_punch_in')}</span>
               {!punchManual && <span className="text-[10px] text-emerald-600">{t('dar_punch_auto')}</span>}
@@ -368,8 +369,8 @@ export default function DARWriter() {
             <input type="time" value={punchIn}
               onChange={function (e) { setPunchIn(e.target.value) }}
               readOnly={!punchManual}
-              className={'w-full border rounded-lg px-3 py-2 text-sm ' +
-                (punchManual ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-gray-50 text-slate-600')} />
+              className={'w-full border-0 neu-inset rounded-xl px-3 py-2.5 text-sm outline-none focus:outline-2 focus:outline-blue-400/60 ' +
+                (punchManual ? 'outline-1 outline-amber-300 text-amber-800' : 'text-slate-600')} />
 
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-500">{t('dar_punch_out')}</span>
@@ -378,8 +379,8 @@ export default function DARWriter() {
             <input type="time" value={punchOut}
               onChange={function (e) { setPunchOut(e.target.value) }}
               readOnly={!punchManual}
-              className={'w-full border rounded-lg px-3 py-2 text-sm ' +
-                (punchManual ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-gray-50 text-slate-600')} />
+              className={'w-full border-0 neu-inset rounded-xl px-3 py-2.5 text-sm outline-none focus:outline-2 focus:outline-blue-400/60 ' +
+                (punchManual ? 'outline-1 outline-amber-300 text-amber-800' : 'text-slate-600')} />
           </div>
 
           {/* Tasks */}
@@ -390,7 +391,7 @@ export default function DARWriter() {
               onChange={function (e) { setTasks(e.target.value) }}
               placeholder={t('dar_tasks_placeholder')}
               rows={6}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none placeholder:text-gray-300"
+              className="w-full border-0 neu-inset rounded-xl px-3 py-2.5 text-sm resize-none placeholder:text-slate-400 text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60"
             />
           </div>
 
@@ -399,7 +400,7 @@ export default function DARWriter() {
 
           {/* Submit */}
           <button onClick={handleSubmitClick}
-            className="w-full py-3 bg-slate-800 text-white text-sm font-semibold rounded-xl active:bg-slate-700">
+            className="w-full py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-600/30 active:bg-blue-700">
             {t('dar_preview')}
           </button>
         </>

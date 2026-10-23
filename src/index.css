@@ -1,4 +1,16 @@
 @import "tailwindcss";
+
+/* App font: Inter for Latin text and numbers, Noto Sans Devanagari for the
+   Hindi screens; system fonts if they haven't loaded (offline). */
+@theme {
+  --font-sans: "Inter", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
 /* iPhone status bar: the app draws under it (viewport-fit=cover +
    black-translucent), so paint that strip in the header colour instead of
    the old white band. Below the camera overlays (z 9998+). */
@@ -9,7 +21,7 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background: #1e293b;
+  background: #0f172a;
   z-index: 9997;
   pointer-events: none;
 }
@@ -20,7 +32,7 @@ body::before {
    top) keeps that strip dark instead of white. */
 html,
 body {
-  background-color: #1e293b;
+  background-color: #0f172a;
   /* Anything poking out sideways makes iOS zoom the whole app out, which
      shows as a small app floating on the dark background. */
   overflow-x: clip;
@@ -34,4 +46,114 @@ body {
 input::-ms-reveal,
 input::-ms-clear {
   display: none;
+}
+
+/* ── Mobile app: warm cream background + neumorphism ─────────────────────
+   The staff app sits on a warm cream base with large soft colour washes in
+   the corners (lavender, rose, sage, honey). Surfaces are neumorphic (see
+   below). */
+:root {
+  --neu-surface: #f8f6f3;
+  --neu-inset: #fcfbf9;
+  --neu-dark: rgba(120, 102, 80, 0.38);
+  --neu-light: rgba(255, 255, 255, 1);
+}
+
+.app-gradient {
+  background:
+    radial-gradient(60% 35% at 0% 0%, rgba(200, 186, 240, 0.35) 0%, rgba(200, 186, 240, 0) 70%),
+    radial-gradient(55% 32% at 100% 10%, rgba(244, 196, 196, 0.28) 0%, rgba(244, 196, 196, 0) 70%),
+    radial-gradient(60% 35% at 0% 100%, rgba(200, 214, 190, 0.3) 0%, rgba(200, 214, 190, 0) 70%),
+    radial-gradient(60% 35% at 100% 100%, rgba(240, 214, 170, 0.3) 0%, rgba(240, 214, 170, 0) 70%),
+    linear-gradient(170deg, #fbfaf8 0%, #ffffff 50%, #faf8f5 100%);
+}
+
+/* Neumorphic surfaces: the same warm tone as the background, lifted by a
+   white highlight top-left and a soft warm shadow bottom-right (raised), or
+   the same two shadows inset (pressed in). Note: these set box-shadow, so
+   Tailwind ring-* utilities don't show on them; use outline-* instead. */
+
+/* Raised card */
+.neu {
+  background: var(--neu-surface);
+  box-shadow: 7px 7px 16px var(--neu-dark), -7px -7px 16px var(--neu-light);
+}
+
+/* Smaller raised element: chips, small buttons, icon tiles */
+.neu-sm {
+  background: var(--neu-surface);
+  box-shadow: 4px 4px 9px var(--neu-dark), -4px -4px 9px var(--neu-light);
+}
+
+/* Pressed in: inputs, active tab, selected chips, inner wells */
+.neu-inset {
+  background: var(--neu-inset);
+  box-shadow: inset 2px 2px 5px rgba(120, 102, 80, 0.18), inset -2px -2px 5px var(--neu-light);
+}
+
+/* Raised button that presses in when tapped */
+.neu-press {
+  background: var(--neu-surface);
+  box-shadow: 4px 4px 9px var(--neu-dark), -4px -4px 9px var(--neu-light);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.neu-press:active {
+  box-shadow: inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light);
+  transform: scale(0.985);
+}
+
+/* Mobile colour theme. MobileShell's root carries .mobile-theme; while it is
+   on the page, Tailwind's blue scale is remapped to a deep indigo accent and
+   gray/slate to warm stone, so every mobile screen (and its portalled
+   modals) picks up the calmer palette without touching the admin pages.
+   Works because Tailwind v4 utilities read var(--color-*). */
+:root:has(.mobile-theme) {
+  --color-blue-50: #eef0fd;
+  --color-blue-100: #e0e3fb;
+  --color-blue-200: #c7cbf6;
+  --color-blue-300: #a5abee;
+  --color-blue-400: #7c82e3;
+  --color-blue-500: #5148d8;
+  --color-blue-600: #4338ca;
+  --color-blue-700: #3730a3;
+  --color-blue-800: #312e81;
+  --color-blue-900: #282563;
+
+  --color-slate-50: #faf8f5;
+  --color-slate-100: #f3efe9;
+  --color-slate-200: #e6e0d7;
+  --color-slate-300: #d4ccc0;
+  --color-slate-400: #a39a8e;
+  --color-slate-500: #776e63;
+  --color-slate-600: #5a5249;
+  --color-slate-700: #443e37;
+  --color-slate-800: #2c2722;
+  --color-slate-900: #1f1b17;
+
+  --color-gray-50: #faf8f5;
+  --color-gray-100: #f3efe9;
+  --color-gray-200: #e6e0d7;
+  --color-gray-300: #d4ccc0;
+  --color-gray-400: #a39a8e;
+  --color-gray-500: #776e63;
+  --color-gray-600: #5a5249;
+  --color-gray-700: #443e37;
+  --color-gray-800: #2c2722;
+  --color-gray-900: #1f1b17;
+}
+
+/* Slim scrollbar for lists that scroll inside a card (admin live feed) */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }

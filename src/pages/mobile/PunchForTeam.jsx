@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { captureProxyPhoto } from '../../lib/camera'
+import MiniIcon from '../../components/MiniIcon'
 import { getLocation } from '../../lib/gps'
 import { useLanguage } from '../../lib/i18n'
 
@@ -419,15 +420,15 @@ export default function PunchForTeam() {
   function renderOpenCard(op) {
     var hoursAgo = Math.round((Date.now() - new Date(op.punched_in_at).getTime()) / 3600000)
     return (
-      <div key={op.punch_id} className={'bg-white border rounded-xl px-4 py-3 ' +
-        (hoursAgo > 12 ? 'border-amber-300 bg-amber-50/50' : 'border-gray-200')}>
+      <div key={op.punch_id} className={'neu rounded-2xl px-4 py-3 ' +
+        (hoursAgo > 12 ? 'outline-2 outline-amber-300' : '')}>
         <div className="flex items-center justify-between mb-1">
           <div>
             <p className="text-sm font-medium text-gray-900">
               {op.name}
-              {op.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">{t('team_casual_tag')}</span>}
+              {op.is_casual && <span className="ml-1 text-[9px] text-slate-600 neu-inset px-1 rounded">{t('team_casual_tag')}</span>}
             </p>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-slate-500">
               {op.emp_code} · {op.department_name} · {formatTime(op.punched_in_at)}
             </p>
           </div>
@@ -436,13 +437,13 @@ export default function PunchForTeam() {
         <div className="flex gap-2 mt-2">
           <button
             onClick={function () { handleProxyPunch({ id: op.employee_id, name: op.name }, 'out') }}
-            className="flex-1 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+            className="flex-1 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg shadow-md shadow-red-500/30 hover:bg-red-600 transition-colors"
           >
             {t('team_punch_out_now')}
           </button>
           <button
             onClick={function () { setRetroTarget(op); setRetroTime(''); setRetroError('') }}
-            className="flex-1 py-1.5 text-xs font-semibold text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex-1 py-1.5 text-xs font-semibold text-slate-700 neu-press rounded-lg"
           >
             {t('team_enter_time')}
           </button>
@@ -452,7 +453,7 @@ export default function PunchForTeam() {
   }
 
   if (loading) {
-    return <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+    return <p className="text-sm text-slate-500 text-center py-12">{t('loading')}</p>
   }
 
   var openIds = {}
@@ -460,11 +461,11 @@ export default function PunchForTeam() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">{t('team_title')}</h2>
-      <p className="text-xs text-gray-400 mb-4">{t('team_subtitle')}</p>
+      <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">{t('team_title')}</h2>
+      <p className="text-[13px] text-slate-500 mt-1 mb-4">{t('team_subtitle')}</p>
 
       {/* Tab bar */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5">
+      <div className="flex gap-1 neu rounded-2xl p-1.5 mb-5">
         {[
           { id: 'punch', label: t('team_tab_punch'), count: casuals.length },
           { id: 'incoming', label: 'Incoming', count: incoming.length },
@@ -474,13 +475,13 @@ export default function PunchForTeam() {
           return (
             <button key={tb.id}
               onClick={function () { setTab(tb.id) }}
-              className={'flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ' +
-                (tab === tb.id ? 'bg-white text-slate-800 shadow-sm' : 'text-gray-500')}
+              className={'flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ' +
+                (tab === tb.id ? 'neu-inset text-blue-600' : 'text-gray-600')}
             >
               {tb.label}
               {tb.count > 0 && (
                 <span className={'ml-1 text-[10px] px-1.5 py-0.5 rounded-full ' +
-                  (tab === tb.id ? 'bg-slate-800 text-white' : 'bg-gray-300 text-gray-600')}>
+                  (tab === tb.id ? 'bg-blue-600 text-white' : 'bg-slate-300/70 text-gray-700')}>
                   {tb.count}
                 </span>
               )}
@@ -494,7 +495,7 @@ export default function PunchForTeam() {
         <div className="space-y-2">
           {casuals.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400 mb-2">{t('team_no_casuals')}</p>
+              <p className="text-sm text-slate-500 mb-2">{t('team_no_casuals')}</p>
               <button onClick={function () { setTab('add') }}
                 className="text-sm text-slate-700 underline">{t('team_add_casual_link')}</button>
             </div>
@@ -505,7 +506,7 @@ export default function PunchForTeam() {
                 value={punchSearch}
                 onChange={function (e) { setPunchSearch(e.target.value) }}
                 placeholder="Search casual worker…"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60"
               />
               {casuals.filter(function (c) {
                 if (!punchSearch) return true
@@ -516,8 +517,8 @@ export default function PunchForTeam() {
                 var isPunching = punchingId === c.id
 
                 return (
-                  <div key={c.id} className={'bg-white border rounded-xl px-4 py-3 flex items-center justify-between ' +
-                    (selectedIds[c.id] ? 'border-blue-400 bg-blue-50/30' : 'border-gray-200')}>
+                  <div key={c.id} className={'neu rounded-2xl px-4 py-3 flex items-center justify-between ' +
+                    (selectedIds[c.id] ? 'outline-2 outline-blue-400/70' : '')}>
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {openIds[c.id] && (
                         <input type="checkbox" checked={!!selectedIds[c.id]}
@@ -526,7 +527,7 @@ export default function PunchForTeam() {
                       )}
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                        <p className="text-[11px] text-gray-400 truncate">
+                        <p className="text-[11px] text-slate-500 truncate">
                           {c.emp_code} · {c.department_name || '—'}
                           {c.vendor_name && <span className="text-blue-500"> · {c.vendor_name}</span>}
                         </p>
@@ -534,30 +535,30 @@ export default function PunchForTeam() {
                     </div>
                     <div className="flex items-center gap-2 ml-2 shrink-0">
                       {isPunching ? (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-slate-500">
                           {punchStep === 'camera' ? t('team_camera') : t('team_uploading')}
                         </span>
                       ) : isOpen ? (
                         <button
                           onClick={function () { handleProxyPunch(c, 'out') }}
-                          className="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg shadow-md shadow-red-500/30 hover:bg-red-600 transition-colors"
                         >
                           {t('team_punch_out')}
                         </button>
                       ) : (
                         <button
                           onClick={function () { handleProxyPunch(c, 'in') }}
-                          className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg shadow-md shadow-emerald-600/30 hover:bg-emerald-700 transition-colors"
                         >
                           {t('team_punch_in')}
                         </button>
                       )}
                       <button
                         onClick={function () { setRemoveTarget(c) }}
-                        className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                         title="Remove casual"
                       >
-                        ✕
+                        <MiniIcon name="x" className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -573,7 +574,7 @@ export default function PunchForTeam() {
         <div className="space-y-2">
           {incoming.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400">No incoming transfers</p>
+              <p className="text-sm text-slate-500">No incoming transfers</p>
             </div>
           ) : (
             <>
@@ -581,37 +582,37 @@ export default function PunchForTeam() {
                 <button
                   onClick={handleBulkReceive}
                   disabled={receivingId === 'bulk'}
-                  className="w-full py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors mb-3"
+                  className="w-full py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 disabled:opacity-40 transition-colors mb-3"
                 >
-                  {receivingId === 'bulk' ? 'Receiving…' : '📷 Receive All ' + incoming.length + ' Workers'}
+                  {receivingId === 'bulk' ? 'Receiving…' : <span className="inline-flex items-center justify-center gap-1.5"><MiniIcon name="camera" className="w-4 h-4" />{'Receive All ' + incoming.length + ' Workers'}</span>}
                 </button>
               )}
               {incoming.map(function (mov) {
             var isReceiving = receivingId === mov.movement_id
             var minsAgo = Math.round((Date.now() - new Date(mov.initiated_at).getTime()) / 60000)
             return (
-              <div key={mov.movement_id} className="bg-white border border-blue-200 rounded-xl px-4 py-3 bg-blue-50/30">
+              <div key={mov.movement_id} className="neu rounded-2xl px-4 py-3 outline-1 outline-blue-300/60">
                 <div className="flex items-center justify-between mb-1">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{mov.name}</p>
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px] text-slate-500">
                       {mov.emp_code} · from <span className="text-amber-600 font-medium">{mov.from_venue}</span> → <span className="text-emerald-600 font-medium">{mov.to_venue}</span>
                     </p>
                   </div>
                   <span className="text-[10px] text-blue-600 font-semibold">{minsAgo}m ago</span>
                 </div>
-                <p className="text-[10px] text-gray-400 mb-2">Sent by {mov.initiated_by_name}</p>
+                <p className="text-[10px] text-slate-500 mb-2">Sent by {mov.initiated_by_name}</p>
                 <div className="flex gap-2">
                   <button
                     onClick={function () { handleReceive(mov) }}
                     disabled={isReceiving}
                     className="flex-1 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                   >
-                    {isReceiving ? 'Receiving…' : '📷 Receive & Punch In'}
+                    {isReceiving ? 'Receiving…' : <span className="inline-flex items-center justify-center gap-1.5"><MiniIcon name="camera" className="w-3.5 h-3.5" />{'Receive & Punch In'}</span>}
                   </button>
                   <button
                     onClick={function () { handleCancelTransfer(mov) }}
-                    className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                    className="px-3 py-1.5 text-xs font-semibold text-red-600 neu-press rounded-lg"
                   >
                     Cancel
                   </button>
@@ -666,7 +667,7 @@ export default function PunchForTeam() {
         <div className="space-y-2">
           {openPunches.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400">{t('team_no_open')}</p>
+              <p className="text-sm text-slate-500">{t('team_no_open')}</p>
             </div>
           ) : (
             <>
@@ -680,12 +681,12 @@ export default function PunchForTeam() {
 
       {/* ADD CASUAL TAB */}
       {tab === 'add' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="neu rounded-2xl p-4">
           <form onSubmit={handleBatchAdd} className="space-y-3">
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('team_department')} *</label>
               <select value={newDept} onChange={function (e) { setNewDept(e.target.value) }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60">
                 <option value="">{t('team_select_dept')}</option>
                 {departments.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
               </select>
@@ -696,16 +697,16 @@ export default function PunchForTeam() {
                 setVendorId(e.target.value)
                 if (e.target.value !== 'new') { setNewVendorName('') }
               }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60">
                 <option value="">— No Vendor —</option>
                 {vendors.map(function (v) { return <option key={v.id} value={v.id}>{v.name}</option> })}
-                <option value="new">➕ Add New Vendor</option>
+                <option value="new">+ Add New Vendor</option>
               </select>
             </div>
             {vendorId === 'new' && (
               <input type="text" value={newVendorName} onChange={function (e) { setNewVendorName(e.target.value) }}
                 placeholder="Vendor / Agency name *" maxLength={100}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+                className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60" />
             )}
 
             <div>
@@ -733,12 +734,12 @@ export default function PunchForTeam() {
                         placeholder={'Name ' + (i + 1)}
                         maxLength={100}
                         autoFocus={i === batchNames.length - 1}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                        className="flex-1 px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60"
                       />
                       {batchNames.length > 1 && (
                         <button type="button" onClick={function () {
                           setBatchNames(batchNames.filter(function (_, j) { return j !== i }))
-                        }} className="px-2 text-gray-300 hover:text-red-500 text-lg">✕</button>
+                        }} className="px-2 text-slate-400 hover:text-red-500"><MiniIcon name="x" className="w-4 h-4" /></button>
                       )}
                     </div>
                   )
@@ -753,7 +754,7 @@ export default function PunchForTeam() {
             {addError && <p className="text-xs text-red-600">{addError}</p>}
 
             <button type="submit" disabled={addSaving}
-              className="w-full py-2.5 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
+              className="w-full py-2.5 text-sm text-white bg-slate-800 rounded-lg shadow-md shadow-slate-800/30 hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
               {addSaving ? t('team_adding') : (
                 batchNames.filter(function (n) { return n.trim() }).length > 1
                   ? 'Add ' + batchNames.filter(function (n) { return n.trim() }).length + ' Workers'
@@ -763,17 +764,17 @@ export default function PunchForTeam() {
           </form>
 
           {confirmExisting && (
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <div className="mt-4 neu-inset rounded-xl p-3">
               <p className="text-sm text-amber-800 font-medium mb-2">
                 {t('team_name_exists', { name: confirmExisting.name })}
               </p>
               <div className="flex gap-2">
                 <button onClick={handleReuseExisting}
-                  className="flex-1 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors">
+                  className="flex-1 py-1.5 text-xs font-semibold text-emerald-700 neu-press rounded-lg">
                   {t('team_yes_same')}
                 </button>
                 <button onClick={handleForceCreate} disabled={addSaving}
-                  className="flex-1 py-1.5 text-xs font-semibold text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40">
+                  className="flex-1 py-1.5 text-xs font-semibold text-slate-700 neu-press rounded-lg disabled:opacity-40">
                   {t('team_no_create')}
                 </button>
               </div>
@@ -814,11 +815,11 @@ export default function PunchForTeam() {
                   {t('team_retro_time_label')}
                 </label>
                 <input type="time" value={retroTime} onChange={function (e) { setRetroTime(e.target.value) }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                  className="w-full px-3 py-2 border-0 neu-inset rounded-xl text-sm text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60"
                   autoFocus />
               </div>
 
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[10px] text-slate-500">
                 {t('team_retro_help', { time: formatTime(retroTarget.punched_in_at) })}
               </p>
 
@@ -828,7 +829,7 @@ export default function PunchForTeam() {
                 <button type="button" onClick={function () { setRetroTarget(null) }}
                   className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">{t('cancel')}</button>
                 <button type="submit" disabled={retroSaving}
-                  className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
+                  className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg shadow-md shadow-slate-800/30 hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
                   {retroSaving ? t('saving') : t('save')}
                 </button>
               </div>

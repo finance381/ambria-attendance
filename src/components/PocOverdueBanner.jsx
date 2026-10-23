@@ -46,7 +46,7 @@ export default function PocOverdueBanner() {
         sub={first.employee_name + ' — ' + first.task_title + ', ' + t('due_overdue_by', { n: daysOverdue(first.due_date) })}
         expanded={open}>
         {open && (
-          <ul className="border-t border-gray-100 divide-y divide-gray-100 max-h-64 overflow-y-auto">
+          <ul className="neu-inset rounded-xl mx-2 mb-2 divide-y divide-slate-300/40 max-h-64 overflow-y-auto">
             {rows.map(function (r) {
               return (
                 <li key={(r.kind || 'task') + r.task_id + '-' + r.employee_id} className="px-3 py-2 flex items-center justify-between gap-3">

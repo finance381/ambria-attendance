@@ -9,12 +9,12 @@ export var ROLES = [
   { value: 'admin', label: 'Admin' }
 ]
 
-export var inputClass = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:border-transparent'
-export var labelClass = 'block text-[13px] font-medium text-gray-700 mb-1.5'
+export var inputClass = 'w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+export var labelClass = 'block text-[13px] font-semibold text-gray-700 mb-1.5'
 // Small grey note next to a label, e.g. "(one or more)".
 export var hintClass = 'ml-1 text-xs font-normal text-gray-400'
 // Heading over a group of fields in the onboarding forms.
-export var sectionClass = 'text-sm font-semibold text-gray-900 pb-2 mb-1 border-b border-gray-100'
+export var sectionClass = 'text-[11px] font-semibold uppercase tracking-wider text-gray-500 pb-2 mb-1 border-b border-gray-100'
 
 export function toggle(list, id) {
   return list.includes(id) ? list.filter(function (x) { return x !== id }) : list.concat(id)
@@ -48,11 +48,11 @@ export function deptLabels(ids, departments) {
 
 // SVG path data for the tile icons (rendered by Icon in OnboardingFields).
 export var ICONS = {
-  edit: ['M13.5 3.5l3 3L7 16H4v-3l9.5-9.5z'],
-  trash: ['M4 6h12', 'M8 6V4h4v2', 'M6 6l1 10h6l1-10'],
-  task: ['M7 4h6', 'M5 5h10v12H5z', 'M8 10l1.5 1.5L12.5 8.5'],
-  test: ['M5 3h7l3 3v11H5z', 'M8 9h4', 'M8 12h4', 'M8 15h2'],
-  open: ['M8 4H4v12h12v-4', 'M11 4h5v5', 'M16 4l-7 7']
+  edit: ['M12 20h9', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z'],
+  trash: ['M3 6h18', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2', 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6', 'M10 11v6M14 11v6'],
+  task: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 14l2 2 4-4'],
+  test: ['M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z', 'M14 3v6h6', 'M8 13h8', 'M8 17h5'],
+  open: ['M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6', 'M15 3h6v6', 'M10 14L21 3']
 }
 
 // ── The onboarding sequence per department (tasks and tests together) ──────

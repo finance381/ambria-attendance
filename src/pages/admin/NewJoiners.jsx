@@ -2,6 +2,7 @@
 // Admin top-level "New Joiners" tab (/admin/new-joiners). Loads the shared
 // lookups (employees, departments, training docs) once and switches between
 // the Tasks, Task Order (per-department priority) and Tests sub-tabs.
+// Phones: the sub-tab bar scrolls sideways and the toast spans the width.
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -59,19 +60,22 @@ export default function NewJoiners() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">New Joiners</h2>
+      <div className="mb-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">New Joiners</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Onboarding tasks, their order and tests for new joiners</p>
+      </div>
 
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="flex gap-1 mb-4 sm:mb-5 bg-white ring-1 ring-gray-200/70 shadow-sm rounded-xl p-1 w-fit max-w-full max-md:overflow-x-auto max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden">
         {TABS.map(function (t) {
           var isActive = tab === t.id
           return (
             <button
               key={t.id}
               onClick={function () { setTab(t.id) }}
-              className={'px-5 py-2.5 text-sm font-semibold rounded-xl border transition-colors flex items-center gap-2.5 ' +
-                (isActive ? 'bg-slate-800 border-slate-800 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50')}
+              className={'px-3 sm:px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 ' +
+                (isActive ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30' : 'text-gray-600 hover:bg-gray-100')}
             >
-              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                 strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{TAB_ICONS[t.id]}</svg>
               {t.label}
             </button>
@@ -90,7 +94,7 @@ export default function NewJoiners() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-xl text-sm shadow-lg z-50">
+        <div className="fixed bottom-4 left-4 right-4 text-center sm:text-left sm:left-auto sm:bottom-6 sm:right-6 bg-slate-800 text-white px-5 py-3 rounded-xl text-sm shadow-lg z-50">
           {toast}
         </div>
       )}

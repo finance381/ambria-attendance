@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { capturePhoto } from '../lib/camera'
 import { getLocation } from '../lib/gps'
 import { useLanguage } from '../lib/i18n'
+import MiniIcon from './MiniIcon'
 import { queuePunch, registerBackgroundSync } from '../lib/offlineQueue'
 
 // Network steps get a time limit. On a weak signal an upload or the punch
@@ -219,25 +220,31 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     stepContent = (
       <button
         onClick={handlePunch}
-        className={'w-full py-4 rounded-2xl text-lg font-bold text-white transition-all active:scale-95 ' +
+        className={'w-full h-[60px] rounded-2xl text-[17px] font-semibold tracking-tight text-white inline-flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] ' +
           (punchType === 'in'
-            ? 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200'
-            : 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-200')
+            ? 'bg-emerald-600 hover:bg-emerald-700 shadow-[0_10px_24px_-8px] shadow-emerald-700/50'
+            : 'bg-rose-700 hover:bg-rose-800 shadow-[0_10px_24px_-8px] shadow-rose-800/50')
         }
       >
-        {'📸 ' + (punchType === 'in' ? t('punch_btn_in') : t('punch_btn_out'))}
+        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {punchType === 'in'
+            ? <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" /></>
+            : <><path d="M14 17l5-5-5-5M19 12H8" /><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5" /></>}
+        </svg>
+        {punchType === 'in' ? t('punch_btn_in') : t('punch_btn_out')}
       </button>
     )
   } else if (step === 'capturing') {
     stepContent = (
-      <div className="text-center py-6">
+      <div className="neu rounded-2xl text-center py-6 px-4">
         <div className="w-8 h-8 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-sm text-gray-500">{t('punch_opening_camera')}</p>
       </div>
     )
   } else if (step === 'uploading') {
     stepContent = (
-      <div className="text-center py-6">
+      <div className="neu rounded-2xl text-center py-6 px-4">
         {preview && <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-slate-200" />}
         <div className="w-8 h-8 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-sm text-gray-500">{t('punch_recording')}</p>
@@ -245,10 +252,10 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     )
   } else if (step === 'done') {
     stepContent = (
-      <div className="text-center py-6">
+      <div className="neu rounded-2xl text-center py-6 px-4">
         {preview && <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-emerald-300" />}
-        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <span className="text-2xl">✓</span>
+        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <MiniIcon name="check" className="w-6 h-6" />
         </div>
         <p className="text-sm font-semibold text-emerald-700">
           {punchType === 'in' ? t('punch_done_in') : t('punch_done_out')}
@@ -257,24 +264,24 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
     )
   } else if (step === 'queued') {
     stepContent = (
-      <div className="text-center py-6">
+      <div className="neu rounded-2xl text-center py-6 px-4">
         {preview && <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-amber-300" />}
-        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <span className="text-2xl">📶</span>
+        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <MiniIcon name="offline" className="w-6 h-6" />
         </div>
-        <p className="text-sm font-semibold text-amber-700">{t('punch_queued') || 'Punch saved offline'}</p>
-        <p className="text-[11px] text-amber-500 mt-1">{t('punch_queued_desc') || 'Will sync automatically when back online'}</p>
+        <p className="text-sm font-semibold text-amber-700">{t('punch_queued')}</p>
+        <p className="text-[11px] text-amber-500 mt-1">{t('punch_queued_desc')}</p>
       </div>
     )
   } else if (step === 'error') {
     stepContent = (
-      <div className="text-center py-6">
-        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <span className="text-2xl">✕</span>
+      <div className="neu rounded-2xl text-center py-6 px-4">
+        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <MiniIcon name="x" className="w-6 h-6" />
         </div>
         <p className="text-sm text-red-600 mb-3">{error}</p>
         <button onClick={function () { setStep('ready'); setError(''); setPreview(null) }}
-          className="px-4 py-2 text-sm text-slate-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+          className="neu-press px-4 py-2 text-sm font-semibold text-slate-700 rounded-xl">
           {t('punch_try_again')}
         </button>
       </div>
@@ -288,8 +295,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
       {showDarReminder && createPortal(
         <div className="fixed inset-0 z-[9997] bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-[300px] w-full shadow-xl text-center">
-            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-2xl">📝</span>
+            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <MiniIcon name="note" className="w-6 h-6" />
             </div>
             <p className="text-[15px] font-bold text-amber-800 mb-1.5">{t('dar_reminder_title') || 'DAR Reminder'}</p>
             <p className="text-[13px] text-stone-500 mb-5">{t('dar_reminder') || 'Remember to write your DAR in the group!'}</p>
@@ -305,8 +312,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
       {showGpsPrompt && createPortal(
         <div className="fixed inset-0 z-[9997] bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-[300px] w-full shadow-xl text-center">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-2xl">📍</span>
+            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <MiniIcon name="pin" className="w-6 h-6" />
             </div>
             <p className="text-[15px] font-bold text-red-600 mb-1.5">GPS Unavailable</p>
             <p className="text-[13px] text-stone-500 mb-5">Your location could not be detected. Punch will be recorded without venue info and flagged for review.</p>

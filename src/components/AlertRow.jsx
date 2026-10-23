@@ -5,12 +5,13 @@
 // the punch card stays near the top.
 // `expanded` turns the chevron down (for rows that open a list below);
 // `children` renders under the row, inside the same card.
+// Styled as a raised neumorphic card (.neu) with a small raised icon tile.
 
 var TONES = {
-  red: { tile: 'bg-red-50 text-red-600', title: 'text-red-800', ring: 'ring-red-100' },
-  amber: { tile: 'bg-amber-50 text-amber-600', title: 'text-amber-800', ring: 'ring-amber-100' },
-  indigo: { tile: 'bg-indigo-50 text-indigo-600', title: 'text-indigo-900', ring: 'ring-indigo-100' },
-  gray: { tile: 'bg-gray-100 text-gray-500', title: 'text-gray-800', ring: 'ring-gray-900/5' }
+  red: { tile: 'text-red-600', title: 'text-red-800', ring: 'ring-red-100' },
+  amber: { tile: 'text-amber-600', title: 'text-amber-800', ring: 'ring-amber-100' },
+  indigo: { tile: 'text-indigo-600', title: 'text-indigo-900', ring: 'ring-indigo-100' },
+  gray: { tile: 'text-gray-500', title: 'text-gray-800', ring: 'ring-gray-900/5' }
 }
 
 var PATHS = {
@@ -30,16 +31,16 @@ function Glyph({ name, className }) {
 export function AlertRow({ tone, icon, title, sub, expanded, children }) {
   var c = TONES[tone] || TONES.gray
   return (
-    <div className={'bg-white rounded-xl shadow-sm ring-1 mb-2.5 overflow-hidden ' + c.ring}>
+    <div className="neu rounded-2xl mb-3 overflow-hidden">
       <div className="flex items-center gap-3 px-3 py-2.5">
-        <span className={'w-8 h-8 rounded-lg inline-flex items-center justify-center shrink-0 ' + c.tile}>
+        <span className={'w-8 h-8 rounded-lg neu-sm inline-flex items-center justify-center shrink-0 ' + c.tile}>
           <Glyph name={icon} className="w-4 h-4" />
         </span>
         <div className="min-w-0 flex-1">
           <p className={'text-[13px] font-semibold truncate leading-tight ' + c.title}>{title}</p>
-          {sub && <p className="text-[11px] text-gray-500 truncate mt-0.5">{sub}</p>}
+          {sub && <p className="text-[11px] text-slate-500 truncate mt-0.5">{sub}</p>}
         </div>
-        <Glyph name="chevron" className={'w-4 h-4 text-gray-400 shrink-0 transition-transform ' + (expanded ? 'rotate-90' : '')} />
+        <Glyph name="chevron" className={'w-4 h-4 text-slate-500 shrink-0 transition-transform ' + (expanded ? 'rotate-90' : '')} />
       </div>
       {children}
     </div>

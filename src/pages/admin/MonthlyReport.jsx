@@ -1,10 +1,37 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// MonthlyReport.jsx — Admin "Monthly Report" page.
+// Per-employee attendance summary for a chosen month (present / half / absent /
+// incomplete days, hours, claims, leave deductions, continue credits) used for
+// payroll. Supports department + search filters, sortable columns, row
+// selection, a day-wise drill-down modal (with DOCX export), and a multi-month
+// export to Word (.docx) or Excel (.xlsx).
+// Phones (< md): stacked toolbar, compact cards, table scrolls inside its card
+// with a sticky Employee column, and the modals open as full-width sheets.
+// ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, HeadingLevel, WidthType, BorderStyle, ShadingType, PageOrientation } from 'docx'
 import * as XLSX from 'xlsx'
+import DeptPicker from '../../components/DeptPicker'
 
 
 var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+// Filter toolbar field style + labelled wrapper (matches DailyAttendance)
+// Phone-only sticky first columns of the report table (released at md)
+var STICKY_CHECK = 'sticky left-0 z-10 md:static md:z-auto'
+var STICKY_EMP = 'sticky left-10 z-10 shadow-[4px_0_6px_-4px_rgba(15,23,42,0.18)] md:static md:z-auto md:shadow-none'
+
+var FIELD = 'h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+
+function FilterField({ label, grow, span, children }) {
+  return (
+    <div className={(grow ? 'flex-1 min-w-48' : '') + (span ? ' col-span-2' : '')}>
+      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1 px-0.5">{label}</label>
+      {children}
+    </div>
+  )
+}
 
 export default function MonthlyReport() {
   var now = new Date()
@@ -798,255 +825,314 @@ export default function MonthlyReport() {
     yearOptions.push(y)
   }
 
+  // Summary stat cards (display only)
+  var STAT_CARDS = [
+    { label: 'Employees', value: filtered.length, dot: 'bg-slate-400', color: 'text-gray-900' },
+    { label: 'Present', value: totals.present, dot: 'bg-emerald-500', color: 'text-emerald-600' },
+    { label: 'Half Day', value: totals.half, dot: 'bg-orange-500', color: 'text-orange-600' },
+    { label: 'Absent', value: totals.absent, dot: 'bg-red-500', color: 'text-red-600' },
+    { label: 'Incomplete', value: totals.incomplete, dot: 'bg-amber-500', color: 'text-amber-600' },
+    { label: 'Total Hours', value: Math.round(totals.hours * 10) / 10, dot: 'bg-blue-500', color: 'text-gray-900' }
+  ]
+
+  var totalDeductions = filtered.reduce(function (sum, r) { return sum + (r.deductions || 0) }, 0)
+
+  function SortHead({ col, label, align, color, extra }) {
+    var arrow = sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+    var active = sortCol === col
+    return (
+      <th onClick={function () { handleSort(col) }}
+        className={(align || 'text-left') + ' px-2.5 py-2.5 md:px-4 md:py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:text-gray-800 transition-colors ' +
+          (active ? 'text-gray-900' : 'text-gray-500') + (extra ? ' ' + extra : '')}>
+        {color && <span className={'inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle ' + color} />}
+        {label}{arrow}
+      </th>
+    )
+  }
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-bold text-gray-900">Monthly Report</h2>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Monthly Report</h2>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5">Attendance summary for payroll · click a name for the day-wise breakdown</p>
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto">
           {selected.length > 0 && (
-            <span className="text-xs text-slate-600 bg-slate-100 px-2.5 py-1.5 rounded-lg font-medium">
-              {selected.length} selected
-              <button onClick={function () { setSelected([]) }} className="ml-2 text-slate-400 hover:text-slate-700">✕</button>
+            <span className="h-9 pl-3 pr-1.5 inline-flex items-center gap-1.5 rounded-lg bg-blue-50 ring-1 ring-blue-100 text-sm font-medium text-blue-700">
+              {selected.length}<span className="hidden md:inline"> selected</span>
+              <button onClick={function () { setSelected([]) }} title="Clear selection"
+                className="w-6 h-6 inline-flex items-center justify-center rounded-md text-blue-400 hover:text-blue-700 hover:bg-blue-100 transition-colors">
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
             </span>
           )}
+          <button onClick={loadData} disabled={loading} title="Refresh"
+            className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg bg-white ring-1 ring-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors">
+            <svg className={'w-4 h-4 ' + (loading ? 'animate-spin' : '')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 4v4h4" /><path d="M4 13a8 8 0 0 0 14.9 3.9M20 20v-4h-4" /></svg>
+            <span className="hidden md:inline">Refresh</span>
+          </button>
           <button
             onClick={function () { setShowExport(true); setExportFromYear(year); setExportFromMonth(month); setExportToYear(year); setExportToMonth(month) }}
             disabled={loading || filtered.length === 0}
-            className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
+            className="h-9 px-3 flex-1 md:flex-initial justify-center md:justify-start inline-flex items-center gap-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 shadow-sm disabled:opacity-40 transition-colors"
           >
-            ⬇ Export {selected.length > 0 ? selected.length + ' Selected' : 'Report'}
+            <DownloadIcon className="w-4 h-4" />
+            <span className="md:hidden">Export{selected.length > 0 ? ' ' + selected.length : ''}</span>
+            <span className="hidden md:inline">Export {selected.length > 0 ? selected.length + ' Selected' : 'Report'}</span>
           </button>
-          
         </div>
       </div>
-      <p className="text-xs text-gray-500 mb-4">Attendance summary for payroll</p>
 
       {/* Casual close gate warning */}
       {casualIncompleteCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-          <p className="text-sm font-semibold text-amber-800">
-            ⚠️ {casualIncompleteCount} casual worker{casualIncompleteCount > 1 ? 's have' : ' has'} incomplete records
-          </p>
-          <p className="text-xs text-amber-600 mt-0.5">
-            Resolve these before exporting for payroll. Unresolved casual records will default to Present in the export.
-          </p>
+        <div className="flex items-start gap-3 bg-amber-50 ring-1 ring-amber-200 rounded-2xl px-4 py-3 mb-4">
+          <WarnIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              {casualIncompleteCount} casual worker{casualIncompleteCount > 1 ? 's have' : ' has'} incomplete records
+            </p>
+            <p className="text-xs text-amber-700/80 mt-0.5">
+              Resolve these before exporting for payroll. Unresolved casual records will default to Present in the export.
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div>
-          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Month</label>
+      {/* Filters toolbar */}
+      <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm p-3 mb-4 grid grid-cols-2 gap-3 md:flex md:flex-wrap md:items-end">
+        <FilterField label="Month">
           <select value={month} onChange={function (e) { setMonth(Number(e.target.value)) }}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+            className={FIELD + ' w-full md:w-auto min-w-0 md:min-w-36'}>
             {MONTHS.map(function (m, i) {
               return <option key={i} value={i + 1}>{m}</option>
             })}
           </select>
-        </div>
-        <div>
-          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Year</label>
+        </FilterField>
+        <FilterField label="Year">
           <select value={year} onChange={function (e) { setYear(Number(e.target.value)) }}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+            className={FIELD + ' w-full md:w-auto min-w-0 md:min-w-24'}>
             {yearOptions.map(function (y) {
               return <option key={y} value={y}>{y}</option>
             })}
           </select>
-        </div>
-        <div>
-          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Department</label>
-          <select value={deptFilter} onChange={function (e) { setDeptFilter(e.target.value) }}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
-            <option value="">All</option>
-            {departments.map(function (d) { return <option key={d.id} value={d.id}>{d.name}</option> })}
-          </select>
-        </div>
-        <div>
-          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Search</label>
-          <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
-            placeholder="Name or code…"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
-        </div>
+        </FilterField>
+        <FilterField label="Department" span>
+          <DeptPicker departments={departments} value={deptFilter} onChange={setDeptFilter}
+            className="h-10 rounded-xl w-full md:w-auto" />
+        </FilterField>
+        <FilterField label="Search" grow span>
+          <div className="relative">
+            <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+            <input type="text" value={search} onChange={function (e) { setSearch(e.target.value) }}
+              placeholder="Name or code…"
+              className={FIELD + ' w-full pl-9'} />
+          </div>
+        </FilterField>
       </div>
+
+      {/* Summary */}
+      {!loading && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 mb-4">
+          {STAT_CARDS.map(function (c) {
+            return (
+              <div key={c.label} className="rounded-2xl px-3 py-2.5 md:px-4 md:py-3 bg-white shadow-sm ring-1 ring-gray-200/70">
+                <p className="flex items-center gap-2 text-[12px] md:text-[13px] font-medium text-gray-500">
+                  <span className={'w-2 h-2 rounded-full ' + c.dot} />
+                  {c.label}
+                </p>
+                <p className={'text-[22px] md:text-[26px] font-bold leading-tight mt-0.5 md:mt-1 tabular-nums ' + c.color}>{c.value}</p>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (
         <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-3 py-2.5 w-10">
-                  <input type="checkbox" checked={allSelected} onChange={toggleAll}
-                    className="w-4 h-4 rounded border-gray-300 text-slate-700 focus:ring-slate-700 cursor-pointer" />
-                </th>
-                {[
-                  { key: 'emp_code', label: 'Code', align: 'text-left', color: 'text-gray-500' },
-                  { key: 'name', label: 'Name', align: 'text-left', color: 'text-gray-500' },
-                  { key: 'department_name', label: 'Department', align: 'text-left', color: 'text-gray-500' },
-                  { key: 'effective_days', label: 'Days', align: 'text-center', color: 'text-gray-500' },
-                  { key: 'days_present', label: 'P', align: 'text-center', color: 'text-emerald-600' },
-                  { key: 'days_half', label: 'H', align: 'text-center', color: 'text-orange-600' },
-                  { key: 'days_absent', label: 'A', align: 'text-center', color: 'text-red-600' },
-                  { key: 'days_incomplete', label: 'Inc', align: 'text-center', color: 'text-amber-600' },
-                  { key: 'total_hours', label: 'Hours', align: 'text-right', color: 'text-gray-500' },
-                  { key: 'claims_used', label: 'Claims', align: 'text-center', color: 'text-purple-600' },
-                  { key: 'deductions', label: 'Ded', align: 'text-center', color: 'text-pink-600' },
-                  { key: 'continue_credits', label: '+C', align: 'text-center', color: 'text-teal-600' }
-                ].map(function (col) {
-                  var arrow = sortCol === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+        <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max md:min-w-0 text-sm">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200">
+                  <th className={'pl-3 md:pl-4 pr-1 py-2.5 md:py-3 w-10 ' + STICKY_CHECK + ' bg-gray-50 md:bg-transparent'}>
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer align-middle" />
+                  </th>
+                  <SortHead col="name" label="Employee" extra={STICKY_EMP + ' bg-gray-50 md:bg-transparent'} />
+                  <SortHead col="department_name" label="Department" />
+                  <SortHead col="effective_days" label="Days" align="text-center" />
+                  <SortHead col="days_present" label="Present" align="text-center" color="bg-emerald-500" />
+                  <SortHead col="days_half" label="Half" align="text-center" color="bg-orange-500" />
+                  <SortHead col="days_absent" label="Absent" align="text-center" color="bg-red-500" />
+                  <SortHead col="days_incomplete" label="Inc" align="text-center" color="bg-amber-500" />
+                  <SortHead col="total_hours" label="Hours" align="text-right" />
+                  <SortHead col="claims_used" label="Claims" align="text-center" color="bg-purple-500" />
+                  <SortHead col="deductions" label="Ded" align="text-center" color="bg-pink-500" />
+                  <SortHead col="continue_credits" label="+C" align="text-center" color="bg-teal-500" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={12} className="text-center py-12 text-sm text-gray-400">No data for this period</td>
+                  </tr>
+                ) : filtered.map(function (r) {
+                  var initials = (r.name || '?').trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0] }).join('').toUpperCase()
+                  var isSel = selected.includes(r.employee_id)
+                  var rowBg = isSel ? ' bg-blue-50 md:bg-transparent' : ' bg-white md:bg-transparent'
                   return (
-                    <th key={col.key}
-                      onClick={function () { handleSort(col.key) }}
-                      className={col.align + ' px-3 py-2.5 text-[10px] font-bold ' + col.color + ' uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none transition-colors'}>
-                      {col.label}{arrow}
-                    </th>
+                    <tr key={r.employee_id} className={'transition-colors ' + (isSel ? 'bg-blue-50/50' : 'hover:bg-blue-50/30')}>
+                      <td className={'pl-3 md:pl-4 pr-1 py-2 md:py-2.5 ' + STICKY_CHECK + rowBg}>
+                        <input type="checkbox" checked={isSel} onChange={function () { toggleOne(r.employee_id) }}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer align-middle" />
+                      </td>
+                      <td className={'px-2.5 py-2 md:px-4 md:py-2.5 ' + STICKY_EMP + rowBg}>
+                        <div className="flex items-center gap-3 w-36 md:w-auto md:min-w-52">
+                          <span className="hidden md:inline-flex w-8 h-8 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold items-center justify-center shrink-0">{initials}</span>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-900 md:truncate">
+                              <button onClick={function () { openDrill(r) }} className="hover:text-blue-700 hover:underline underline-offset-2 text-left">
+                                {r.name}
+                              </button>
+                              {r.is_casual && <span className="ml-1.5 text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded align-middle">casual</span>}
+                              {r.days_incomplete > 0 && <span className="ml-1.5 text-[10px] font-semibold text-amber-700 bg-amber-50 ring-1 ring-amber-100 px-1.5 py-0.5 rounded align-middle">needs review</span>}
+                            </p>
+                            <p className="text-xs text-gray-400 tabular-nums">{r.emp_code}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-[13px] text-gray-600 whitespace-nowrap">{r.department_name || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-[13px] text-gray-600 text-center tabular-nums">{r.effective_days}</td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-center"><NumPill value={r.days_present} cls="bg-emerald-50 text-emerald-700" /></td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-center"><NumPill value={r.days_half} cls="bg-orange-50 text-orange-600" /></td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-center"><NumPill value={r.days_absent} cls="bg-red-50 text-red-600" /></td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-center"><NumPill value={r.days_incomplete > 0 ? r.days_incomplete : 0} cls="bg-amber-50 text-amber-700" /></td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-[13px] text-right font-medium text-gray-800 tabular-nums">{r.total_hours}</td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-center">
+                        {r.claims_over_limit ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 ring-1 ring-red-200 text-xs font-bold text-red-600 tabular-nums whitespace-nowrap" title={'Over limit of ' + r.claims_limit}>
+                            <WarnIcon className="w-3 h-3" />
+                            {r.claims_used}/{r.claims_limit}
+                          </span>
+                        ) : r.claims_used > 0 ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full bg-purple-50 text-xs font-semibold text-purple-700 tabular-nums">{r.claims_used}/{r.claims_limit}</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-center">
+                        {r.deductions > 0
+                          ? <span className="inline-flex px-2 py-0.5 rounded-full bg-pink-50 ring-1 ring-pink-200 text-xs font-bold text-pink-700 tabular-nums">{r.deductions}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-2.5 py-2 md:px-4 md:py-2.5 text-center" title="Continue credits added">
+                        {r.continue_credits > 0 ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full bg-teal-50 text-xs font-bold text-teal-700 tabular-nums">+{r.continue_credits}</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                    </tr>
                   )
                 })}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={13} className="text-center py-8 text-sm text-gray-400 italic">No data for this period</td>
-                </tr>
-              ) : (
-                <>
-                  {filtered.map(function (r) {
-                    var hasIssue = r.days_incomplete > 0
-                    return (
-                      <tr key={r.employee_id} className={'border-b border-gray-100 hover:bg-gray-50' + (hasIssue ? ' bg-amber-50/40' : '')}>
-                        <td className="px-3 py-2">
-                          <input type="checkbox" checked={selected.includes(r.employee_id)} onChange={function () { toggleOne(r.employee_id) }}
-                            className="w-4 h-4 rounded border-gray-300 text-slate-700 focus:ring-slate-700 cursor-pointer" />
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-400 font-mono">{r.emp_code}</td>
-                        <td className="px-3 py-2 font-medium text-gray-900">
-                          <button onClick={function () { openDrill(r) }} className="hover:text-slate-600 hover:underline underline-offset-2 text-left">
-                            {r.name}
-                          </button>
-                          {r.is_casual && <span className="ml-1 text-[9px] text-gray-400 bg-gray-100 px-1 rounded">casual</span>}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{r.department_name || '—'}</td>
-                        <td className="px-3 py-2 text-xs text-gray-500 text-center">{r.effective_days}</td>
-                        <td className="px-3 py-2 text-xs text-center font-semibold text-emerald-700">{r.days_present || '—'}</td>
-                        <td className="px-3 py-2 text-xs text-center font-semibold text-orange-600">{r.days_half || '—'}</td>
-                        <td className="px-3 py-2 text-xs text-center font-semibold text-red-600">{r.days_absent || '—'}</td>
-                        <td className="px-3 py-2 text-xs text-center font-semibold text-amber-600">
-                          {r.days_incomplete > 0 ? r.days_incomplete : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-right font-mono text-gray-700">{r.total_hours}</td>
-                        <td className="px-3 py-2 text-xs text-center">
-                          {r.claims_over_limit ? (
-                            <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded" title={'Over limit of ' + r.claims_limit}>
-                              ⚠ {r.claims_used}/{r.claims_limit}
-                            </span>
-                          ) : r.claims_used > 0 ? (
-                            <span className="font-semibold text-purple-600">{r.claims_used}/{r.claims_limit}</span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className={'px-3 py-2 text-xs text-center font-bold ' + (r.deductions > 0 ? 'text-pink-600' : 'text-gray-400')}>
-                          {r.deductions > 0 ? r.deductions : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-center" title="Continue credits added">
-                          {r.continue_credits > 0 ? (
-                            <span className="font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">+{r.continue_credits}</span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>                        
-                        
-                      </tr>
-                    )
-                  })}
-                  {/* Totals row */}
-                  <tr className="bg-gray-50 border-t-2 border-gray-300 font-bold">
-                    <td className="px-3 py-2.5 text-xs text-gray-500" colSpan={4}>TOTAL ({filtered.length} employees)</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-gray-600">{totals.effective}</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-emerald-700">{totals.present}</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-orange-600">{totals.half}</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-red-600">{totals.absent}</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-amber-600">{totals.incomplete}</td>
-                    <td className="px-3 py-2.5 text-xs text-right font-mono text-gray-700">{Math.round(totals.hours * 10) / 10}</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-purple-600">{totals.claims}</td>
-                    <td className="px-3 py-2.5 text-xs text-center text-teal-600">{totals.continue > 0 ? '+' + totals.continue : '—'}</td>                    <td className="px-3 py-2.5 text-xs text-center text-pink-600">{filtered.reduce(function (sum, r) { return sum + (r.deductions || 0) }, 0) || '—'}</td>
+              </tbody>
+              {filtered.length > 0 && (
+                <tfoot>
+                  <tr className="bg-gray-50/80 border-t border-gray-200 font-semibold">
+                    <td className="px-3 py-2.5 md:px-4 md:py-3 text-[11px] text-gray-500 uppercase tracking-wider whitespace-nowrap sticky left-0 z-10 bg-gray-50 shadow-[4px_0_6px_-4px_rgba(15,23,42,0.18)] md:static md:z-auto md:bg-transparent md:shadow-none" colSpan={2}>Total · {filtered.length}<span className="hidden md:inline"> employees</span></td>
+                    <td />
+
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-gray-700 tabular-nums">{totals.effective}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-emerald-700 tabular-nums">{totals.present}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-orange-600 tabular-nums">{totals.half}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-red-600 tabular-nums">{totals.absent}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-amber-600 tabular-nums">{totals.incomplete}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-right text-gray-800 tabular-nums">{Math.round(totals.hours * 10) / 10}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-purple-600 tabular-nums">{totals.claims}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-pink-600 tabular-nums">{totalDeductions || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-2.5 py-2.5 md:px-4 md:py-3 text-[13px] text-center text-teal-600 tabular-nums">{totals.continue > 0 ? '+' + totals.continue : <span className="text-gray-300">—</span>}</td>
                   </tr>
-                </>
+                </tfoot>
               )}
-            </tbody>
-          </table>
+            </table>
+          </div>
+          {filtered.length > 0 && (
+            <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500">
+              Showing {filtered.length} of {records.length}
+            </div>
+          )}
         </div>
       )}
 
       {showExport && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { if (!exporting) setShowExport(false) }}>
-          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl" onClick={function (e) { e.stopPropagation() }}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={function () { if (!exporting) setShowExport(false) }}>
+          <div className="bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-sm max-h-[92vh] overflow-y-auto md:max-h-none md:overflow-visible pb-[env(safe-area-inset-bottom)] md:pb-0 shadow-xl ring-1 ring-gray-200/70" onClick={function (e) { e.stopPropagation() }}>
             <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-900">Export Report</h3>
-              <p className="text-xs text-gray-500">Choose format and month range</p>
+              <h3 className="text-base font-bold text-gray-900">Export Report</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Choose format and month range</p>
             </div>
             <div className="px-5 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">From Month</label>
+                <FilterField label="From Month">
                   <select value={exportFromMonth} onChange={function (e) { setExportFromMonth(Number(e.target.value)) }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    className={FIELD + ' w-full'}>
                     {MONTHS.map(function (m, i) { return <option key={i} value={i + 1}>{m}</option> })}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">From Year</label>
+                </FilterField>
+                <FilterField label="From Year">
                   <select value={exportFromYear} onChange={function (e) { setExportFromYear(Number(e.target.value)) }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    className={FIELD + ' w-full'}>
                     {yearOptions.map(function (y) { return <option key={y} value={y}>{y}</option> })}
                   </select>
-                </div>
+                </FilterField>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">To Month</label>
+                <FilterField label="To Month">
                   <select value={exportToMonth} onChange={function (e) { setExportToMonth(Number(e.target.value)) }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    className={FIELD + ' w-full'}>
                     {MONTHS.map(function (m, i) { return <option key={i} value={i + 1}>{m}</option> })}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">To Year</label>
+                </FilterField>
+                <FilterField label="To Year">
                   <select value={exportToYear} onChange={function (e) { setExportToYear(Number(e.target.value)) }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700">
+                    className={FIELD + ' w-full'}>
                     {yearOptions.map(function (y) { return <option key={y} value={y}>{y}</option> })}
                   </select>
-                </div>
+                </FilterField>
               </div>
 
               {(exportToYear < exportFromYear || (exportToYear === exportFromYear && exportToMonth < exportFromMonth)) && (
                 <p className="text-xs text-red-600">To month must be same or after From month</p>
               )}
 
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Format</label>
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              <FilterField label="Format">
+                <div className="flex p-1 gap-1 rounded-xl bg-gray-100">
                   <button onClick={function () { setExportFormat('docx') }}
-                    className={'flex-1 py-2 text-xs font-medium transition-colors ' + (exportFormat === 'docx' ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
-                    📄 Word (.docx)
+                    className={'flex-1 h-8 inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors ' + (exportFormat === 'docx' ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'text-gray-500 hover:text-gray-800')}>
+                    <DocIcon className="w-3.5 h-3.5" />
+                    Word (.docx)
                   </button>
                   <button onClick={function () { setExportFormat('xlsx') }}
-                    className={'flex-1 py-2 text-xs font-medium transition-colors ' + (exportFormat === 'xlsx' ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
-                    📊 Excel (.xlsx)
+                    className={'flex-1 h-8 inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors ' + (exportFormat === 'xlsx' ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'text-gray-500 hover:text-gray-800')}>
+                    <SheetIcon className="w-3.5 h-3.5" />
+                    Excel (.xlsx)
                   </button>
                 </div>
-              </div>
+              </FilterField>
 
               <div className="flex gap-2 pt-1">
                 <button onClick={function () { setShowExport(false) }} disabled={exporting}
-                  className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40">Cancel</button>
+                  className="flex-1 h-9 text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40">Cancel</button>
                 <button onClick={exportFormat === 'xlsx' ? exportXLSX : exportCSV}
                   disabled={exporting || exportToYear < exportFromYear || (exportToYear === exportFromYear && exportToMonth < exportFromMonth)}
-                  className="flex-1 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium">
-                  {exporting ? 'Exporting…' : (exportFormat === 'xlsx' ? '⬇ Export Excel' : '⬇ Export Word')}
+                  className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm disabled:opacity-40 transition-colors font-medium">
+                  {!exporting && <DownloadIcon className="w-4 h-4" />}
+                  {exporting ? 'Exporting…' : (exportFormat === 'xlsx' ? 'Export Excel' : 'Export Word')}
                 </button>
               </div>
             </div>
@@ -1055,47 +1141,63 @@ export default function MonthlyReport() {
       )}
 
       {drillEmp && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={function () { setDrillEmp(null) }}>
-          <div className="bg-white rounded-xl w-full max-w-3xl shadow-xl max-h-[85vh] flex flex-col" onClick={function (e) { e.stopPropagation() }}>
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">{drillEmp.name}</h3>
-                <p className="text-xs text-gray-500">{drillEmp.emp_code} · {MONTHS[month - 1]} {year}</p>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={function () { setDrillEmp(null) }}>
+          <div className="bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-3xl shadow-xl ring-1 ring-gray-200/70 max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden" onClick={function (e) { e.stopPropagation() }}>
+            <div className="px-4 py-3 md:px-5 md:py-4 border-b border-gray-100 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 text-xs font-bold inline-flex items-center justify-center shrink-0">
+                  {(drillEmp.name || '?').trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0] }).join('').toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-gray-900 truncate">{drillEmp.name}</h3>
+                  <p className="text-xs text-gray-500 tabular-nums">{drillEmp.emp_code} · {MONTHS[month - 1]} {year}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button onClick={exportDrillDocx} className="px-3 py-1.5 text-xs font-medium text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors">⬇ DOCX</button>
-                <button onClick={function () { setDrillEmp(null) }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={exportDrillDocx}
+                  className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg bg-white ring-1 ring-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  <DownloadIcon className="w-4 h-4" />
+                  DOCX
+                </button>
+                <button onClick={function () { setDrillEmp(null) }} title="Close"
+                  className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                  <XIcon className="w-4 h-4" />
+                </button>
               </div>
             </div>
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto overflow-x-auto md:overflow-x-visible flex-1">
               {drillLoading ? (
                 <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-50">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
                     <tr className="border-b border-gray-200">
-                      <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Date</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Day</th>
-                      <th className="px-3 py-2 text-center text-[10px] font-bold text-emerald-600 uppercase">In</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-bold text-emerald-600 uppercase">In Location</th>
-                      <th className="px-3 py-2 text-center text-[10px] font-bold text-red-500 uppercase">Out</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-bold text-red-500 uppercase">Out Location</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Hours</th>
+                      <th className="px-2.5 md:px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-2.5 md:px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Day</th>
+                      <th className="px-2.5 md:px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle bg-emerald-500" />In
+                      </th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">In Location</th>
+                      <th className="px-2.5 md:px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle bg-red-500" />Out
+                      </th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Out Location</th>
+                      <th className="px-2.5 md:px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Hours</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100">
                     {drillData.map(function (row) {
                       var isFuture = new Date(row.date + 'T23:59:59') > new Date()
-                      var bgClass = isFuture ? ' text-gray-300' : !row.hasData ? ' bg-red-50/50' : ''
+                      var bgClass = isFuture ? ' text-gray-300' : !row.hasData ? ' bg-red-50/40' : ' hover:bg-blue-50/30'
                       return (
-                        <tr key={row.date} className={'border-b border-gray-100' + bgClass}>
-                          <td className="px-3 py-1.5 text-xs font-mono text-gray-600">{row.date.slice(8)}</td>
-                          <td className="px-3 py-1.5 text-xs text-gray-500">{row.day}</td>
-                          <td className="px-3 py-1.5 text-xs text-center text-emerald-700 font-medium">{isFuture ? '' : fmtTime(row.punchIn)}</td>
-                          <td className="px-3 py-1.5 text-xs text-left text-emerald-600/70 truncate max-w-[140px]" title={row.inLoc || ''}>{isFuture ? '' : (row.inLoc || '—')}</td>
-                          <td className="px-3 py-1.5 text-xs text-center text-red-600 font-medium">{isFuture ? '' : fmtTime(row.punchOut)}</td>
-                          <td className="px-3 py-1.5 text-xs text-left text-red-500/70 truncate max-w-[140px]" title={row.outLoc || ''}>{isFuture ? '' : (row.outLoc || '—')}</td>
-                          <td className="px-3 py-1.5 text-xs text-right font-mono text-gray-700">{isFuture ? '' : (row.hours != null ? row.hours : '—')}</td>
+                        <tr key={row.date} className={'transition-colors' + bgClass}>
+                          <td className="px-2.5 md:px-4 py-2 text-[13px] font-semibold text-gray-700 tabular-nums">{row.date.slice(8)}</td>
+                          <td className="px-2.5 md:px-4 py-2 text-[13px] text-gray-500">{row.day}</td>
+                          <td className="px-2.5 md:px-4 py-2 text-[13px] text-center text-emerald-700 font-medium tabular-nums whitespace-nowrap">{isFuture ? '' : fmtTime(row.punchIn)}{!isFuture && row.inLoc && <span className="md:hidden block mx-auto max-w-24 truncate text-[10px] font-normal text-gray-400" title={row.inLoc}>{row.inLoc}</span>}</td>
+                          <td className="hidden md:table-cell px-4 py-2 text-xs text-left text-gray-500 truncate max-w-[160px]" title={row.inLoc || ''}>{isFuture ? '' : (row.inLoc || <span className="text-gray-300">—</span>)}</td>
+                          <td className="px-2.5 md:px-4 py-2 text-[13px] text-center text-red-600 font-medium tabular-nums whitespace-nowrap">{isFuture ? '' : fmtTime(row.punchOut)}{!isFuture && row.outLoc && <span className="md:hidden block mx-auto max-w-24 truncate text-[10px] font-normal text-gray-400" title={row.outLoc}>{row.outLoc}</span>}</td>
+                          <td className="hidden md:table-cell px-4 py-2 text-xs text-left text-gray-500 truncate max-w-[160px]" title={row.outLoc || ''}>{isFuture ? '' : (row.outLoc || <span className="text-gray-300">—</span>)}</td>
+                          <td className="px-2.5 md:px-4 py-2 text-[13px] text-right font-medium text-gray-800 tabular-nums">{isFuture ? '' : (row.hours != null ? row.hours : <span className="text-gray-300">—</span>)}</td>
                         </tr>
                       )
                     })}
@@ -1108,10 +1210,56 @@ export default function MonthlyReport() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-xl text-sm shadow-lg z-50">
+        <div className="fixed bottom-4 left-4 right-4 text-center md:text-left md:left-auto md:bottom-6 md:right-6 bg-slate-800 text-white px-5 py-3 rounded-xl text-sm shadow-lg z-50">
           {toast}
         </div>
       )}
     </div>
+  )
+}
+
+// Coloured count pill; zero / empty renders a muted dash
+function NumPill({ value, cls }) {
+  if (!value) return <span className="text-gray-300">—</span>
+  return <span className={'inline-flex min-w-7 justify-center px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ' + cls}>{value}</span>
+}
+
+function DownloadIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12M7 10l5 5 5-5" /><path d="M5 21h14" />
+    </svg>
+  )
+}
+
+function WarnIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    </svg>
+  )
+}
+
+function XIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
+function DocIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" />
+    </svg>
+  )
+}
+
+function SheetIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="2" /><path d="M4 10h16M4 15h16M10 4v16" />
+    </svg>
   )
 }

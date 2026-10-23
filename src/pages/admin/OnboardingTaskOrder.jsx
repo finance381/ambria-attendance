@@ -9,6 +9,8 @@
 // and the first of them opens by default.
 // Tables: onboarding_task_order + onboarding_test_order (migrations
 // 20261009060000 and 20261011060000); helpers in onboardingUtils.
+// Phones: the two panels stack (departments above, order below) and the
+// rows use slightly smaller handles and number tiles.
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -148,23 +150,26 @@ export default function OnboardingTaskOrder({ departments, showToast }) {
   return (
     <div>
       {loadError && (
-        <div className="px-3 py-2 mb-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-xs text-red-600">{loadError}</p>
+        <div className="mb-4 px-4 py-3 bg-red-50 ring-1 ring-red-200 rounded-xl">
+          <p className="text-sm text-red-600">{loadError}</p>
         </div>
       )}
 
       {departments.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-10 shadow-sm">
-          <p className="text-sm text-gray-400 text-center">No departments yet.</p>
+        <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm text-center px-6 py-14">
+          <span className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-500 inline-flex items-center justify-center mb-3">
+            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{DEPT_ICON_DEFAULT}</svg>
+          </span>
+          <p className="text-base font-semibold text-gray-800">No departments yet</p>
         </div>
       ) : (
-        <div className="grid gap-5 md:grid-cols-[300px_minmax(0,1fr)] items-stretch">
+        <div className="grid gap-4 md:grid-cols-[300px_minmax(0,1fr)] items-stretch">
           {/* Departments */}
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
-            <div className="px-5 pt-5 pb-4">
-              <div className="flex items-baseline justify-between gap-2 mb-3">
-                <p className="text-base font-bold text-gray-900">Departments</p>
-                <p className="text-xs text-gray-500">{withTasks} of {departments.length} have tasks</p>
+          <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm overflow-hidden flex flex-col">
+            <div className="px-4 pt-4 pb-3">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-base font-semibold text-gray-900">Departments</p>
+                <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full tabular-nums">{withTasks} of {departments.length} have tasks</span>
               </div>
               <div className="relative">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" viewBox="0 0 24 24"
@@ -173,10 +178,10 @@ export default function OnboardingTaskOrder({ departments, showToast }) {
                 </svg>
                 <input type="text" value={deptSearch} onChange={function (e) { setDeptSearch(e.target.value) }}
                   placeholder="Search department"
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-700" />
+                  className="w-full h-10 pl-9 pr-3 border border-gray-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
-            <div className="flex-1 max-h-[calc(100vh-300px)] min-h-[240px] overflow-y-auto px-2 pb-3">
+            <div className="flex-1 max-h-72 md:max-h-[calc(100vh-300px)] min-h-[240px] overflow-y-auto px-2 pb-3">
               {shownDepts.length === 0 && (
                 <p className="px-3 py-6 text-xs text-gray-400 text-center">No department matches "{deptSearch}"</p>
               )}
@@ -185,12 +190,12 @@ export default function OnboardingTaskOrder({ departments, showToast }) {
                 var n = counts[d.id]
                 return (
                   <button key={d.id} type="button" onClick={function () { pickDept(d.id) }}
-                    className={'w-full flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg text-left border-l-[3px] transition-colors ' +
-                      (on ? 'bg-slate-100 border-slate-800 text-gray-900' : 'border-transparent hover:bg-gray-50 text-gray-600')}>
-                    <span className={on ? 'text-gray-900' : 'text-gray-500'}><DeptIcon name={d.name} /></span>
+                    className={'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ' +
+                      (on ? 'bg-blue-50 text-blue-800' : 'hover:bg-gray-50 text-gray-600')}>
+                    <span className={on ? 'text-blue-600' : 'text-gray-400'}><DeptIcon name={d.name} /></span>
                     <span className={'flex-1 min-w-0 truncate text-sm ' + (on ? 'font-semibold' : 'font-normal')}>{d.name}</span>
-                    <span className={'shrink-0 min-w-[26px] h-6 px-2 rounded-full text-[11px] font-semibold inline-flex items-center justify-center ' +
-                      (on ? 'bg-slate-200 text-slate-800' : 'bg-gray-100 text-gray-500')}>{n}</span>
+                    <span className={'shrink-0 min-w-[26px] h-6 px-2 rounded-full text-[11px] font-semibold tabular-nums inline-flex items-center justify-center ' +
+                      (on ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}>{n}</span>
                   </button>
                 )
               })}
@@ -198,38 +203,39 @@ export default function OnboardingTaskOrder({ departments, showToast }) {
           </div>
 
           {/* The sequence for the chosen department */}
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-            <div className="flex flex-wrap items-center gap-3 px-6 py-5 border-b border-gray-100">
+          <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center gap-3 px-4 sm:px-5 py-3.5 sm:py-4 border-b border-gray-100">
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-bold text-gray-900">
+                <p className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight flex flex-wrap items-center gap-2">
                   {dept ? dept.name : ''}
-                  {list.length > 0 && <span className="ml-2 text-sm font-normal text-gray-500">{list.length} {list.length === 1 ? 'task' : 'tasks'}</span>}
+                  {list.length > 0 && <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full tabular-nums">{list.length} {list.length === 1 ? 'task' : 'tasks'}</span>}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">New joiners go top to bottom. Drag a row or use the arrows. Tests take the place set on each test.</p>
               </div>
               {dirty && (
                 <button type="button" onClick={function () { setList(tasksFor(deptId)); setDirty(false) }}
-                  className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Reset</button>
+                  className="h-10 px-4 text-sm font-medium bg-white ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">Reset</button>
               )}
               <button type="button" onClick={save} disabled={!dirty || saving}
-                className="px-5 py-2.5 text-sm text-white bg-gray-900 rounded-lg hover:bg-black disabled:opacity-40 transition-colors font-semibold">
+                className="h-10 px-5 inline-flex items-center gap-1.5 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-600/30 disabled:opacity-40 disabled:shadow-none transition-colors font-semibold">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                 {saving ? 'Saving…' : 'Save order'}
               </button>
             </div>
 
             {list.length === 0 ? (
               <div className="px-6 py-14 text-center">
-                <div className="mx-auto mb-3 w-11 h-11 rounded-full bg-slate-100 text-slate-400 inline-flex items-center justify-center">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <div className="mx-auto mb-3 w-14 h-14 rounded-2xl bg-blue-50 text-blue-500 inline-flex items-center justify-center">
+                  <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
                     <rect x="9" y="3" width="6" height="4" rx="1" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold text-gray-700">No tasks for {dept ? dept.name : 'this department'} yet</p>
-                <p className="text-xs text-gray-500 mt-1">Add a task for this department (or for All Departments) in the Tasks tab, then set its order here.</p>
+                <p className="text-base font-semibold text-gray-800">No tasks for {dept ? dept.name : 'this department'} yet</p>
+                <p className="text-sm text-gray-500 mt-1">Add a task for this department (or for All Departments) in the Tasks tab, then set its order here.</p>
               </div>
             ) : (
-              <ol className="p-3 space-y-3">
+              <ol className="p-2 sm:p-3 space-y-2">
                 {list.map(function (x, i) {
                   var row = taskById[x.id]
                   if (!row) return null
@@ -241,31 +247,32 @@ export default function OnboardingTaskOrder({ departments, showToast }) {
                       onDragOver={function (e) { e.preventDefault(); if (overIndex !== i) setOverIndex(i) }}
                       onDragEnd={function () { setDragIndex(null); setOverIndex(null) }}
                       onDrop={function (e) { e.preventDefault(); if (dragIndex != null) move(dragIndex, i); setDragIndex(null); setOverIndex(null) }}
-                      className={'flex items-stretch bg-white border rounded-xl transition-colors ' +
+                      className={'flex items-stretch bg-white rounded-xl ring-1 transition-all ' +
                         (dragIndex === i ? 'opacity-40 ' : '') +
-                        (overIndex === i && dragIndex !== null && dragIndex !== i ? 'border-slate-800 ring-1 ring-slate-800' : 'border-gray-200 hover:border-gray-300')}>
-                      <span className="shrink-0 w-11 flex items-center justify-center border-r border-gray-100 cursor-grab text-gray-300 hover:text-gray-500 select-none" title="Drag to reorder" aria-hidden="true">
+                        (overIndex === i && dragIndex !== null && dragIndex !== i ? 'ring-2 ring-blue-500 bg-blue-50/40' : 'ring-gray-200 hover:ring-gray-300 hover:shadow-sm')}>
+                      <span className="shrink-0 w-7 sm:w-10 flex items-center justify-center border-r border-gray-100 cursor-grab text-gray-300 hover:text-gray-500 select-none" title="Drag to reorder" aria-hidden="true">
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                           <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" />
                           <circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" />
                           <circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" />
                         </svg>
                       </span>
-                      <span className="flex-1 min-w-0 flex items-center gap-4 px-4 py-3">
-                        <span className="shrink-0 w-14 h-12 rounded-xl text-base font-bold inline-flex items-center justify-center bg-slate-50 text-gray-900">{i + 1}</span>
+                      <span className="flex-1 min-w-0 flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2.5">
+                        <span className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl text-[13px] sm:text-sm font-bold tabular-nums inline-flex items-center justify-center bg-blue-50 text-blue-700">{i + 1}</span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-base font-bold text-gray-900 truncate">{row.name}</span>
-                          <span className="block text-sm text-gray-500 mt-0.5">
-                            Due day {row.due_days}{isAll ? ' · All departments' : ''}
+                          <span className="block text-sm sm:text-[15px] sm:leading-normal font-semibold text-gray-900 truncate">{row.name}</span>
+                          <span className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 ring-1 ring-amber-100">Due day {row.due_days}</span>
+                            {isAll && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 ring-1 ring-gray-200">All departments</span>}
                           </span>
                         </span>
-                        <span className="shrink-0 inline-flex items-center gap-2">
+                        <span className="shrink-0 inline-flex items-center gap-0.5 sm:gap-1">
                           <button type="button" onClick={function () { move(i, i - 1) }} disabled={i === 0} aria-label="Move up"
-                            className="w-12 h-10 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-30 inline-flex items-center justify-center">
+                            className="w-9 h-9 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500 inline-flex items-center justify-center transition-colors">
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
                           </button>
                           <button type="button" onClick={function () { move(i, i + 1) }} disabled={i === list.length - 1} aria-label="Move down"
-                            className="w-12 h-10 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-30 inline-flex items-center justify-center">
+                            className="w-9 h-9 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500 inline-flex items-center justify-center transition-colors">
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
                           </button>
                         </span>

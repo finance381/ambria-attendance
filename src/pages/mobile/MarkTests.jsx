@@ -4,10 +4,11 @@
 // departments; the marker enters a score (and optional remarks) per joiner.
 // Data + permission checks live in the tests_to_mark() / submit_test_score()
 // RPCs — see migration 20261008060000_onboarding_test_results.sql.
-// Layout: title, dark stats card (pending / marked / average), then per test
+// Layout: title, stats card (pending / marked / average), then per test
 // a header card (collapsible)
 // followed by one card per joiner. Pending joiners open with the score form;
 // marked ones show their score and expand for remarks.
+// Styling: soft neumorphism — raised .neu cards, pressed-in .neu-inset inputs.
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -62,7 +63,7 @@ function ProgressRing({ done, total }) {
   return (
     <div className="relative w-11 h-11 shrink-0">
       <svg viewBox="0 0 36 36" className="w-11 h-11 -rotate-90">
-        <circle cx="18" cy="18" r={r} fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-100" />
+        <circle cx="18" cy="18" r={r} fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-300/60" />
         <circle cx="18" cy="18" r={r} fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c * (1 - frac)}
           className={'transition-all duration-500 ' + (frac === 1 ? 'text-emerald-500' : 'text-amber-500')} />
@@ -99,7 +100,7 @@ export default function MarkTests() {
   useEffect(function () { load() }, [load])
 
   if (loading) {
-    return <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+    return <p className="text-sm text-slate-500 text-center py-12">{t('loading')}</p>
   }
 
   // Stats across every test: pending, marked, and the average as a % of max
@@ -116,32 +117,32 @@ export default function MarkTests() {
   var avgPct = markedTotal ? Math.round(pctSum / markedTotal * 100) : null
 
   var stats = [
-    { label: t('mt_stat_pending'), value: pendingTotal, icon: 'test', tile: 'bg-amber-400/15 text-amber-300' },
-    { label: t('mt_stat_marked'), value: markedTotal, icon: 'checkCircle', tile: 'bg-emerald-400/15 text-emerald-300' },
-    { label: t('mt_stat_avg'), value: avgPct == null ? '—' : avgPct + '%', icon: 'chart', tile: 'bg-violet-400/20 text-violet-300' }
+    { label: t('mt_stat_pending'), value: pendingTotal, icon: 'test', tile: 'neu-sm text-amber-600' },
+    { label: t('mt_stat_marked'), value: markedTotal, icon: 'checkCircle', tile: 'neu-sm text-emerald-600' },
+    { label: t('mt_stat_avg'), value: avgPct == null ? '—' : avgPct + '%', icon: 'chart', tile: 'neu-sm text-violet-600' }
   ]
 
   return (
     <div className="max-w-2xl mx-auto">
       <button onClick={function () { navigate('/') }}
-        className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-800 mb-2">
+        className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 mb-2">
         <Icon name="back" className="w-3.5 h-3.5" />
         {t('back')}
       </button>
 
-      <h2 className="text-xl font-bold text-gray-900 tracking-tight">{t('mt_title')}</h2>
+      <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">{t('mt_title')}</h2>
 
       {groups.length > 0 && (
-        <div className="mt-4 mb-4 grid grid-cols-3 rounded-2xl bg-slate-800 text-white shadow-md overflow-hidden">
+        <div className="mt-4 mb-4 grid grid-cols-3 neu rounded-2xl text-gray-900 overflow-hidden">
           {stats.map(function (s, i) {
             return (
-              <div key={s.label} className={'flex items-center gap-2 px-2.5 py-3.5 ' + (i > 0 ? 'border-l border-white/10' : '')}>
+              <div key={s.label} className={'flex items-center gap-2 px-2.5 py-3.5 ' + (i > 0 ? 'border-l border-slate-300/50' : '')}>
                 <span className={'w-8 h-8 rounded-lg inline-flex items-center justify-center shrink-0 ' + s.tile}>
                   <Icon name={s.icon} className="w-4 h-4" />
                 </span>
                 <div className="min-w-0">
                   <p className="text-lg font-bold tabular-nums leading-none">{s.value}</p>
-                  <p className="text-[10px] text-white/60 mt-1 truncate">{s.label}</p>
+                  <p className="text-[10px] text-slate-500 mt-1 truncate">{s.label}</p>
                 </div>
               </div>
             )
@@ -157,8 +158,8 @@ export default function MarkTests() {
       )}
 
       {groups.length === 0 && !loadError && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-          <p className="text-sm text-gray-400">{t('mt_empty')}</p>
+        <div className="neu rounded-2xl p-8 text-center">
+          <p className="text-sm text-slate-500">{t('mt_empty')}</p>
         </div>
       )}
 
@@ -175,8 +176,8 @@ export default function MarkTests() {
             <section key={g.test.id} className="space-y-2.5">
               <button
                 onClick={function () { setCollapsed(Object.assign({}, collapsed, { [g.test.id]: isOpen })) }}
-                className="w-full text-left flex items-center gap-3 bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5 px-4 py-3.5">
-                <span className="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 ring-1 ring-amber-200/70 inline-flex items-center justify-center shrink-0">
+                className="w-full text-left flex items-center gap-3 neu rounded-2xl px-4 py-3.5">
+                <span className="w-11 h-11 rounded-xl neu-sm text-amber-600 inline-flex items-center justify-center shrink-0">
                   <Icon name="test" className="w-5 h-5" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -187,7 +188,7 @@ export default function MarkTests() {
                   </p>
                 </div>
                 <ProgressRing done={done} total={total} />
-                <Icon name="chevron" className={'w-4 h-4 text-gray-400 shrink-0 transition-transform ' + (isOpen ? 'rotate-90' : '')} />
+                <Icon name="chevron" className={'w-4 h-4 text-slate-500 shrink-0 transition-transform ' + (isOpen ? 'rotate-90' : '')} />
               </button>
               {g.test.description && isOpen && (
                 <p className="px-1 text-xs text-gray-500 leading-relaxed whitespace-pre-line">{g.test.description}</p>
@@ -266,8 +267,8 @@ function JoinerCard({ joiner, maxScore, testId, onSaved }) {
   var showForm = open && editing
 
   return (
-    <div className={'bg-white rounded-2xl shadow-sm overflow-hidden ' +
-      (showForm ? 'ring-1 ring-violet-200 border-l-4 border-l-violet-400' : 'ring-1 ring-gray-900/5')}>
+    <div className={'neu rounded-2xl overflow-hidden ' +
+      (showForm ? 'outline-2 outline-violet-300/70' : '')}>
       <div className="flex items-center gap-3 px-4 py-3">
         <span className={'w-10 h-10 rounded-full text-sm font-bold inline-flex items-center justify-center shrink-0 ' +
           (scored ? 'bg-sky-100 text-sky-800' : 'bg-violet-100 text-violet-700')}>
@@ -280,27 +281,27 @@ function JoinerCard({ joiner, maxScore, testId, onSaved }) {
           </p>
         </div>
         {scored ? (
-          <div className="flex items-center gap-0.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <span className={'text-sm font-bold tabular-nums px-2 py-1 rounded-lg ring-1 mr-1 ' + scoreCls}>
               {joiner.score} <span className="font-medium opacity-70">/ {maxScore}</span>
             </span>
             <button onClick={startEdit} aria-label={t('mt_edit')}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-600 hover:bg-gray-100">
+              className="w-7 h-7 inline-flex items-center justify-center rounded-lg neu-press text-gray-600">
               <Icon name="edit" className="w-4 h-4" />
             </button>
             <button onClick={function () { setOpen(!open); if (open) cancelEdit() }} aria-label={t('mt_details')}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100">
+              className="w-7 h-7 inline-flex items-center justify-center rounded-lg neu-press text-gray-600">
               <Icon name="chevron" className={'w-4 h-4 transition-transform ' + (open ? 'rotate-90' : '')} />
             </button>
           </div>
         ) : (
           <div className="flex items-center gap-1 shrink-0">
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-orange-50 text-orange-700">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200/80">
               <Icon name="clock" className="w-3.5 h-3.5" />
               {t('mt_stat_pending')}
             </span>
             <button onClick={function () { setOpen(!open) }} aria-label={t('mt_details')}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-violet-600 hover:bg-violet-50">
+              className="w-7 h-7 inline-flex items-center justify-center rounded-lg neu-press text-violet-600">
               <Icon name="chevronDown" className={'w-4 h-4 transition-transform ' + (open ? 'rotate-180' : '')} />
             </button>
           </div>
@@ -309,40 +310,40 @@ function JoinerCard({ joiner, maxScore, testId, onSaved }) {
 
       {/* Marked, opened: the remarks they were given */}
       {open && scored && !editing && (
-        <div className="mx-3 mb-3 px-3 py-2.5 rounded-xl bg-gray-50 text-xs text-gray-600 whitespace-pre-line">
-          {joiner.remarks ? joiner.remarks : <span className="text-gray-400">{t('mt_no_remarks')}</span>}
+        <div className="mx-3 mb-3 px-3 py-2.5 rounded-xl neu-inset text-xs text-gray-600 whitespace-pre-line">
+          {joiner.remarks ? joiner.remarks : <span className="text-slate-500">{t('mt_no_remarks')}</span>}
         </div>
       )}
 
       {showForm && (
-        <div className="mx-3 mb-3 p-3 rounded-xl bg-gray-50">
+        <div className="mx-3 mb-3 p-1">
           <div className="flex gap-2.5">
             <label className="w-24 shrink-0">
               <span className="block text-[11px] font-medium text-gray-600 mb-1">{t('mt_score')}</span>
-              <span className="h-10 flex items-center border border-gray-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-slate-700 focus-within:border-transparent">
+              <span className="h-10 flex items-center border-0 neu-inset rounded-xl focus-within:outline-2 focus-within:outline-blue-400/60">
                 <input type="number" inputMode="numeric" min={0} max={maxScore} step={1} value={score}
                   onChange={function (e) { setScore(e.target.value) }}
                   className="w-full min-w-0 pl-2.5 bg-transparent text-base font-semibold text-gray-900 focus:outline-none" />
-                <span className="pr-2.5 text-sm text-gray-400 shrink-0">/ {maxScore}</span>
+                <span className="pr-2.5 text-sm text-slate-500 shrink-0">/ {maxScore}</span>
               </span>
             </label>
             <label className="flex-1 min-w-0">
               <span className="block text-[11px] font-medium text-gray-600 mb-1">{t('mt_remarks')}</span>
               <input type="text" value={remarks} onChange={function (e) { setRemarks(e.target.value) }}
                 placeholder={t('mt_remarks_ph')} maxLength={300}
-                className="w-full h-10 px-2.5 border border-gray-300 rounded-lg bg-white text-base placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-slate-700 focus:border-transparent" />
+                className="w-full h-10 px-2.5 border-0 neu-inset rounded-xl text-base text-gray-900 placeholder:text-sm placeholder:text-slate-500 outline-none focus:outline-2 focus:outline-blue-400/60" />
             </label>
           </div>
           {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
           <div className="flex justify-end gap-2 mt-3">
             {scored && (
               <button onClick={cancelEdit}
-                className="h-9 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-100">
+                className="h-9 px-4 text-sm font-medium text-gray-700 neu-press rounded-xl">
                 {t('cancel')}
               </button>
             )}
             <button onClick={handleSave} disabled={saving}
-              className="h-9 px-5 inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm disabled:opacity-40">
+              className="h-9 px-5 inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/30 disabled:opacity-40">
               <Icon name="check" className="w-4 h-4" />
               {saving ? t('saving') : t('save')}
             </button>

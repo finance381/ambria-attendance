@@ -7,7 +7,8 @@
 // notifies its point of contact.
 // Layout: progress bar, then a numbered timeline with one card per step
 // (status chip, contact + due date, doc chips, action); the next step to do is
-// highlighted.
+// highlighted. Cards are raised neumorphic surfaces (.neu) on the gradient;
+// a test keeps its solid coloured header band.
 // Data: my_onboarding_flow() RPC — migration
 // 20261011060000_onboarding_test_sequence.sql.
 
@@ -96,7 +97,7 @@ export default function MyTasks() {
 
   // Small chip under the card's top row: "Up next" for the current step.
   function UpNext() {
-    return <span className="text-[10px] font-bold uppercase tracking-wider text-slate-800 bg-slate-100 px-2 py-0.5 rounded-full">{t('mytasks_up_next')}</span>
+    return <span className="text-[10px] font-bold uppercase tracking-wider text-slate-800 neu-inset px-2 py-0.5 rounded-full">{t('mytasks_up_next')}</span>
   }
 
   function renderTest(test, i) {
@@ -108,9 +109,9 @@ export default function MyTasks() {
     // A test is a checkpoint, not another to-do: it gets a solid coloured
     // header band and a tinted body so it never reads like a task card.
     var band = scored ? 'bg-emerald-600' : test.ready ? 'bg-indigo-600' : 'bg-amber-500'
-    var body = scored ? 'bg-emerald-50 border-emerald-200' : test.ready ? 'bg-indigo-50 border-indigo-200' : 'bg-amber-50 border-amber-200'
+    var body = 'neu'
     return (
-      <div className={'rounded-2xl border overflow-hidden shadow-sm ' + body + (current ? ' ring-2 ring-amber-200' : '')}>
+      <div className={'rounded-2xl overflow-hidden ' + body + (current ? ' outline-2 outline-amber-300' : '')}>
           <div className={'flex items-center justify-between gap-2 px-4 py-2 text-white ' + band}>
             <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider">
               <Icon name="test" className="w-4 h-4" />
@@ -126,7 +127,7 @@ export default function MyTasks() {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-gray-600">
               {test.poc_names.length > 0 && (
                 <span className="inline-flex items-center gap-1.5">
-                  <Icon name="user" className="w-3.5 h-3.5 text-gray-400" />
+                  <Icon name="user" className="w-3.5 h-3.5 text-slate-500" />
                   <span className="text-gray-500">{t('mytasks_test_taken_by')}:</span>
                   <span className="font-medium text-gray-800">{test.poc_names.join(', ')}</span>
                 </span>
@@ -134,13 +135,13 @@ export default function MyTasks() {
               {/* Tests only have a due date when the admin set one */}
               {test.due_date && !scored && (
                 <span className={'inline-flex items-center gap-1.5 ' + (isOverdue(test.due_date) ? 'text-red-600 font-medium' : '')}>
-                  <Icon name="calendar" className={'w-3.5 h-3.5 ' + (isOverdue(test.due_date) ? 'text-red-500' : 'text-gray-400')} />
+                  <Icon name="calendar" className={'w-3.5 h-3.5 ' + (isOverdue(test.due_date) ? 'text-red-500' : 'text-slate-500')} />
                   {t('mytasks_due', { date: formatDate(test.due_date) })}
                 </span>
               )}
             </div>
             {!scored && (
-              <p className="text-xs text-gray-600 mt-3 pt-3 border-t border-black/5">
+              <p className="text-xs text-gray-600 mt-3 pt-3 border-t border-slate-300/50">
                 {test.ready ? t('mytasks_test_ready_note') : t('mytasks_test_waiting_note')}
               </p>
             )}
@@ -154,8 +155,8 @@ export default function MyTasks() {
     var current = i === currentIndex
     var overdue = !done && task.due_date && isOverdue(task.due_date)
     return (
-      <div className={'rounded-2xl border bg-white p-4 shadow-sm ' +
-        (current ? 'border-slate-300 ring-2 ring-slate-100' : done ? 'border-gray-100' : 'border-gray-200')}>
+      <div className={'neu rounded-2xl p-4 ' +
+        (current ? 'outline-2 outline-blue-300/70' : '')}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -165,9 +166,9 @@ export default function MyTasks() {
               {current && <UpNext />}
             </div>
             {done ? (
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0 bg-emerald-50 text-emerald-700">{t('mytasks_done')}</span>
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0 bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/80">{t('mytasks_done')}</span>
             ) : overdue ? (
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0 bg-red-50 text-red-700">{t('mytasks_overdue')}</span>
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0 bg-red-50 text-red-700 ring-1 ring-inset ring-red-200/80">{t('mytasks_overdue')}</span>
             ) : null}
           </div>
           <h3 className={'text-base font-bold mt-1.5 leading-snug ' + (done ? 'text-gray-500' : 'text-gray-900')}>{task.title}</h3>
@@ -178,25 +179,25 @@ export default function MyTasks() {
           {!done && <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-gray-600">
             {task.poc_names.length > 0 && (
               <span className="inline-flex items-center gap-1.5">
-                <Icon name="user" className="w-3.5 h-3.5 text-gray-400" />
-                <span className="text-gray-400">{t('mytasks_contact')}:</span>
+                <Icon name="user" className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-slate-500">{t('mytasks_contact')}:</span>
                 <span className="font-medium text-gray-700">{task.poc_names.join(', ')}</span>
               </span>
             )}
             <span className={'inline-flex items-center gap-1.5 ' + (overdue ? 'text-red-600 font-medium' : '')}>
-              <Icon name="calendar" className={'w-3.5 h-3.5 ' + (overdue ? 'text-red-500' : 'text-gray-400')} />
+              <Icon name="calendar" className={'w-3.5 h-3.5 ' + (overdue ? 'text-red-500' : 'text-slate-500')} />
               {task.due_date ? t('mytasks_due', { date: formatDate(task.due_date) }) : t('mytasks_due_days', { n: task.due_days })}
             </span>
           </div>}
 
           {task.docs.length > 0 && (
             <div className="mt-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{t('mytasks_docs')}</p>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{t('mytasks_docs')}</p>
               <div className="flex flex-wrap gap-2">
                 {task.docs.map(function (d) {
                   return (
                     <button key={d.id} onClick={function () { openDoc(d) }}
-                      className="inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-left">
+                      className="inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg neu-press text-left">
                       <span className={'text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ' +
                         (d.file_type === 'pdf' ? 'text-red-700 bg-red-100' : 'text-blue-700 bg-blue-100')}>{d.file_type}</span>
                       <span className="text-xs font-medium text-slate-800">{d.title}</span>
@@ -210,14 +211,14 @@ export default function MyTasks() {
           {done ? (
             <div className="mt-2 flex justify-end">
               <button onClick={function () { toggleDone(task) }} disabled={saving === task.id}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-lg disabled:opacity-50">
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 neu-press rounded-lg disabled:opacity-50">
                 <Icon name="undo" className="w-3.5 h-3.5" />
                 {t('mytasks_undo')}
               </button>
             </div>
           ) : (
             <button onClick={function () { toggleDone(task) }} disabled={saving === task.id}
-              className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50">
+              className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-600/30 transition-colors disabled:opacity-50">
               <Icon name="check" className="w-4 h-4" />
               {t('mytasks_mark_done')}
             </button>
@@ -227,20 +228,20 @@ export default function MyTasks() {
   }
 
   if (loading) {
-    return <p className="text-sm text-gray-400 text-center py-12">{t('loading')}</p>
+    return <p className="text-sm text-slate-500 text-center py-12">{t('loading')}</p>
   }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h2 className="text-xl font-bold text-gray-900">{t('mytasks_title')}</h2>
+      <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">{t('mytasks_title')}</h2>
 
       {tasks.length > 0 && (
-        <div className="mt-3 mb-5 bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+        <div className="mt-3 mb-5 neu rounded-2xl p-4">
           <div className="flex items-baseline justify-between">
             <p className="text-sm font-semibold text-gray-800">{t('mytasks_progress_steps', { done: doneCount, total: tasks.length })}</p>
             <p className="text-xs font-bold text-emerald-600">{Math.round(doneCount / tasks.length * 100)}%</p>
           </div>
-          <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div className="mt-2 h-2 rounded-full neu-inset overflow-hidden">
             <div className="h-full rounded-full bg-emerald-500 transition-all duration-500"
               style={{ width: (doneCount / tasks.length * 100) + '%' }} />
           </div>
@@ -255,8 +256,8 @@ export default function MyTasks() {
       )}
 
       {tasks.length === 0 && !loadError && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-          <p className="text-sm text-gray-400">{t('mytasks_empty')}</p>
+        <div className="neu rounded-2xl p-8 text-center">
+          <p className="text-sm text-slate-500">{t('mytasks_empty')}</p>
         </div>
       )}
 
@@ -272,8 +273,8 @@ export default function MyTasks() {
             : current
               ? (isTest ? 'bg-amber-500 text-white' : 'bg-slate-800 text-white')
               : isTest
-                ? 'bg-amber-50 text-amber-700 border border-amber-300'
-                : 'bg-white text-gray-500 border border-gray-300'
+                ? 'neu-sm text-amber-700'
+                : 'neu-sm text-gray-600'
           return (
             <div key={step.kind + step.id} className="flex gap-3">
               <div className="flex flex-col items-center shrink-0">
@@ -283,7 +284,7 @@ export default function MyTasks() {
                     : isTest ? <Icon name="test" className="w-3.5 h-3.5" />
                     : i + 1}
                 </span>
-                {!isLast && <span className={'flex-1 w-0.5 mt-1 ' + (done ? 'bg-emerald-200' : 'bg-gray-200')} />}
+                {!isLast && <span className={'flex-1 w-0.5 mt-1 ' + (done ? 'bg-emerald-300' : 'bg-slate-300/70')} />}
               </div>
               <div className="flex-1 min-w-0 pb-3">
                 {isTest ? renderTest(step, i) : renderTask(step, i)}
@@ -295,10 +296,10 @@ export default function MyTasks() {
         {/* What comes after a test the joiner has not been marked on yet */}
         {lockedCount > 0 && (
           <div className="flex gap-3">
-            <span className="w-7 h-7 rounded-full bg-gray-100 text-gray-400 inline-flex items-center justify-center shrink-0 mt-2">
+            <span className="w-7 h-7 rounded-full neu-sm text-slate-500 inline-flex items-center justify-center shrink-0 mt-2">
               <Icon name="lock" className="w-3.5 h-3.5" />
             </span>
-            <div className="flex-1 rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
+            <div className="flex-1 rounded-2xl neu-inset px-4 py-3">
               <p className="text-xs text-gray-600">{t('mytasks_locked', { n: lockedCount })}</p>
             </div>
           </div>
@@ -306,7 +307,7 @@ export default function MyTasks() {
       </div>
 
       {tasks.length > 0 && !hasTests && (
-        <div className="mt-3 flex items-start gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+        <div className="mt-3 flex items-start gap-3 neu rounded-2xl p-4">
           <Icon name="test" className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-bold text-indigo-900">{t('mytasks_test_title')}</p>
