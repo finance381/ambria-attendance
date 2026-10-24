@@ -422,8 +422,9 @@ export default function Employees() {
 
   return (
     <div>
-      {/* Title, then the actions: one row on desktop; on a phone the
-          buttons drop below the title as three equal, single-line buttons */}
+      {/* Title, then the actions: one row on desktop; on a phone they drop
+          below the title, Export and Import side by side and Add Employee
+          full width, so every label fits on one line */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Employees</h2>
@@ -431,7 +432,7 @@ export default function Employees() {
             {activeCount} active · {inactiveCount} inactive
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <button
             onClick={exportCSV}
             className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
@@ -444,14 +445,14 @@ export default function Employees() {
             className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
           >
             <EmpIcon name="upload" />
-            Import
+            Import CSV
           </button>
           <button
             onClick={openAdd}
-            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors text-white bg-slate-800 hover:bg-slate-900"
+            className="col-span-2 inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors text-white bg-slate-800 hover:bg-slate-900"
           >
             <EmpIcon name="plus" />
-            Add
+            Add Employee
           </button>
         </div>
       </div>
