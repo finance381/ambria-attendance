@@ -200,14 +200,16 @@ export default function AppConfig() {
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between">
-        <p className="text-[10px] text-gray-400">
+      {/* Save bar: on a phone it sticks to the bottom of the screen with a
+          full-width button, so it stays in reach while scrolling the list */}
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:-mx-4 max-sm:px-4 max-sm:py-3 max-sm:bg-white max-sm:border-t max-sm:border-gray-200">
+        <p className="text-[11px] text-gray-400">
           Changes take effect immediately for all new attendance calculations.
         </p>
         <button
           onClick={handleSave}
           disabled={!hasChanges || saving}
-          className="px-5 py-2.5 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-40 transition-colors font-medium"
+          className="w-full sm:w-auto whitespace-nowrap px-5 py-2.5 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium"
         >
           {saving ? 'Saving…' : 'Save Changes'}
         </button>

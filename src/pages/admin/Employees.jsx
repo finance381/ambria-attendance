@@ -422,31 +422,36 @@ export default function Employees() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      {/* Title, then the actions: one row on desktop; on a phone the
+          buttons drop below the title as three equal, single-line buttons */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Employees</h2>
           <p className="text-xs text-gray-500">
             {activeCount} active · {inactiveCount} inactive
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
           <button
             onClick={exportCSV}
-            className="px-3 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
           >
-            ⬇ Export
+            <EmpIcon name="download" />
+            Export
           </button>
           <button
             onClick={function () { setShowImport(true) }}
-            className="px-3 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
           >
-            ⬆ Import CSV
+            <EmpIcon name="upload" />
+            Import
           </button>
           <button
             onClick={openAdd}
-            className="px-4 py-2 text-sm text-white bg-slate-800 rounded-lg hover:bg-slate-900 transition-colors font-medium"
+            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors text-white bg-slate-800 hover:bg-slate-900"
           >
-            + Add Employee
+            <EmpIcon name="plus" />
+            Add
           </button>
         </div>
       </div>
@@ -955,4 +960,17 @@ function roleColor(role) {
   if (role === 'manager') return 'bg-blue-50 text-blue-700'
   if (role === 'supervisor') return 'bg-amber-50 text-amber-700'
   return 'bg-gray-100 text-gray-600'
+}
+
+// Line icons for the Export / Import / Add buttons
+function EmpIcon({ name }) {
+  var paths = {
+    download: <><path d="M12 4v11" /><path d="M7 10l5 5 5-5" /><path d="M5 20h14" /></>,
+    upload: <><path d="M12 20V9" /><path d="M7 14l5-5 5 5" /><path d="M5 4h14" /></>,
+    plus: <path d="M12 5v14M5 12h14" />
+  }
+  return (
+    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
+  )
 }
