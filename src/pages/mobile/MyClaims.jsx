@@ -201,11 +201,12 @@ export default function MyClaims() {
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">{t('claims_date')} *</label>
               <input type="date" value={formDate} onChange={function (e) { handleDateChange(e.target.value) }}
+                // TEMPORARY: claims window widened to the whole current month —
+                // revert to the rolling-3-day cutoff below once asked to.
                 min={function () {
                   var now = new Date()
                   var ist = new Date(now.getTime() + (330 * 60000))
-                  var cutoff = new Date(ist.getTime() - 3 * 86400000)
-                  return cutoff.getUTCFullYear() + '-' + String(cutoff.getUTCMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getUTCDate()).padStart(2, '0')
+                  return ist.getUTCFullYear() + '-' + String(ist.getUTCMonth() + 1).padStart(2, '0') + '-01'
                 }()}
                 max={function () {
                   var now = new Date()
