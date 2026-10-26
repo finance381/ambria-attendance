@@ -96,6 +96,25 @@ function hbar(isPhone, right) {
 var DOTS = { 'text-emerald-600': 'bg-emerald-500', 'text-red-500': 'bg-red-500', 'text-red-600': 'bg-red-500', 'text-blue-600': 'bg-blue-500', 'text-amber-600': 'bg-amber-500', 'text-orange-600': 'bg-orange-500' }
 function initialsOf(name) { return String(name || '?').trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0] }).join('').toUpperCase() }
 
+// Punch Timing's "Avg Hrs" uses the same formula as the Hours tab: total
+// worked hours / (Present + Half Day days), from monthly_summary_range, so
+// Half Day days count in both. (avg_punch_times leaves short Half Day days
+// out of its own average, so the two tabs showed different numbers for the
+// same person.) Rows with no match keep the function's own value.
+function withHoursTabAvg(timingRows, summaryRows) {
+  var byKey = {}
+  summaryRows.forEach(function (r) {
+    if (r.employee_id) byKey['id:' + r.employee_id] = r
+    if (r.emp_code) byKey['code:' + r.emp_code] = r
+  })
+  return timingRows.map(function (t) {
+    var m = (t.employee_id && byKey['id:' + t.employee_id]) || (t.emp_code && byKey['code:' + t.emp_code])
+    if (!m) return t
+    var days = (m.days_present || 0) + (m.days_half || 0)
+    return { ...t, avg_hours: days > 0 ? Math.round((m.total_hours / days) * 10) / 10 : 0 }
+  })
+}
+
 export default function AdminAnalysis() {
   var { employee } = useAuth()
   var now = new Date()
@@ -140,10 +159,15 @@ export default function AdminAnalysis() {
 
   var loadTiming = useCallback(async function () {
     setTimingLoading(true)
-    var [cur, prv] = await Promise.all([
+    var [cur, prv, curSum, prvSum] = await Promise.all([
       supabase.rpc('avg_punch_times', { p_from_date: fromDate, p_to_date: toDate, p_department_id: deptIdParam }),
       supabase.rpc('avg_punch_times', { p_from_date: prev.from, p_to_date: prev.to, p_department_id: deptIdParam }),
-    ]); setTimingData(cur.data || []); setPrevTimingData(prv.data || []); setTimingLoading(false)
+      supabase.rpc('monthly_summary_range', { p_from_date: fromDate, p_to_date: toDate, p_department_id: deptIdParam }),
+      supabase.rpc('monthly_summary_range', { p_from_date: prev.from, p_to_date: prev.to, p_department_id: deptIdParam }),
+    ])
+    setTimingData(withHoursTabAvg(cur.data || [], curSum.data || []))
+    setPrevTimingData(withHoursTabAvg(prv.data || [], prvSum.data || []))
+    setTimingLoading(false)
   }, [fromDate, toDate, prev.from, prev.to, deptIdParam])
 
   var loadMonthly = useCallback(async function () {
