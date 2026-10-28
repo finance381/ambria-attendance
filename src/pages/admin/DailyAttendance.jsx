@@ -27,10 +27,12 @@ var STATUS_DOTS = {
 // Filter toolbar field style + labelled wrapper
 var FIELD = 'h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
-function FilterField({ label, grow, children }) {
+// One filter with its label. On a phone the label is hidden (the field's own
+// text says what it is) and `order` places it in the 2 x 2 grid.
+function FilterField({ label, grow, order, children }) {
   return (
-    <div className={grow ? 'sm:flex-1 sm:min-w-48' : ''}>
-      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1 px-0.5">{label}</label>
+    <div className={'min-w-0 ' + (grow ? 'sm:flex-1 sm:min-w-48 ' : '') + (order || '')}>
+      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1 px-0.5 max-sm:sr-only">{label}</label>
       {children}
     </div>
   )
@@ -219,19 +221,21 @@ export default function DailyAttendance() {
         </div>
       </div>
 
-      {/* Filters toolbar */}
-      <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm p-3 mb-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
-        <FilterField label="Date">
+      {/* Filters toolbar: one row on desktop; a compact 2 x 2 grid on a phone
+          (Department | Date, Status | Search). Department sits on the left
+          so its wide drop-down list stays on screen. */}
+      <div className="bg-white rounded-2xl ring-1 ring-gray-200/70 shadow-sm p-3 mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+        <FilterField label="Date" order="max-sm:order-2">
           <input type="date" value={date} onChange={function (e) { setDate(e.target.value) }}
             className={FIELD + ' w-full sm:w-auto'} />
         </FilterField>
-        <FilterField label="Department">
+        <FilterField label="Department" order="max-sm:order-1">
           <DeptPicker departments={departments} value={deptFilter} onChange={setDeptFilter}
-            counts={deptCounts} total={records.length} className="h-10 rounded-xl w-full sm:w-auto" />
+            counts={deptCounts} total={records.length} className="h-10 rounded-xl w-full sm:w-auto max-sm:min-w-0" />
         </FilterField>
-        <FilterField label="Status">
+        <FilterField label="Status" order="max-sm:order-3">
           <select value={statusFilter} onChange={function (e) { setStatusFilter(e.target.value) }}
-            className={FIELD + ' w-full sm:w-auto min-w-36'}>
+            className={FIELD + ' w-full sm:w-auto sm:min-w-36'}>
             <option value="">All statuses</option>
             <option value="Present">Present</option>
             <option value="Absent">Absent</option>
@@ -239,7 +243,7 @@ export default function DailyAttendance() {
             <option value="Half Day">Half Day</option>
           </select>
         </FilterField>
-        <FilterField label="Search" grow>
+        <FilterField label="Search" grow order="max-sm:order-4">
           <div className="relative">
             <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
