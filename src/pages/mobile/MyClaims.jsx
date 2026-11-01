@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useLanguage } from '../../lib/i18n'
+import { useAuth } from '../../lib/useAuth'
 import MiniIcon from '../../components/MiniIcon'
+import { resizeImageFile } from '../../lib/imageResize'
 
 var STATUS_COLORS = {
   pending: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/80',
@@ -10,6 +12,8 @@ var STATUS_COLORS = {
 }
 
 export default function MyClaims() {
+  var { employee } = useAuth()
+  var photoInputRef = useRef(null)
   var [claims, setClaims] = useState([])
   var [used, setUsed] = useState(0)
   var [limit, setLimit] = useState(4)
@@ -29,6 +33,9 @@ export default function MyClaims() {
   var [formReason, setFormReason] = useState('')
   var [formError, setFormError] = useState('')
   var [saving, setSaving] = useState(false)
+  var [photoBlob, setPhotoBlob] = useState(null)
+  var [photoPreview, setPhotoPreview] = useState('')
+  var [photoBusy, setPhotoBusy] = useState(false)
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -89,6 +96,25 @@ export default function MyClaims() {
     setPendingOut(false)
     setFormReason('')
     setFormError('')
+    setPhotoBlob(null)
+    setPhotoPreview('')
+    if (photoInputRef.current) photoInputRef.current.value = ''
+  }
+
+  async function handlePhotoChange(e) {
+    var file = e.target.files && e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+    setFormError('')
+    setPhotoBusy(true)
+    try {
+      var resized = await resizeImageFile(file)
+      setPhotoBlob(resized.blob)
+      setPhotoPreview(resized.dataUrl)
+    } catch {
+      setFormError('Could not use that photo — try another one')
+    }
+    setPhotoBusy(false)
   }
 
   async function handleSubmit(e) {
@@ -104,6 +130,7 @@ export default function MyClaims() {
       return setFormError('Change at least one punch time to submit a claim')
     }
     if (!formReason.trim()) return setFormError(t('claims_err_reason'))
+    if (!photoBlob) return setFormError(t('claims_err_photo'))
 
     setSaving(true)
 
@@ -111,11 +138,20 @@ export default function MyClaims() {
     var primaryTime = inChanged ? formInTime + ':00' : formOutTime + ':00'
     var outTime = (claimType === 'missed_both') ? formOutTime + ':00' : null
 
+    var photoPath = employee.id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg'
+    var uploadRes = await supabase.storage.from('claim-photos').upload(photoPath, photoBlob, { contentType: 'image/jpeg' })
+    if (uploadRes.error) {
+      setSaving(false)
+      setFormError('Could not upload photo — try again')
+      return
+    }
+
     var rpcParams = {
       p_attendance_date: formDate,
       p_claim_type: claimType,
       p_claimed_time: primaryTime,
-      p_reason: formReason.trim()
+      p_reason: formReason.trim(),
+      p_photo_path: photoPath
     }
     if (outTime) rpcParams.p_claimed_out_time = outTime
 
@@ -262,6 +298,29 @@ export default function MyClaims() {
                     rows={2} maxLength={500} placeholder={t('claims_reason_placeholder')}
                     className="w-full px-3.5 py-2.5 border-0 neu-inset rounded-xl text-base text-gray-900 outline-none focus:outline-2 focus:outline-blue-400/60 resize-none" />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+                    {t('claims_photo')} *
+                  </label>
+                  <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" id="claim-photo-input" />
+                  {photoPreview ? (
+                    <div className="relative">
+                      <img src={photoPreview} alt="" className="w-full h-40 object-cover rounded-xl neu-inset" />
+                      <button type="button" onClick={function () { setPhotoBlob(null); setPhotoPreview('') }}
+                        className="absolute top-2 right-2 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/55 text-white">
+                        <ClaimIcon name="x" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="claim-photo-input"
+                      className="flex items-center justify-center gap-2 h-20 neu-inset rounded-xl text-sm font-semibold text-blue-600 cursor-pointer">
+                      {photoBusy ? t('claims_photo_processing') : (
+                        <><ClaimIcon name="camera" className="w-5 h-5" />{t('claims_photo_add')}</>
+                      )}
+                    </label>
+                  )}
+                </div>
               </>
             )}
 
@@ -270,7 +329,7 @@ export default function MyClaims() {
             <div className="flex gap-3">
               <button type="button" onClick={function () { setShowNew(false) }}
                 className="flex-1 h-12 text-[15px] font-semibold text-gray-700 neu-press rounded-xl">{t('cancel')}</button>
-              <button type="submit" disabled={saving || !formDate || fetchingPunches}
+              <button type="submit" disabled={saving || !formDate || fetchingPunches || photoBusy || !photoBlob}
                 className="flex-1 h-12 text-[15px] font-semibold text-white bg-blue-600 rounded-xl shadow-md shadow-blue-600/30 hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 {saving ? t('claims_submitting') : t('claims_submit')}
               </button>
@@ -336,7 +395,11 @@ function formatDate(isoString) {
 }
 
 function ClaimIcon({ name, className }) {
-  var paths = { plus: <path d="M12 5v14M5 12h14" /> }
+  var paths = {
+    plus: <path d="M12 5v14M5 12h14" />,
+    x: <path d="M6 6l12 12M18 6L6 18" />,
+    camera: <><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13" r="3.5" /></>
+  }
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>

@@ -123,6 +123,10 @@ var translations = {
     claims_err_date: 'Select a date',
     claims_err_time: 'Enter the approximate time',
     claims_err_reason: 'Reason is required',
+    claims_err_photo: 'A photo is required to submit a claim',
+    claims_photo: 'Photo Evidence',
+    claims_photo_add: 'Add Photo (camera or gallery)',
+    claims_photo_processing: 'Processing…',
     claims_toast_submitted: 'Claim submitted — {used} of {limit} used this month',
 
     // ── Punch for Team ───────────────────────
@@ -330,6 +334,7 @@ var translations = {
     ca_hide_punches: 'Hide existing punches',
     ca_no_punches: 'No punches recorded for this date',
     ca_claim_tag: '(claim)',
+    ca_photo_alt: 'Claim evidence',
     ca_own_claim: 'Your own claim — cannot review',
     ca_approve: 'Approve',
     ca_reject: 'Reject',
@@ -467,6 +472,10 @@ var translations = {
     claims_err_date: 'तारीख़ चुनें',
     claims_err_time: 'अनुमानित समय दर्ज करें',
     claims_err_reason: 'कारण ज़रूरी है',
+    claims_err_photo: 'क्लेम भेजने के लिए फ़ोटो ज़रूरी है',
+    claims_photo: 'फ़ोटो सबूत',
+    claims_photo_add: 'फ़ोटो जोड़ें (कैमरा या गैलरी)',
+    claims_photo_processing: 'प्रोसेस हो रहा है…',
     claims_toast_submitted: 'क्लेम भेजा गया — इस महीने {limit} में से {used} इस्तेमाल हुए',
 
     // ── Punch for Team ───────────────────────
@@ -673,6 +682,7 @@ var translations = {
     ca_hide_punches: 'पंच छिपाएँ',
     ca_no_punches: 'इस तारीख का कोई पंच नहीं',
     ca_claim_tag: '(क्लेम)',
+    ca_photo_alt: 'क्लेम सबूत',
     ca_own_claim: 'आपका अपना क्लेम — इस पर फ़ैसला नहीं कर सकते',
     ca_approve: 'स्वीकार करें',
     ca_reject: 'अस्वीकार करें',

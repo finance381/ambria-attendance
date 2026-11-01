@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { selfieThumbUrl, selfieFullUrl } from '../../lib/selfieUrl'
+import { claimPhotoThumbUrl, claimPhotoFullUrl } from '../../lib/claimPhotoUrl'
 
 var STATUS_COLORS = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -33,6 +34,7 @@ export default function ClaimsQueue() {
   var [expandedClaim, setExpandedClaim] = useState(null)
   var [claimPunches, setClaimPunches] = useState([])
   var [punchLoading, setPunchLoading] = useState(false)
+  var [photoLightbox, setPhotoLightbox] = useState(null)
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -303,6 +305,16 @@ export default function ClaimsQueue() {
                   {c.reason && (
                     <p className="mt-3 pl-3 border-l-2 border-blue-300 text-[13px] text-gray-700 leading-relaxed">{c.reason}</p>
                   )}
+                  {c.photo_path && (
+                    <button type="button" onClick={function () { setPhotoLightbox(c.photo_path) }} className="block mt-3">
+                      <img
+                        src={claimPhotoThumbUrl(c.photo_path)}
+                        onError={function (e) { e.target.onerror = null; e.target.src = claimPhotoFullUrl(c.photo_path) }}
+                        className="h-24 rounded-lg object-cover ring-1 ring-gray-200 hover:ring-blue-400 transition-all"
+                        alt="Claim evidence"
+                      />
+                    </button>
+                  )}
                   <p className="text-[11px] text-gray-400 mt-2">Submitted {formatDateTime(c.created_at)}</p>
 
                   {!isPending && c.reviewed_by_name && (
@@ -446,6 +458,22 @@ export default function ClaimsQueue() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Claim photo lightbox */}
+      {photoLightbox && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={function () { setPhotoLightbox(null) }}>
+          <img
+            src={claimPhotoFullUrl(photoLightbox)}
+            className="max-w-full max-h-full rounded-lg"
+            alt="Claim evidence"
+            onClick={function (e) { e.stopPropagation() }}
+          />
+          <button onClick={function () { setPhotoLightbox(null) }}
+            className="absolute top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">
+            <QIcon name="x" className="w-5 h-5" />
+          </button>
         </div>
       )}
 
