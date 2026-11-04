@@ -11,6 +11,7 @@ export default function Departments() {
   var [toast, setToast] = useState('')
   var [deleteTarget, setDeleteTarget] = useState(null)
   var [permDelete, setPermDelete] = useState(null)
+  var [togglingIds, setTogglingIds] = useState({})
 
   var showToast = useCallback(function (msg) {
     setToast(msg)
@@ -90,6 +91,44 @@ export default function Departments() {
     loadAll()
   }
 
+  async function handleToggleGuardPunch(dept) {
+    if (togglingIds[dept.id]) return // a request for this row is already in flight
+    var next = !dept.guard_punch_enabled
+
+    setTogglingIds(function (prev) { return Object.assign({}, prev, { [dept.id]: true }) })
+    // Optimistic update via the functional form — revert below can't clobber
+    // a different row's update that resolved in between.
+    setDepartments(function (prev) {
+      return prev.map(function (d) {
+        return d.id === dept.id ? Object.assign({}, d, { guard_punch_enabled: next }) : d
+      })
+    })
+
+    var { data, error } = await supabase
+      .from('departments')
+      .update({ guard_punch_enabled: next })
+      .eq('id', dept.id)
+      .select()
+
+    setTogglingIds(function (prev) {
+      var copy = Object.assign({}, prev)
+      delete copy[dept.id]
+      return copy
+    })
+
+    if (error || !data || data.length === 0) {
+      setDepartments(function (prev) {
+        return prev.map(function (d) {
+          return d.id === dept.id ? Object.assign({}, d, { guard_punch_enabled: !next }) : d
+        })
+      })
+      showToast('Could not update — ' + (error ? error.message : 'check permissions'))
+      return
+    }
+
+    showToast(dept.name + (next ? ': guard punch enabled' : ': guard punch disabled'))
+  }
+
   if (loading) {
     return <p className="text-sm text-gray-400 text-center py-12">Loading…</p>
   }
@@ -139,6 +178,7 @@ export default function Departments() {
               <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department</th>
               <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Employees</th>
               <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Type</th>
+              <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Guard Punch</th>
               <th className="text-left px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
             </tr>
@@ -161,6 +201,18 @@ export default function Departments() {
                     ) : (
                       <span className="text-[10px] font-bold uppercase text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">Custom</span>
                     )}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={function () { handleToggleGuardPunch(dept) }}
+                      disabled={!dept.active || !!togglingIds[dept.id]}
+                      title={!dept.active ? 'Reactivate the department first' : 'Lets security guards proxy-punch salaried staff in this department'}
+                      className={'relative inline-flex items-center h-6 w-11 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ' +
+                        (dept.guard_punch_enabled ? 'bg-emerald-500' : 'bg-gray-300')}
+                    >
+                      <span className={'inline-block w-4 h-4 transform rounded-full bg-white transition-transform ' +
+                        (dept.guard_punch_enabled ? 'translate-x-6' : 'translate-x-1')} />
+                    </button>
                   </td>
                   <td className="px-4 py-2.5">
                     {dept.active ? (

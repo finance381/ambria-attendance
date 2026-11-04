@@ -648,7 +648,7 @@ export function capturePhoto() {
   })
 }
 
-export function captureProxyPhoto() {
+export function captureProxyPhoto(labelText) {
   return new Promise(function (resolve, reject) {
     var video = createHiddenVideo(false)
     var preview = startCanvasPreview(video, false)
@@ -658,7 +658,7 @@ export function captureProxyPhoto() {
 
     var label = document.createElement('div')
     label.style.cssText = 'color:#fff;font-size:14px;font-weight:600;text-align:center;padding:8px 20px;border-radius:20px;background:rgba(0,0,0,0.5);margin-top:60px'
-    label.textContent = 'Take photo of the worker'
+    label.textContent = labelText || 'Take photo of the worker'
 
     var btnWrap = document.createElement('div')
     btnWrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;padding-bottom:20px'
