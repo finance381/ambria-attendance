@@ -466,6 +466,28 @@ export default function PunchForTeam() {
       <h2 className="text-[22px] font-bold text-slate-900 tracking-tight leading-tight">{t('team_title')}</h2>
       <p className="text-[13px] text-slate-500 mt-1 mb-4">{t('team_subtitle')}</p>
 
+      {/* Salaried Staff vs Casual Workers mode */}
+      <div className="flex gap-1 neu rounded-2xl p-1.5 mb-5">
+        <button
+          onClick={function () { setPunchMode('salaried') }}
+          className={'flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ' +
+            (punchMode === 'salaried' ? 'neu-on text-blue-600' : 'text-gray-600')}
+        >
+          {t('team_mode_salaried')}
+        </button>
+        <button
+          onClick={function () { setPunchMode('casual') }}
+          className={'flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ' +
+            (punchMode === 'casual' ? 'neu-on text-blue-600' : 'text-gray-600')}
+        >
+          {t('team_mode_casual')}
+        </button>
+      </div>
+
+      {punchMode === 'salaried' && <SalariedPunch showToast={showToast} />}
+
+      {punchMode === 'casual' && (
+        <>
       {/* Tab bar */}
       <div className="flex gap-1 neu rounded-2xl p-1.5 mb-5">
         {[
@@ -494,28 +516,6 @@ export default function PunchForTeam() {
 
       {/* PUNCH TAB */}
       {tab === 'punch' && (
-        <div>
-          {/* Salaried Staff vs Casual Workers mode */}
-          <div className="flex gap-1 neu rounded-2xl p-1.5 mb-4">
-            <button
-              onClick={function () { setPunchMode('salaried') }}
-              className={'flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ' +
-                (punchMode === 'salaried' ? 'neu-on text-blue-600' : 'text-gray-600')}
-            >
-              {t('team_mode_salaried')}
-            </button>
-            <button
-              onClick={function () { setPunchMode('casual') }}
-              className={'flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ' +
-                (punchMode === 'casual' ? 'neu-on text-blue-600' : 'text-gray-600')}
-            >
-              {t('team_mode_casual')}
-            </button>
-          </div>
-
-          {punchMode === 'salaried' && <SalariedPunch showToast={showToast} />}
-
-          {punchMode === 'casual' && (
         <div className="space-y-2">
           {casuals.length === 0 ? (
             <div className="text-center py-8">
@@ -591,8 +591,6 @@ export default function PunchForTeam() {
             </>
           )}
         </div>
-          )}
-        </div>
       )}
 
       {/* INCOMING TRANSFERS TAB */}
@@ -652,7 +650,7 @@ export default function PunchForTeam() {
       )}
 
       {/* TRANSFER BAR (sticky bottom when casuals selected) */}
-      {tab === 'punch' && punchMode === 'casual' && selectedCount > 0 && (
+      {tab === 'punch' && selectedCount > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-40">
           <button onClick={function () { setShowTransfer(true); setTransferVenue('') }}
             className="w-full py-3 text-sm font-bold text-white bg-blue-600 rounded-xl shadow-lg hover:bg-blue-700 transition-colors">
@@ -807,6 +805,8 @@ export default function PunchForTeam() {
             </div>
           )}
         </div>
+      )}
+        </>
       )}
 
       {/* REMOVE CASUAL CONFIRM */}
