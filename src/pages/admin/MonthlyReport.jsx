@@ -181,7 +181,7 @@ export default function MonthlyReport() {
 
     var { data } = await supabase
       .from('punches')
-      .select('attendance_date, punch_type, punched_at, location_name')
+      .select('attendance_date, punch_type, punched_at, location_name, venues(name)')
       .eq('employee_id', emp.employee_id)
       .gte('attendance_date', startDate)
       .lte('attendance_date', endDate)
@@ -192,12 +192,13 @@ export default function MonthlyReport() {
     var byDate = {}
     ;(data || []).forEach(function (p) {
       if (!byDate[p.attendance_date]) byDate[p.attendance_date] = { ins: [], outs: [], inLocs: [], outLocs: [] }
+      var locName = (p.venues && p.venues.name) || p.location_name || null
       if (p.punch_type === 'in') {
         byDate[p.attendance_date].ins.push(p.punched_at)
-        byDate[p.attendance_date].inLocs.push(p.location_name || null)
+        byDate[p.attendance_date].inLocs.push(locName)
       } else {
         byDate[p.attendance_date].outs.push(p.punched_at)
-        byDate[p.attendance_date].outLocs.push(p.location_name || null)
+        byDate[p.attendance_date].outLocs.push(locName)
       }
     })
 

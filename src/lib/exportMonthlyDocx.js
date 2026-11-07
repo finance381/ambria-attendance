@@ -135,7 +135,7 @@ async function fetchPunches(employeeIds, fromDate, toDate) {
     var batch = employeeIds.slice(i, i + 20)
     var { data } = await supabase
       .from('punches')
-      .select('employee_id, attendance_date, punch_type, punched_at, location_name')
+      .select('employee_id, attendance_date, punch_type, punched_at, location_name, venues(name)')
       .in('employee_id', batch)
       .gte('attendance_date', fromDate)
       .lte('attendance_date', toDate)
@@ -254,13 +254,17 @@ function buildDailyPunchPages(employees, punchData, includeLocations) {
     punches.forEach(function (p) {
       var d = p.attendance_date
       if (!byDate[d]) byDate[d] = { inTime: null, outTime: null, inLoc: null, outLoc: null }
+      var locName = (p.venues && p.venues.name) || p.location_name || null
       if (p.punch_type === 'in') {
-        byDate[d].inTime = fmtTime(p.punched_at)
-        byDate[d].inLoc = p.location_name || '—'
+        // Keep the first punch-in of the day, not the last.
+        if (!byDate[d].inTime) {
+          byDate[d].inTime = fmtTime(p.punched_at)
+          byDate[d].inLoc = locName
+        }
       }
       if (p.punch_type === 'out') {
         byDate[d].outTime = fmtTime(p.punched_at)
-        byDate[d].outLoc = p.location_name || '—'
+        byDate[d].outLoc = locName
       }
     })
 
@@ -298,13 +302,13 @@ function buildDailyPunchPages(employees, punchData, includeLocations) {
       ]
       var ci = 3
       if (includeLocations) {
-        cells.push(dataCell(d.inLoc === '—' ? '— (no GPS)' : d.inLoc, colWidths[ci], { alt: alt, left: true, color: d.inLoc === '—' ? 'A0AEC0' : '059669' }))
+        cells.push(dataCell(d.inLoc || '—', colWidths[ci], { alt: alt, left: true, color: d.inLoc ? '059669' : 'A0AEC0' }))
         ci++
       }
       cells.push(dataCell(d.outTime || '—', colWidths[ci], { alt: alt, color: 'DC2626' }))
       ci++
       if (includeLocations) {
-        cells.push(dataCell(d.outLoc === '—' ? '— (no GPS)' : d.outLoc, colWidths[ci], { alt: alt, left: true, color: d.outLoc === '—' ? 'A0AEC0' : '059669' }))
+        cells.push(dataCell(d.outLoc || '—', colWidths[ci], { alt: alt, left: true, color: d.outLoc ? '059669' : 'A0AEC0' }))
       }
 
       rows.push(new TableRow({ children: cells }))
