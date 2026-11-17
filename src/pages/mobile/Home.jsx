@@ -8,7 +8,7 @@ import InstallPrompt from '../../components/InstallPrompt'
 import MarkTestsBanner from '../../components/MarkTestsBanner'
 import TaskDueBanner from '../../components/TaskDueBanner'
 import PocOverdueBanner from '../../components/PocOverdueBanner'
-import { syncOfflinePunches, useOfflineSyncState, dismissRejected } from '../../lib/offlineSync'
+import { useOfflineSyncState, dismissRejected } from '../../lib/offlineSync'
 import MiniIcon from '../../components/MiniIcon'
 
 export default function Home() {
@@ -16,12 +16,10 @@ export default function Home() {
   var [status, setStatus] = useState(null)
   var [punches, setPunches] = useState([])
   var [loading, setLoading] = useState(true)
-  // Punches saved on the phone and still being sent (offlineSync.js runs the
-  // sending from the mobile shell; this screen only shows it)
+  // Punches saved on the phone and still being sent (offlineSync.js sends
+  // them quietly in the background). They are shown here like any other
+  // punch, so a slow network never looks like a missing punch.
   var sync = useOfflineSyncState()
-  var pendingCount = sync.pending
-  var syncing = sync.syncing
-  var syncError = sync.error
 
   var loadStatus = useCallback(async function () {
     var [statusRes, punchesRes] = await Promise.all([
@@ -54,7 +52,15 @@ export default function Home() {
   }
 
   
-  var isPunchedIn = status && status.is_punched_in
+  // Today's punches = the server's + those still waiting on the phone; the
+  // newest waiting punch decides whether the person is in or out
+  var todayStr = new Date().toLocaleDateString('en-CA')
+  var waiting = sync.items
+    .filter(function (q) { return new Date(q.clientTimestamp).toLocaleDateString('en-CA') === todayStr })
+    .map(function (q, i) { return { id: 'q' + i, punch_type: q.punchType, punched_at: q.clientTimestamp, nearest_venue: q.areaName } })
+  var allPunches = punches.concat(waiting).sort(function (a, b) { return new Date(a.punched_at) - new Date(b.punched_at) })
+  var lastWaiting = sync.items[sync.items.length - 1]
+  var isPunchedIn = lastWaiting ? lastWaiting.punchType === 'in' : (status && status.is_punched_in)
   var punchType = isPunchedIn ? 'out' : 'in'
 
   return (
@@ -70,33 +76,6 @@ export default function Home() {
       <TaskDueBanner />
       <PocOverdueBanner />
       <MarkTestsBanner />
-      {pendingCount > 0 && (
-        <div className={'rounded-2xl px-4 py-3 mb-4 border ' + (syncing ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200')}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={'flex items-center gap-1.5 text-sm font-semibold ' + (syncing ? 'text-blue-800' : 'text-amber-800')}>
-                <MiniIcon name={syncing ? 'sync' : 'offline'} className={'w-4 h-4 shrink-0' + (syncing ? ' animate-spin' : '')} />
-                {syncing ? 'Syncing...' : pendingCount + ' punch' + (pendingCount > 1 ? 'es' : '') + ' waiting'}
-              </p>
-              <p className={'text-[11px] mt-0.5 ' + (syncing ? 'text-blue-600' : 'text-amber-600')}>
-                {syncing ? 'Uploading offline punches' : 'Will sync when back online'}
-              </p>
-            </div>
-            {!syncing && navigator.onLine && (
-              <button onClick={syncOfflinePunches} className="text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg">
-                Sync now
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      
-      {syncError && !syncing && (
-        <div className="rounded-2xl px-4 py-3 mb-4 border bg-amber-50 border-amber-200">
-          <p className="text-sm text-amber-800">{syncError}</p>
-        </div>
-      )}
-
       {/* Punches the server refused after they were sent from the phone */}
       {sync.rejected.map(function (r, i) {
         var when = new Date(r.clientTimestamp)
@@ -125,12 +104,12 @@ export default function Home() {
       )}
 
       {/* Today's punches */}
-      {punches.length > 0 && (
+      {allPunches.length > 0 && (
         <div className="mb-5">
           <div className="flex items-center justify-between mb-2.5">
             <h3 className="flex items-center gap-2 text-base font-bold text-gray-900">
               {t('home_today_punches')}
-              <span className="min-w-6 h-6 px-1.5 rounded-full neu-inset text-xs font-semibold text-gray-700 inline-flex items-center justify-center">{punches.length}</span>
+              <span className="min-w-6 h-6 px-1.5 rounded-full neu-inset text-xs font-semibold text-gray-700 inline-flex items-center justify-center">{allPunches.length}</span>
             </h3>
             <Link to="/attendance" className="inline-flex items-center gap-0.5 text-sm font-medium text-blue-600 no-underline">
               {t('home_view_all')}
@@ -138,7 +117,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="space-y-2.5">
-            {punches.map(function (p) {
+            {allPunches.map(function (p) {
               var isIn = p.punch_type === 'in'
               return (
                 <div key={p.id} className={'px-4 py-3 flex items-center gap-3 rounded-2xl neu'}>

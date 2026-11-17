@@ -6,7 +6,7 @@ import { getLocation } from '../lib/gps'
 import { useLanguage } from '../lib/i18n'
 import MiniIcon from './MiniIcon'
 import { queuePunch, registerBackgroundSync } from '../lib/offlineQueue'
-import { syncOfflinePunches } from '../lib/offlineSync'
+import { syncOfflinePunches, refreshPending } from '../lib/offlineSync'
 
 // Network steps get a time limit. On a weak signal an upload or the punch
 // call could hang with no error, leaving the "Recording punch" spinner up
@@ -124,9 +124,11 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
       }
       // Background sync is a bonus; never wait long on it
       withTimeout(registerBackgroundSync(), STORAGE_TIMEOUT_MS).catch(function () {})
-      // Usually the network was only slow: try sending it again shortly
+      // Usually the network was only slow: try sending it again shortly.
+      // To the person it is simply done; Home shows it like any punch.
+      refreshPending()
       setTimeout(syncOfflinePunches, 5000)
-      setStep('queued')
+      setStep('done')
       if (onComplete) onComplete({ queued: true })
     }
 
@@ -263,17 +265,6 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
         <p className="text-sm font-semibold text-emerald-700">
           {punchType === 'in' ? t('punch_done_in') : t('punch_done_out')}
         </p>
-      </div>
-    )
-  } else if (step === 'queued') {
-    stepContent = (
-      <div className="neu rounded-2xl text-center py-6 px-4">
-        {preview && <img src={preview} alt="Selfie" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-amber-300" />}
-        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
-          <MiniIcon name="offline" className="w-6 h-6" />
-        </div>
-        <p className="text-sm font-semibold text-amber-700">{t('punch_queued')}</p>
-        <p className="text-[11px] text-amber-500 mt-1">{t('punch_queued_desc')}</p>
       </div>
     )
   } else if (step === 'error') {

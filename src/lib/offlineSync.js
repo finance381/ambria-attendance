@@ -4,8 +4,9 @@
 // screen: when the app opens, when the internet comes back, when the app
 // returns from the background, a few seconds after a punch is saved, and
 // once a minute while anything is still waiting.
-// A punch the server refuses is not dropped silently: it is kept in a
-// "rejected" list that the Home screen shows, so the person can file a claim.
+// The person never sees "offline": Home shows a waiting punch like any other
+// (items below). Only a punch the server refuses is shown, in a "rejected"
+// list on Home, so the person can file a claim instead of losing it.
 // Screens read the live state with useOfflineSyncState().
 
 import { useState, useEffect } from 'react'
@@ -16,7 +17,7 @@ var REJECTED_KEY = 'ambria-rejected-punches'
 var RETRY_MS = 60000
 var CALL_TIMEOUT_MS = 30000
 
-var state = { pending: 0, syncing: false, error: '', rejected: loadRejected() }
+var state = { pending: 0, items: [], syncing: false, error: '', rejected: loadRejected() }
 var listeners = []
 var running = false
 var retryTimer = null
@@ -27,6 +28,21 @@ function loadRejected() {
 
 function saveRejected(list) {
   try { localStorage.setItem(REJECTED_KEY, JSON.stringify(list)) } catch { /* storage blocked */ }
+}
+
+// The waiting punches without their photos (enough for Home to show them)
+function summarise(list) {
+  return list.map(function (p) {
+    return { punchType: p.punchType, clientTimestamp: p.clientTimestamp, areaName: p.areaName || null }
+  })
+}
+
+// Re-read the queue (called right after a punch is saved on the phone)
+export async function refreshPending() {
+  try {
+    var list = await getPendingPunches()
+    setState({ pending: list.length, items: summarise(list) })
+  } catch { /* storage unavailable */ }
 }
 
 function setState(patch) {
@@ -52,7 +68,7 @@ export async function syncOfflinePunches() {
   running = true
   try {
     var pending = await getPendingPunches()
-    setState({ pending: pending.length })
+    setState({ pending: pending.length, items: summarise(pending) })
     if (pending.length === 0) return
     if (!navigator.onLine) { scheduleRetry(); return }
 
@@ -103,7 +119,7 @@ export async function syncOfflinePunches() {
     }
 
     var remaining = await getPendingPunches()
-    setState({ pending: remaining.length })
+    setState({ pending: remaining.length, items: summarise(remaining) })
     if (remaining.length > 0) {
       if (navigator.onLine) setState({ error: remaining.length + ' punch' + (remaining.length > 1 ? 'es' : '') + ' not sent yet — retrying automatically' })
       scheduleRetry()
@@ -141,7 +157,7 @@ export function startOfflineSync() {
   }
 }
 
-// Live { pending, syncing, error, rejected } for the Home banner
+// Live { pending, items, syncing, error, rejected } for the Home screen
 export function useOfflineSyncState() {
   var [s, setS] = useState(state)
   useEffect(function () {
