@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
@@ -8,7 +8,7 @@ import InstallPrompt from '../../components/InstallPrompt'
 import MarkTestsBanner from '../../components/MarkTestsBanner'
 import TaskDueBanner from '../../components/TaskDueBanner'
 import PocOverdueBanner from '../../components/PocOverdueBanner'
-import { getPendingPunches, removePunch } from '../../lib/offlineQueue'
+import { syncOfflinePunches, useOfflineSyncState, dismissRejected } from '../../lib/offlineSync'
 import MiniIcon from '../../components/MiniIcon'
 
 export default function Home() {
@@ -16,10 +16,12 @@ export default function Home() {
   var [status, setStatus] = useState(null)
   var [punches, setPunches] = useState([])
   var [loading, setLoading] = useState(true)
-  var [pendingCount, setPendingCount] = useState(0)
-  var [syncing, setSyncing] = useState(false)
-  var [syncError, setSyncError] = useState('')
-  var syncingRef = useRef(false)
+  // Punches saved on the phone and still being sent (offlineSync.js runs the
+  // sending from the mobile shell; this screen only shows it)
+  var sync = useOfflineSyncState()
+  var pendingCount = sync.pending
+  var syncing = sync.syncing
+  var syncError = sync.error
 
   var loadStatus = useCallback(async function () {
     var [statusRes, punchesRes] = await Promise.all([
@@ -36,89 +38,12 @@ export default function Home() {
     loadStatus()
   }, [loadStatus])
 
-  var syncOfflinePunches = useCallback(async function () {
-    // Atomic guard — prevents concurrent runs even across re-renders
-    if (syncingRef.current) return
-    syncingRef.current = true
-
-    try {
-      var pending = await getPendingPunches()
-      setPendingCount(pending.length)
-      if (pending.length === 0) {
-        return
-      }
-
-      setSyncing(true)
-      setSyncError('')
-
-      for (var i = 0; i < pending.length; i++) {
-        var p = pending[i]
-        try {
-          var { data: { user } } = await supabase.auth.getUser()
-          if (!user) break
-
-          var filePath = user.id + '/' + p.clientTimestamp.slice(0, 10) + '_' + p.punchType + '_' + Date.now() + '.jpg'
-          var { error: upErr } = await supabase.storage
-            .from('selfies')
-            .upload(filePath, p.selfieBlob, { contentType: 'image/jpeg', upsert: false })
-
-          if (upErr) {
-            // Storage upload failed — could be network. Skip, retry next cycle.
-            continue
-          }
-
-          var { data: result, error: rpcErr } = await supabase.rpc('punch', {
-            p_punch_type: p.punchType,
-            p_selfie_path: filePath,
-            p_latitude: p.latitude,
-            p_longitude: p.longitude,
-            p_gps_accuracy: p.gpsAccuracy,
-            p_device_info: p.deviceInfo,
-            p_client_timestamp: p.clientTimestamp,
-            p_client_punch_id: p.clientPunchId
-          })
-
-          if (rpcErr) {
-            // Network / infrastructure error — keep in queue for retry
-            console.warn('Offline punch RPC network error, will retry:', rpcErr)
-            continue
-          }
-
-          // Success OR server-side rejection (duplicate / already punched / stale)
-          // Either way, remove — retrying will not fix a server rejection
-          if (result && result.error) {
-            console.warn('Offline punch rejected by server, removing from queue:', result.error)
-          }
-          await removePunch(p.id)
-        } catch (e) {
-          console.warn('Offline punch sync exception, will retry:', e)
-        }
-      }
-
-      var remaining = await getPendingPunches()
-      setPendingCount(remaining.length)
-      if (remaining.length === 0) {
-        loadStatus()
-      } else if (navigator.onLine) {
-        setSyncError(remaining.length + ' punch' + (remaining.length > 1 ? 'es' : '') + ' failed to sync — check network and retry')
-      }
-    } finally {
-      syncingRef.current = false
-      setSyncing(false)
-    }
-  }, [loadStatus])
   var { t } = useLanguage()
-  // Sync on mount + when coming back online
+  // Refresh the status once queued punches have reached the server
   useEffect(function () {
-    syncOfflinePunches()
-    window.addEventListener('online', syncOfflinePunches)
-    function onSWMessage(e) { if (e.data && e.data.type === 'sync-punches') syncOfflinePunches() }
-    navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', onSWMessage)
-    return function () {
-      window.removeEventListener('online', syncOfflinePunches)
-      navigator.serviceWorker && navigator.serviceWorker.removeEventListener('message', onSWMessage)
-    }
-  }, [syncOfflinePunches])
+    window.addEventListener('ambria-punches-synced', loadStatus)
+    return function () { window.removeEventListener('ambria-punches-synced', loadStatus) }
+  }, [loadStatus])
 
   function handlePunchComplete() {
     setTimeout(function () { loadStatus() }, 1500)
@@ -166,21 +91,32 @@ export default function Home() {
         </div>
       )}
       
-      {syncError && (
-        <div className="rounded-2xl px-4 py-3 mb-4 border bg-red-50 border-red-200">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-red-700">{syncError}</p>
-            <button onClick={async function () {
-              var all = await getPendingPunches()
-              for (var i = 0; i < all.length; i++) { await removePunch(all[i].id) }
-              setPendingCount(0)
-              setSyncError('')
-            }} className="text-xs font-semibold text-red-600 bg-red-100 px-3 py-1.5 rounded-lg">
-              Clear queue
-            </button>
-          </div>
+      {syncError && !syncing && (
+        <div className="rounded-2xl px-4 py-3 mb-4 border bg-amber-50 border-amber-200">
+          <p className="text-sm text-amber-800">{syncError}</p>
         </div>
       )}
+
+      {/* Punches the server refused after they were sent from the phone */}
+      {sync.rejected.map(function (r, i) {
+        var when = new Date(r.clientTimestamp)
+        var whenText = when.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ', ' +
+          when.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
+        return (
+          <div key={i} className="rounded-2xl px-4 py-3 mb-4 border bg-red-50 border-red-200">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-red-800">
+              <MiniIcon name="alert" className="w-4 h-4 shrink-0" />
+              {(r.punchType === 'in' ? t('home_punch_in') : t('home_punch_out')) + ' · ' + whenText + ' — ' + t('sync_rejected_title')}
+            </p>
+            <p className="text-[11px] text-red-700 mt-0.5">{r.reason}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <Link to="/claims" className="text-xs font-semibold text-white bg-red-600 px-3 py-1.5 rounded-lg no-underline">{t('sync_rejected_claim')}</Link>
+              <button onClick={function () { dismissRejected(i) }} className="text-xs font-semibold text-red-700 bg-red-100 px-3 py-1.5 rounded-lg">{t('sync_rejected_dismiss')}</button>
+            </div>
+          </div>
+        )
+      })}
+
       {status && status.has_stale_punch && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800"><MiniIcon name="alert" className="w-4 h-4 shrink-0" />{t('home_stale_title')}</p>

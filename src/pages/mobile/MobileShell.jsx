@@ -14,6 +14,7 @@ import { useAuth } from '../../lib/useAuth'
 import { refreshPushSubscription } from '../../lib/pushRefresh'
 import { useLanguage, LanguageToggle } from '../../lib/i18n'
 import PullToRefresh from '../../components/PullToRefresh'
+import { startOfflineSync } from '../../lib/offlineSync'
 
 var ALL_TABS = [
   { to: '/', key: 'tab_home', tabId: 'home' },
@@ -41,6 +42,9 @@ export default function MobileShell() {
   useEffect(function () {
     if (employee) refreshPushSubscription(employee.id)
   }, [employee])
+
+  // Send punches saved on the phone, whichever screen is open
+  useEffect(function () { return startOfflineSync() }, [])
 
   var navigate = useNavigate()
   var location = useLocation()

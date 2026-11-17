@@ -6,6 +6,7 @@ import { getLocation } from '../lib/gps'
 import { useLanguage } from '../lib/i18n'
 import MiniIcon from './MiniIcon'
 import { queuePunch, registerBackgroundSync } from '../lib/offlineQueue'
+import { syncOfflinePunches } from '../lib/offlineSync'
 
 // Network steps get a time limit. On a weak signal an upload or the punch
 // call could hang with no error, leaving the "Recording punch" spinner up
@@ -123,6 +124,8 @@ export default function PunchCapture({ punchType, onComplete, onCancel }) {
       }
       // Background sync is a bonus; never wait long on it
       withTimeout(registerBackgroundSync(), STORAGE_TIMEOUT_MS).catch(function () {})
+      // Usually the network was only slow: try sending it again shortly
+      setTimeout(syncOfflinePunches, 5000)
       setStep('queued')
       if (onComplete) onComplete({ queued: true })
     }
