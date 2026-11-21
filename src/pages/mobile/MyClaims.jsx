@@ -303,7 +303,6 @@ export default function MyClaims() {
                   <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
                     {t('claims_photo')} *
                   </label>
-                  <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" id="claim-photo-input" />
                   {photoPreview ? (
                     <div className="relative">
                       <img src={photoPreview} alt="" className="w-full h-40 object-cover rounded-xl neu-inset" />
@@ -313,12 +312,18 @@ export default function MyClaims() {
                       </button>
                     </div>
                   ) : (
-                    <label htmlFor="claim-photo-input"
-                      className="flex items-center justify-center gap-2 h-20 neu-inset rounded-xl text-sm font-semibold text-blue-600 cursor-pointer">
+                    // The real file input lies invisibly over the whole tile, so the
+                    // tap lands on it directly. A hidden (display:none) input opened
+                    // through a <label> does nothing on some Android phones and in
+                    // apps that open this page in a built-in browser.
+                    <div className="relative flex items-center justify-center gap-2 h-20 neu-inset rounded-xl text-sm font-semibold text-blue-600">
                       {photoBusy ? t('claims_photo_processing') : (
                         <><ClaimIcon name="camera" className="w-5 h-5" />{t('claims_photo_add')}</>
                       )}
-                    </label>
+                      <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange}
+                        disabled={photoBusy} aria-label={t('claims_photo_add')}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    </div>
                   )}
                 </div>
               </>
