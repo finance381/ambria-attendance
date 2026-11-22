@@ -155,9 +155,16 @@ export default function DailyAttendance() {
     loadData()
   }
 
-  // Stats
-  var stats = { total: filtered.length, Present: 0, Absent: 0, Incomplete: 0, 'Half Day': 0 }
-  filtered.forEach(function (r) {
+  // Stats: counted with the department and search filters but NOT the status
+  // filter, so clicking a status tile doesn't turn the other tiles to 0
+  var stats = { total: 0, Present: 0, Absent: 0, Incomplete: 0, 'Half Day': 0 }
+  records.forEach(function (r) {
+    if (deptFilter && String(r.department_id) !== deptFilter) return
+    if (search) {
+      var q = search.toLowerCase()
+      if (!r.name.toLowerCase().includes(q) && !r.emp_code.toLowerCase().includes(q)) return
+    }
+    stats.total++
     if (stats[r.status] !== undefined) stats[r.status]++
   })
 
