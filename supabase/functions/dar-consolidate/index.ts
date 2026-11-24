@@ -1,6 +1,33 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
+// Some employees format their DAR with WhatsApp "stylized text" generator
+// apps (small-caps look). Those aren't real letters — "ᴅᴀʀ" is Unicode
+// U+1D05/U+1D00/U+0280, not ASCII d/a/r — so .toLowerCase().includes('dar')
+// and the month-name regex both silently fail on them, dropping the whole
+// message with no error (found via Ravi Attri's 2026-11-21 DAR going missing
+// despite being sent on time, correctly dated, from the right number).
+const STYLIZED_SMALL_CAPS: Record<string, string> = {
+  'ᴀ': 'a', 'ʙ': 'b', 'ᴄ': 'c', 'ᴅ': 'd', 'ᴇ': 'e',
+  'ꜰ': 'f', 'ɢ': 'g', 'ʜ': 'h', 'ɪ': 'i', 'ᴊ': 'j',
+  'ᴋ': 'k', 'ʟ': 'l', 'ᴍ': 'm', 'ɴ': 'n', 'ᴏ': 'o',
+  'ᴘ': 'p', 'ꞯ': 'q', 'ʀ': 'r', 'ʁ': 'r', 'ꜱ': 's',
+  'ᴛ': 't', 'ᴜ': 'u', 'ᴠ': 'v', 'ᴡ': 'w', 'ʏ': 'y',
+  'ᴢ': 'z',
+  // Alternate glyphs some generators use instead of the above for f/q
+  'ғ': 'f', 'ǫ': 'q',
+}
+const STYLIZED_CHARS_REGEX = /[ɢɴʀʁʙʜʟʏᴀᴄᴅᴇᴊᴋᴍᴏᴘᴛᴜᴠ-ᴢɪꜰꜱꞯғǫ]/g
+
+function normalizeStylizedText(text: string): string {
+  // NFKC first folds most other stylized fonts (mathematical bold/italic,
+  // fullwidth, superscript) back to plain ASCII — Unicode gives those a
+  // compatibility decomposition. It does NOT cover the small-caps glyphs
+  // above (Unicode treats those as distinct phonetic symbols, not a font
+  // variant), which is why the manual table below still runs afterward.
+  return text.normalize('NFKC').replace(STYLIZED_CHARS_REGEX, ch => STYLIZED_SMALL_CAPS[ch] || ch)
+}
+
 const MONTH_MAP: Record<string, number> = {
   // Standard abbreviations
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
@@ -344,7 +371,7 @@ serve(async (req) => {
       for (const msg of messages) {
         if (msg.timestamp && parseInt(msg.timestamp) < cutoffEpoch) continue
 
-        const text = msg.text?.body || msg.text || ''
+        const text = normalizeStylizedText(msg.text?.body || msg.text || '')
         if (!isDARMessage(text)) continue
 
         // Extract sender phone (strip any @suffix: @s.whatsapp.net, @lid, etc.)
