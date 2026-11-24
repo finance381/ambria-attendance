@@ -377,6 +377,15 @@ serve(async (req) => {
         if (!submittedByDate[darDate]) submittedByDate[darDate] = new Map()
         const msgTs = parseInt(msg.timestamp || '0')
         const prev = submittedByDate[darDate].get(employee.emp_code)
+        // Two genuinely different messages (hours apart, not a retry/edit)
+        // resolving to the same darDate is the signature of someone's DAR
+        // getting mis-dated — e.g. copy-pasting yesterday's header — which
+        // silently erases whichever day loses this in-memory collision
+        // before a row is ever written. Surfacing it here (not at the DB
+        // upsert) is the only place this is visible at all.
+        if (prev !== undefined && msgTs > 0 && Math.abs(msgTs - prev) > 6 * 3600) {
+          console.log(`MULTI_DAR_SAME_DATE: ${employee.emp_code} darDate=${darDate} timestamps=${prev},${msgTs} header="${text.split('\n')[0].slice(0, 60)}"`)
+        }
         // Ignore malformed/duplicate entries with a missing or zero timestamp —
         // otherwise one bad entry permanently poisons the recorded send time to 0,
         // which downstream gets treated as "unknown" and miscounted as late.
@@ -423,8 +432,21 @@ serve(async (req) => {
     console.log(`submittedByDate[${d}]: ${codes.size} employees`)
   }
 
-  // Build report
+  // Build report. "Submitted" must include DARs that never came through
+  // WhatsApp at all — the in-app DAR writer (DARWriter.jsx) inserts straight
+  // into daily_reports — otherwise anyone using that screen instead of
+  // WhatsApp gets reported "missing" every single day regardless of what
+  // they actually submitted.
+  const { data: existingReports, error: existingReportsError } = await withRetry(() => supabase
+    .from('daily_reports')
+    .select('emp_code')
+    .eq('report_date', reportDate))
+  console.log(`Loaded ${existingReports?.length ?? 0} existing daily_reports rows for ${reportDate}`, existingReportsError ? `ERROR: ${existingReportsError.message}` : '')
+
   const todaySubmitted = submittedByDate[reportDate] || new Map()
+  for (const row of (existingReports || [])) {
+    if (!todaySubmitted.has(row.emp_code)) todaySubmitted.set(row.emp_code, 0)
+  }
   const todaySubmittedActive = new Set([...todaySubmitted.keys()].filter(c => allEmpCodes.has(c)))
   const todayMissing = [...allEmpCodes].filter(c => !todaySubmitted.has(c))
 
