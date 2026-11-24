@@ -118,8 +118,13 @@ export default function MobileShell() {
         </div>
       </header>
 
-      {/* Page content */}
-      <main className="relative z-10 px-4 py-5 max-w-lg mx-auto">
+      {/* Page content. No z-index here: giving `main` its own stacking
+          context used to trap every modal a page renders (e.g. a punch
+          detail sheet) below the header/bottom-nav — their z-50 only won
+          within main's own context, so the sheet's lower portion rendered
+          behind the nav bar instead of above it. Plain DOM order already
+          keeps this above the fixed background (z-0) without needing one. */}
+      <main className="relative px-4 py-5 max-w-lg mx-auto">
         <PullToRefresh>
           <Outlet />
         </PullToRefresh>
