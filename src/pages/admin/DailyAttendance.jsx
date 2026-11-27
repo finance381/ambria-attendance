@@ -533,14 +533,18 @@ export default function DailyAttendance() {
                   <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Overrides</h4>
                   <div className="space-y-2 mb-4">
                     {Object.keys(detailTarget.overrides).map(function (key) {
-                      var ov = detailTarget.overrides[key]
+                      var items = Array.isArray(detailTarget.overrides[key]) ? detailTarget.overrides[key] : [detailTarget.overrides[key]]
                       return (
-                        <div key={key} className="bg-blue-50 rounded-lg px-3 py-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-blue-700 uppercase">{key.replace('_', ' ')}</span>
-                            <span className="text-xs font-mono text-blue-800">{ov.value}</span>
-                          </div>
-                          <p className="text-[10px] text-blue-600 mt-0.5">Reason: {ov.reason}</p>
+                        <div key={key} className="bg-blue-50 rounded-lg px-3 py-2 space-y-1.5">
+                          <span className="text-[10px] font-bold text-blue-700 uppercase block">{key.replace('_', ' ')}</span>
+                          {items.map(function (ov, i) {
+                            return (
+                              <div key={i} className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] text-blue-600 flex-1">Reason: {ov.reason}</p>
+                                <span className="text-xs font-mono text-blue-800 shrink-0">{ov.value}</span>
+                              </div>
+                            )
+                          })}
                         </div>
                       )
                     })}
@@ -621,6 +625,8 @@ export default function DailyAttendance() {
 
               <p className="text-[10px] text-gray-400">
                 This override will be logged with your name and reason. It cannot be deleted.
+                {(overrideType === 'punch_in' || overrideType === 'punch_out') &&
+                  ' This adds a new punch — it does not replace an existing one. To correct a wrong punch, delete it first (trash icon on the punch row), then add the override.'}
               </p>
 
               <div className="flex justify-end gap-2 pt-1">
